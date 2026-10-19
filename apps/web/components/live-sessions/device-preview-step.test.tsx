@@ -311,3 +311,19 @@ describe('DevicePreviewStep', () => {
     });
   });
 });
+
+it('returns from ready-to-join without starting a session', async () => {
+  const onBack = vi.fn(),
+    onJoin = vi.fn();
+  render(
+    <DevicePreviewStep
+      displayName="Student"
+      sessionTitle="Class"
+      onJoin={onJoin}
+      onBack={onBack}
+    />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Back', exact: true }));
+  expect(onBack).toHaveBeenCalledOnce();
+  expect(onJoin).not.toHaveBeenCalled();
+});

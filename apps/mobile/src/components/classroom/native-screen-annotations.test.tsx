@@ -115,7 +115,9 @@ describe('native screen annotation delivery', () => {
         'auto',
       ),
     );
-    fireEvent.press(screen.getByLabelText('Laser pointer'));
+    expect(screen.getByLabelText('Laser pointer').props.accessibilityState.selected).toBe(
+      true,
+    );
     stroke(screen);
     await waitFor(() => expect(api.laser).toHaveBeenCalled());
     await waitFor(() =>
@@ -137,6 +139,7 @@ describe('native screen annotation delivery', () => {
         'auto',
       ),
     );
+    fireEvent.press(screen.getByLabelText('Pen'));
     stroke(screen);
     await waitFor(() => expect(api.save).toHaveBeenCalled());
     expect(api.save.mock.calls[0][1]).toMatchObject({
@@ -159,6 +162,7 @@ describe('native screen annotation delivery', () => {
         'auto',
       ),
     );
+    fireEvent.press(screen.getByLabelText('Pen'));
     stroke(screen);
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
@@ -184,6 +188,7 @@ describe('native screen annotation delivery', () => {
         'auto',
       ),
     );
+    fireEvent.press(screen.getByLabelText('Pen'));
     stroke(screen);
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
@@ -210,6 +215,7 @@ describe('native screen annotation delivery', () => {
     expect(
       screen.getByText('The host has turned off participant annotations.'),
     ).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Pen'));
     stroke(screen);
     expect(api.save).not.toHaveBeenCalled();
     expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
@@ -264,6 +270,7 @@ it('removes annotation totals and keeps Format separate from More actions', asyn
       'auto',
     ),
   );
+  fireEvent.press(screen.getByLabelText('Pen'));
   stroke(screen);
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   expect(screen.queryByText(/^\d+ annotations?$/)).toBeNull();
@@ -276,7 +283,7 @@ it('removes annotation totals and keeps Format separate from More actions', asyn
   fireEvent.press(screen.getByLabelText('Close annotation options'));
   expect(screen.queryByLabelText('Export annotations image')).toBeNull();
 });
-it('opens and closes a single launcher, stops drawing when collapsed, and reopens with the pen', async () => {
+it('opens and closes a single launcher, stops drawing when collapsed, and reopens with the laser pointer', async () => {
   const onToggle = jest.fn();
   const screen = render(
     <NativeScreenAnnotations
@@ -302,7 +309,9 @@ it('opens and closes a single launcher, stops drawing when collapsed, and reopen
       onToggle={onToggle}
     />,
   );
-  expect(screen.getByLabelText('Pen')).toBeTruthy();
+  expect(screen.getByLabelText('Laser pointer').props.accessibilityState.selected).toBe(
+    true,
+  );
   fireEvent.press(screen.getByLabelText('Close annotation toolbar'));
   screen.rerender(
     <NativeScreenAnnotations
@@ -327,6 +336,7 @@ it('applies staged formatting to a selection and persists the toolbar dock', asy
       'auto',
     ),
   );
+  fireEvent.press(screen.getByLabelText('Pen'));
   stroke(screen);
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
@@ -352,4 +362,23 @@ it('applies staged formatting to a selection and persists the toolbar dock', asy
     'annotation-toolbar',
     expect.stringContaining('"dock":"bottom"'),
   );
+});
+
+it('keeps the color picker closed after drawing and toggles it from the selected tool', async () => {
+  const { screen, api } = setup();
+  await waitFor(() =>
+    expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+      'auto',
+    ),
+  );
+  fireEvent.press(screen.getByLabelText('Pen'));
+  fireEvent.press(screen.getByLabelText('Close drawing styles'));
+  expect(screen.queryByLabelText('Close drawing styles')).toBeNull();
+  stroke(screen);
+  await waitFor(() => expect(api.save).toHaveBeenCalled());
+  expect(screen.queryByLabelText('Close drawing styles')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Pen'));
+  expect(screen.getByLabelText('Close drawing styles')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Pen'));
+  expect(screen.queryByLabelText('Close drawing styles')).toBeNull();
 });

@@ -1,3 +1,6 @@
+import { formatMeetingStudentNames } from '@iconicedu/utils';
+import { Check } from 'lucide-react-native';
+import { NativeClassroomError } from './native-classroom-error';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -57,9 +60,15 @@ export function NativeClassroomEntry({
   const guest = useRef<{ displayName: string; passcode: string } | null>(null);
 
   const [admissionToken, setAdmissionToken] = useState<string | undefined>();
-  const [selected, setSelected] = useState<string | undefined>();
+  const [previewName, setPreviewName] = useState('Choose a student');
+  const [selected, setSelected] = useState<string[]>([]);
   const load = useCallback(
-    async (studentProfileId?: string, admissionToken?: string) => {
+    async (
+      studentProfileId?: string | string[],
+      admissionToken?: string,
+      displayNameOverride?: string,
+      propagateError = false,
+    ) => {
       setLoading(true);
       setError(null);
       try {
@@ -108,28 +117,38 @@ export function NativeClassroomEntry({
             return;
           }
         }
-        if ((info.participant?.students?.length ?? 0) > 1 && !studentProfileId) {
+        const requestedIds =
+          typeof studentProfileId === 'string' ? [studentProfileId] : studentProfileId;
+        if ((info.participant?.students?.length ?? 0) > 1 && !requestedIds?.length) {
           setStudents(info.participant?.students ?? []);
           return;
         }
-        const joiningStudent =
-          studentProfileId ?? info.participant?.students?.[0]?.profileId;
-        if (joiningStudent) setSelected(joiningStudent);
+        const joiningStudents = requestedIds?.length
+          ? requestedIds
+          : info.participant?.students?.[0]
+            ? [info.participant.students[0].profileId]
+            : [];
+        setSelected(joiningStudents);
         const joinName = info.participant?.displayName ?? guest.current!.displayName;
         const requestToken =
           admissionToken ??
           (await nativeAdmissionToken(
             info.sessionId ?? sessionId,
             joinName,
-            joiningStudent,
+            joiningStudents.length === 1 ? joiningStudents[0] : joiningStudents,
             link.current,
           ));
         setAdmissionToken(requestToken);
         const result = await api.join(info.sessionId ?? sessionId, {
           displayName: joinName,
+          ...(displayNameOverride ? { displayNameOverride } : {}),
           passcode: info.participant ? '' : guest.current!.passcode,
           ...(link.current ? { linkToken: link.current } : {}),
-          studentProfileId: joiningStudent,
+          ...(joiningStudents.length === 1
+            ? { studentProfileId: joiningStudents[0] }
+            : joiningStudents.length
+              ? { studentProfileIds: joiningStudents }
+              : {}),
           admissionToken: requestToken,
         });
         setGuestForm(false);
@@ -144,11 +163,14 @@ export function NativeClassroomEntry({
           setAdmissionToken(result.admission.token);
         } else {
           setAdmission(null);
-          if (result.studentProfileId) setSelected(result.studentProfileId);
+          if (result.studentProfileIds) setSelected(result.studentProfileIds);
+          else if (result.studentProfileId) setSelected([result.studentProfileId]);
           setCredentials(result);
+          return result;
         }
       } catch (cause) {
         setError(cause instanceof Error ? cause.message : 'Unable to load the meeting.');
+        if (propagateError) throw cause;
       } finally {
         setLoading(false);
       }
@@ -169,7 +191,11 @@ export function NativeClassroomEntry({
           setError(null);
           if (status.status === 'approved') {
             clearInterval(timer);
-            void load(selected, status.token);
+            void load(
+              selected,
+              status.token,
+              students.length > 1 ? previewName : undefined,
+            );
           } else if (status.status !== 'waiting') {
             clearInterval(timer);
             setAdmission(status);
@@ -183,27 +209,115 @@ export function NativeClassroomEntry({
       active = false;
       clearInterval(timer);
     };
-  }, [admission, canonicalId, selected, load, api]);
-  if (credentials)
+  }, [admission, canonicalId, selected, load, api, students.length, previewName]);
+  if (credentials || (students.length > 1 && !admission))
     return (
       <NativeClassroom
         {...meetingProps}
         meetingApi={api}
         sessionId={canonicalId}
         title={title}
-        credentials={credentials}
+        credentials={credentials ?? undefined}
+        previewDisplayName={!credentials ? previewName : undefined}
+        studentChoices={
+          !credentials ? (
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: colors.text, fontWeight: '600' }}>
+                Who is joining?
+              </Text>
+              <Text style={{ color: colors.textMuted }}>
+                Select one or more students sharing this device.
+              </Text>
+              {students.map((student) => (
+                <Pressable
+                  key={student.profileId}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{
+                    checked: selected.includes(student.profileId),
+                    disabled: loading,
+                  }}
+                  disabled={loading}
+                  onPress={() => {
+                    const ids = selected.includes(student.profileId)
+                      ? selected.filter((id) => id !== student.profileId)
+                      : selected.length < 10
+                        ? [...selected, student.profileId]
+                        : selected;
+                    setSelected(ids);
+                    setAdmissionToken(undefined);
+                    setPreviewName(
+                      formatMeetingStudentNames(
+                        students
+                          .filter((student) => ids.includes(student.profileId))
+                          .map((student) => student.displayName),
+                      ) || 'Choose students',
+                    );
+                  }}
+                  style={{
+                    minHeight: 48,
+                    padding: 12,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: selected.includes(student.profileId)
+                      ? colors.action
+                      : colors.border,
+                    backgroundColor: colors.card,
+                  }}
+                >
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 5,
+                      borderWidth: 1,
+                      borderColor: colors.border,
+                      backgroundColor: selected.includes(student.profileId)
+                        ? colors.action
+                        : colors.card,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {selected.includes(student.profileId) && (
+                      <Check size={16} color={colors.actionForeground} />
+                    )}
+                  </View>
+                  <Text style={{ color: colors.text }}>{student.displayName}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : undefined
+        }
+        joinDisabled={!credentials && (!selected.length || loading)}
         hostEligible={hostEligible}
         onRejoin={() => {
           setCredentials(null);
           void load(selected, admissionToken);
         }}
         authorize={async (displayNameOverride) => {
+          if (!credentials) {
+            const result = await load(
+              selected,
+              admissionToken,
+              displayNameOverride ?? previewName,
+              true,
+            );
+            if (!result) throw new Error('Waiting for teacher approval');
+            return result;
+          }
           const result = await api.join(canonicalId, {
             displayName: credentials.displayName,
             displayNameOverride,
             passcode: guest.current?.passcode ?? '',
             ...(link.current ? { linkToken: link.current } : {}),
-            studentProfileId: selected,
+            ...(selected.length === 1
+              ? { studentProfileId: selected[0] }
+              : selected.length
+                ? { studentProfileIds: selected }
+                : {}),
             admissionToken,
           });
           if ('admission' in result) {
@@ -235,11 +349,7 @@ export function NativeClassroomEntry({
           Join classroom
         </Text>
         {loading && <ActivityIndicator accessibilityLabel="Loading meeting" />}
-        {error && (
-          <Text accessibilityRole="alert" style={{ color: colors.text }}>
-            {error}
-          </Text>
-        )}
+        {error && <NativeClassroomError message={error} />}
         {guestForm && !admission && (
           <View style={{ gap: 12, paddingVertical: 16 }}>
             <TextInput
@@ -314,20 +424,6 @@ export function NativeClassroomEntry({
                 : 'The meeting has ended.'}
           </Text>
         )}
-        {!admission &&
-          students.map((student) => (
-            <Pressable
-              accessibilityRole="button"
-              key={student.profileId}
-              onPress={() => {
-                setSelected(student.profileId);
-                void load(student.profileId);
-              }}
-              style={{ padding: 16 }}
-            >
-              <Text style={{ color: colors.text }}>{student.displayName}</Text>
-            </Pressable>
-          ))}
         {!loading && error && !admission && !guestForm && (
           <Pressable
             accessibilityRole="button"

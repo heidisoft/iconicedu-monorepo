@@ -39,7 +39,9 @@ function setup(joining = false) {
 }
 it('retains signed-in identity and requires explicit Join after preview', () => {
   const { props, screen } = setup();
-  expect(screen.getByDisplayValue('Test teacher')).toBeTruthy();
+  expect(
+    screen.getByLabelText('Change display name, currently Test teacher'),
+  ).toBeTruthy();
   expect(screen.getByText('Camera preview')).toBeTruthy();
   expect(props.onJoin).not.toHaveBeenCalled();
   expect(screen.queryByLabelText('Test audio and video')).toBeNull();
@@ -63,4 +65,12 @@ it.each([false, true])('centers the join label while joining is %s', (joining) =
     alignItems: 'center',
     justifyContent: 'center',
   });
+});
+
+it('edits the name with explicit save and cancel controls', () => {
+  const { props, screen } = setup();
+  fireEvent.press(screen.getByLabelText('Change display name, currently Test teacher'));
+  fireEvent.changeText(screen.getByLabelText('Your display name'), 'Edited name');
+  fireEvent.press(screen.getByLabelText('Save name'));
+  expect(props.onDisplayName).toHaveBeenCalledWith('Edited name');
 });

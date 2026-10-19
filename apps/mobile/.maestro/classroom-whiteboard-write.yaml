@@ -16,9 +16,9 @@ name: Write and draw on the real native whiteboard canvas and reopen saved conte
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
-    visible: 'Return to video'
+    visible: 'Expand whiteboard to full screen'
     timeout: 30000
-- tapOn: 'Draw'
+- tapOn: 'Pen'
 - swipe:
     start: '45%,45%'
     end: '60%,55%'
@@ -36,15 +36,15 @@ name: Write and draw on the real native whiteboard canvas and reopen saved conte
     visible:
       id: 'whiteboard-saved-elements-2'
     timeout: 30000
-- tapOn: 'Return to video'
-- assertNotVisible: 'Return to video'
+- runFlow: hide-classroom-whiteboard.yaml
+- assertNotVisible: 'Expand whiteboard to full screen'
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
     visible:
       id: 'whiteboard-saved-elements-2'
     timeout: 30000
-- tapOn: 'Return to video'
+- runFlow: hide-classroom-whiteboard.yaml
 - tapOn: 'Leave or end class'
 - tapOn: 'Leave'
 - assertVisible: 'You left the classroom'

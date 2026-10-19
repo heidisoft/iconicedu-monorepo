@@ -84,7 +84,13 @@ export class WhiteboardsService {
       Math.abs(viewport.centerY) > 10_000_000 ||
       !Number.isFinite(viewport.zoom) ||
       viewport.zoom < 0.1 ||
-      viewport.zoom > 30
+      viewport.zoom > 30 ||
+      (viewport.writing !== undefined &&
+        (!viewport.writing ||
+          !Number.isFinite(viewport.writing.x) ||
+          !Number.isFinite(viewport.writing.y) ||
+          Math.abs(viewport.writing.x) > 10_000_000 ||
+          Math.abs(viewport.writing.y) > 10_000_000))
     )
       throw new BadRequestException('Invalid whiteboard viewport');
     const { db } = await this.access(token);
@@ -95,6 +101,9 @@ export class WhiteboardsService {
           centerX: viewport.centerX,
           centerY: viewport.centerY,
           zoom: viewport.zoom,
+          ...(viewport.writing
+            ? { writing: { x: viewport.writing.x, y: viewport.writing.y } }
+            : {}),
         },
         viewport_updated_at: new Date().toISOString(),
       })
@@ -242,12 +251,12 @@ export class WhiteboardsService {
       // A lost stop response must be retryable after its presenter identity was cleared.
       if (op.type === 'presentation' && board.applied_operations.includes(op.id))
         return this.get(token);
-      if (op.type === 'presentation' && role !== 'teacher') {
+      if (op.type === 'presentation') {
         const owner = board.document.presentation;
         const self = hashWhiteboardToken(token).slice(0, 16);
         if (!op.enabled && owner?.presenterId !== self)
           throw new ForbiddenException(
-            'Only the presenter or a teacher can stop sharing',
+            'Only the person who started the whiteboard can stop sharing',
           );
         if (
           op.enabled &&

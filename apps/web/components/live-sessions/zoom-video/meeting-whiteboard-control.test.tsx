@@ -4,32 +4,7 @@ import { expect, it, vi } from 'vitest';
 import { TooltipProvider } from '@iconicedu/ui-web/ui/tooltip';
 import { MeetingWhiteboardControl } from './meeting-whiteboard-control';
 
-it.each([true, false])(
-  'stops directly when authorized, with visibility %s',
-  async (visible) => {
-    const user = userEvent.setup();
-    const onStop = vi.fn();
-    const onToggle = vi.fn();
-    render(
-      <TooltipProvider>
-        <MeetingWhiteboardControl
-          visible={visible}
-          presenting
-          canStop
-          onStop={onStop}
-          onToggle={onToggle}
-        />
-      </TooltipProvider>,
-    );
-    expect(screen.getAllByRole('button')).toHaveLength(1);
-    await user.click(screen.getByRole('button', { name: 'Stop presenting whiteboard' }));
-    expect(onStop).toHaveBeenCalledOnce();
-    expect(onToggle).not.toHaveBeenCalled();
-    expect(screen.queryByRole('menu')).toBeNull();
-  },
-);
-it('opens directly when the whiteboard is closed', async () => {
-  const user = userEvent.setup();
+it('allows anyone to start an inactive whiteboard', async () => {
   const onToggle = vi.fn();
   render(
     <TooltipProvider>
@@ -37,33 +12,82 @@ it('opens directly when the whiteboard is closed', async () => {
         visible={false}
         presenting={false}
         canStop={false}
-        onStop={vi.fn()}
         onToggle={onToggle}
+        onStop={vi.fn()}
       />
     </TooltipProvider>,
   );
-  await user.click(screen.getByRole('button', { name: 'Open whiteboard' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Start whiteboard' }));
   expect(onToggle).toHaveBeenCalledOnce();
 });
-it('does not hide the board or grant viewers permission to stop it', async () => {
-  const user = userEvent.setup();
+it.each([true, false])(
+  'offers local visibility and owner-only stop (owner %s)',
+  async (owner) => {
+    const onToggle = vi.fn(),
+      onStop = vi.fn();
+    render(
+      <TooltipProvider>
+        <MeetingWhiteboardControl
+          visible
+          presenting={owner}
+          canStop={owner}
+          onToggle={onToggle}
+          onStop={onStop}
+        />
+      </TooltipProvider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Whiteboard options' }));
+    expect(
+      screen.queryByRole('menuitem', { name: 'Stop sharing for everyone' }) !== null,
+    ).toBe(owner);
+    await userEvent.click(
+      screen.getByRole('menuitem', { name: 'Hide whiteboard for me' }),
+    );
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(onStop).not.toHaveBeenCalled();
+    if (owner) {
+      await userEvent.click(screen.getByRole('button', { name: 'Whiteboard options' }));
+      await userEvent.click(
+        screen.getByRole('menuitem', { name: 'Stop sharing for everyone' }),
+      );
+      expect(onStop).toHaveBeenCalledOnce();
+    }
+  },
+);
+it('reopens a locally hidden presentation without starting another one', async () => {
   const onToggle = vi.fn();
-  const onStop = vi.fn();
   render(
     <TooltipProvider>
       <MeetingWhiteboardControl
-        visible
+        active
+        visible={false}
         presenting={false}
         canStop={false}
-        onStop={onStop}
         onToggle={onToggle}
+        onStop={vi.fn()}
       />
     </TooltipProvider>,
   );
-  const button = screen.getByRole('button', { name: 'Whiteboard is being presented' });
-  expect(button).toBeDisabled();
-  await user.click(button);
+  await userEvent.click(screen.getByRole('button', { name: 'Whiteboard options' }));
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Show whiteboard' }));
+  expect(onToggle).toHaveBeenCalledOnce();
+});
+
+it('disables starting a whiteboard while screen sharing is active', async () => {
+  const onToggle = vi.fn();
+  render(
+    <TooltipProvider>
+      <MeetingWhiteboardControl
+        visible={false}
+        presenting={false}
+        canStop={false}
+        disabled
+        onToggle={onToggle}
+        onStop={vi.fn()}
+      />
+    </TooltipProvider>,
+  );
+  expect(screen.getByRole('button', { name: 'Start whiteboard' })).toBeDisabled();
+  await userEvent.click(screen.getByRole('button', { name: 'Start whiteboard' }));
   expect(onToggle).not.toHaveBeenCalled();
-  expect(onStop).not.toHaveBeenCalled();
-  expect(screen.queryByRole('menu')).toBeNull();
 });

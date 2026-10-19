@@ -36,8 +36,8 @@ name: Students cannot use host controls
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
-    visible: 'Return to video'
+    visible: 'Expand whiteboard to full screen'
     timeout: 30000
-- tapOn: 'Whiteboard options'
+- tapOn: 'More whiteboard actions'
 - assertNotVisible: 'Allow student editing'
 - assertNotVisible: 'Clear board'

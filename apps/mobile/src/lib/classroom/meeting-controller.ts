@@ -55,6 +55,8 @@ export type NativeMediaDevice = { id: string; label: string; selected: boolean }
 export type NativeMediaDevices = {
   cameras: NativeMediaDevice[];
   audio: NativeMediaDevice[];
+  microphones?: NativeMediaDevice[];
+  microphoneRouting?: 'independent' | 'linked';
   mirrored: boolean;
 };
 export interface NativeMeetingAdapter {
@@ -75,6 +77,7 @@ export interface NativeMeetingAdapter {
   devices?(): Promise<NativeMediaDevices>;
   selectCamera?(id: string): Promise<void>;
   selectAudioRoute?(id: string): Promise<void>;
+  selectMicrophone?(id: string): Promise<void>;
   mirror?(enabled: boolean): Promise<void>;
   shareMode?(): Promise<NativeShareMode>;
   setShareMode?(mode: NativeShareMode): Promise<void>;
@@ -171,9 +174,9 @@ export class NativeMeetingController {
   settings: LiveSessionSettingsVM;
   constructor(
     readonly adapter: NativeMeetingAdapter,
-    readonly credentials: LiveSessionJoinCredentialsVM,
+    readonly credentials?: LiveSessionJoinCredentialsVM,
   ) {
-    this.settings = credentials.settings ?? DEFAULT_LIVE_SESSION_SETTINGS;
+    this.settings = credentials?.settings ?? DEFAULT_LIVE_SESSION_SETTINGS;
   }
   subscribe = (listener: () => void) => {
     this.listeners.add(listener);
@@ -191,6 +194,7 @@ export class NativeMeetingController {
     if (this.state.phase === 'preview') this.update(options);
   }
   async join(credentials = this.credentials) {
+    if (!credentials) throw new Error('Join authorization is required.');
     if (this.busy || this.state.phase !== 'preview' || this.disposed) return;
     this.busy = true;
     this.settings = credentials.settings ?? DEFAULT_LIVE_SESSION_SETTINGS;

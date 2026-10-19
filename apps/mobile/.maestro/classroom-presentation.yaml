@@ -20,27 +20,28 @@ name: Presentation visibility expansion and recording status
     direction: UP
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
-    visible: 'Draw'
+    visible: 'Pen'
     timeout: 30000
 - assertVisible: 'More controls'
 - tapOn: 'Expand whiteboard to full screen'
 - extendedWaitUntil:
-    visible: 'Draw'
+    visible: 'Pen'
     timeout: 30000
 - assertVisible: 'Collapse whiteboard'
 - assertVisible: 'Recording active'
 - tapOn: 'Collapse whiteboard'
 - assertVisible: 'More controls'
-- tapOn: 'Return to video'
-- assertNotVisible: 'Return to video'
+- runFlow: hide-classroom-whiteboard.yaml
+- assertNotVisible: 'Expand whiteboard to full screen'
 - runFlow: open-classroom-controls.yaml
-- tapOn: 'Return to whiteboard'
-- assertVisible: 'Return to video'
-- tapOn: 'Whiteboard options'
-- assertVisible: 'Stop presenting board'
-- tapOn: 'Stop presenting board'
+- tapOn: 'Whiteboard'
+- tapOn: 'Show whiteboard'
+- assertVisible: 'Expand whiteboard to full screen'
+- tapOn: 'More whiteboard actions'
+- assertVisible: 'Stop sharing for everyone'
+- tapOn: 'Stop sharing for everyone'
 - extendedWaitUntil:
-    notVisible: 'Return to video'
+    notVisible: 'Expand whiteboard to full screen'
     timeout: 10000
 - tapOn: 'Leave or end class'
 - tapOn: 'Leave'

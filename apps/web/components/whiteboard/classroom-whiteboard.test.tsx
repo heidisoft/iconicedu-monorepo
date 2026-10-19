@@ -26,7 +26,21 @@ vi.mock('./use-whiteboard', () => ({
     changeElements: vi.fn(),
   }),
 }));
-it('offers tutor following by default and lets participants select peers or explore freely', async () => {
+it('offers an icon-only one-time tutor focus with a tooltip', async () => {
+  render(
+    <ClassroomWhiteboard
+      token="synthetic-token"
+      repository={{ load: vi.fn(), save: vi.fn() }}
+    />,
+  );
+  const focus = screen.getByRole('button', { name: 'Focus tutor' });
+  expect(focus).toHaveAttribute('title', 'Focus tutor’s current view');
+  expect(focus).not.toHaveAttribute('aria-pressed');
+  expect(focus).not.toHaveTextContent('Focus tutor');
+  await userEvent.click(focus);
+  expect(screen.queryByRole('button', { name: 'Follow viewport' })).toBeNull();
+});
+it('keeps Saved and board options inside toolbar More and exposes a direct tutor toggle', async () => {
   const user = userEvent.setup();
   render(
     <ClassroomWhiteboard
@@ -34,19 +48,12 @@ it('offers tutor following by default and lets participants select peers or expl
       repository={{ load: vi.fn(), save: vi.fn() }}
     />,
   );
-  await user.click(screen.getByRole('button', { name: 'Follow viewport' }));
-  expect(screen.getByRole('menuitemradio', { name: 'Tutor (default)' })).toHaveAttribute(
-    'aria-checked',
-    'true',
-  );
-  expect(screen.queryByRole('menuitemradio', { name: 'Me' })).toBeNull();
-  await user.click(screen.getByRole('menuitemradio', { name: 'Peer' }));
-  expect(screen.getByRole('button', { name: 'Follow viewport' })).toHaveTextContent(
-    'Follow Peer',
-  );
-  await user.click(screen.getByRole('button', { name: 'Follow viewport' }));
-  await user.click(screen.getByRole('menuitemradio', { name: 'Explore freely' }));
-  expect(screen.getByRole('button', { name: 'Follow viewport' })).toHaveTextContent(
-    'Explore freely',
-  );
+  expect(screen.queryByText('Saved')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Board options' })).toBeNull();
+  const follow = screen.getByRole('button', { name: 'Focus tutor', exact: true });
+  await user.click(follow);
+  await user.click(follow);
+  await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
+  expect(screen.getByRole('status')).toHaveTextContent('Saved');
+  expect(screen.getByRole('menuitem', { name: 'Export PNG' })).toBeTruthy();
 });

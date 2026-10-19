@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase/client';
 export async function nativeAdmissionToken(
   sessionId: string,
   displayName: string,
-  studentProfileId?: string,
+  studentProfileId?: string | string[],
   linkToken?: string,
 ): Promise<string> {
   const {
@@ -15,7 +15,11 @@ export async function nativeAdmissionToken(
   const identity = JSON.stringify([
     session?.user.id ?? null,
     displayName,
-    studentProfileId ?? null,
+    Array.isArray(studentProfileId)
+      ? studentProfileId.length === 1
+        ? studentProfileId[0]
+        : [...studentProfileId].sort()
+      : (studentProfileId ?? null),
     linkToken ?? null,
   ]);
   const storageKey = `classroom.admission.${sessionId.replace(/[^a-zA-Z0-9._-]/g, '_')}`;

@@ -72,6 +72,8 @@ export interface WhiteboardViewportVM {
   centerX: number;
   centerY: number;
   zoom: number;
+  /** Active scene-space writing position; ephemeral, never saved in the drawing. */
+  writing?: { x: number; y: number };
 }
 export interface WhiteboardViewportPresenceVM {
   actorId: string;

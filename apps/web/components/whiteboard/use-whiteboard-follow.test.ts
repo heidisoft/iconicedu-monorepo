@@ -32,10 +32,11 @@ it('defaults to the tutor, switches participants, and stops following in free mo
   );
   await act(async () => {});
   expect(result.current.following).toBe('tutor');
-  expect(receive).toHaveBeenLastCalledWith(tutor);
+  expect(receive).toHaveBeenLastCalledWith(tutor, expect.any(String));
+  const firstSource = receive.mock.calls[0][1];
   act(() => result.current.setFollowing('peer'));
   await act(async () => {});
-  expect(receive).toHaveBeenLastCalledWith(peer);
+  expect(receive).toHaveBeenLastCalledWith(peer, expect.any(String));
   act(() => result.current.setFollowing('free'));
   await act(async () => {});
   receive.mockClear();
@@ -45,6 +46,9 @@ it('defaults to the tutor, switches participants, and stops following in free mo
   });
   expect(repository.publishViewport).toHaveBeenCalledWith(tutor);
   expect(receive).not.toHaveBeenCalled();
+  act(() => result.current.setFollowing('tutor'));
+  await act(async () => {});
+  expect(receive.mock.calls[receive.mock.calls.length - 1][1]).not.toBe(firstSource);
   unmount();
   const calls = repository.viewports.mock.calls.length;
   await act(async () => {
@@ -75,7 +79,7 @@ it('ignores expired viewport samples', async () => {
   unmount();
 });
 
-it('continues following when publishing the local viewport fails', async () => {
+it('focuses only once while continuing to publish local viewports', async () => {
   vi.useFakeTimers();
   const viewport = { centerX: 300, centerY: 400, zoom: 2 };
   const repository = {
@@ -97,7 +101,10 @@ it('continues following when publishing the local viewport fails', async () => {
     vi.advanceTimersByTime(500);
   });
   expect(repository.publishViewport).toHaveBeenCalled();
-  expect(receive).toHaveBeenCalledWith(viewport);
+  expect(receive).not.toHaveBeenCalled();
+  act(() => result.current.focusTutor());
+  await act(async () => {});
+  expect(receive).toHaveBeenCalledWith(viewport, expect.any(String));
   expect(result.current.status).toBe('following');
   unmount();
   vi.useRealTimers();
@@ -126,6 +133,6 @@ it('follows the currently publishing tutor after a capability changes on rejoin'
     useWhiteboardFollow('token', repository, current, true, receive),
   );
   await act(async () => {});
-  expect(receive).toHaveBeenCalledWith(viewport);
+  expect(receive).toHaveBeenCalledWith(viewport, expect.any(String));
   unmount();
 });

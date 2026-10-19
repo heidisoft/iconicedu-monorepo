@@ -12,9 +12,9 @@ appId: com.heidisoft.iconicedu
 - scrollUntilVisible:
     element: 'Whiteboard'
 - tapOn: 'Whiteboard'
-- tapOn: 'Whiteboard options'
+- tapOn: 'More whiteboard actions'
 - extendedWaitUntil:
-    visible: 'Stop presenting board'
+    visible: 'Stop sharing for everyone'
     timeout: 30000
 - tapOn: 'Allow student editing'
 - assertVisible: 'Disable student editing'

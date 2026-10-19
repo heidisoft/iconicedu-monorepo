@@ -28,3 +28,56 @@ it('shows the current custom color and sends native style choices', () => {
   fireEvent.click(screen.getByRole('button', { name: 'More style options' }));
   expect(onMore).toHaveBeenCalledOnce();
 });
+
+it('closes and reopens the picker without changing the selected tool style', () => {
+  const onClose = vi.fn(),
+    onStyle = vi.fn();
+  render(
+    <DrawingStyleStrip
+      color="#123456"
+      width={2}
+      fill="transparent"
+      showWidth
+      showFill
+      optionsOpen={false}
+      onMore={vi.fn()}
+      onStyle={onStyle}
+      onClose={onClose}
+    />,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Close drawing styles' }));
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(screen.queryByRole('button', { name: 'Stroke color #123456' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Show drawing styles' }));
+  expect(screen.getByRole('button', { name: 'Stroke color #123456' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  expect(onStyle).not.toHaveBeenCalled();
+});
+
+it('preserves palette order while highlighting the picked color', () => {
+  const props = {
+    color: '#e03131',
+    width: 2,
+    fill: 'transparent',
+    showWidth: true,
+    showFill: true,
+    optionsOpen: false,
+    onStyle: vi.fn(),
+    onMore: vi.fn(),
+  };
+  const view = render(<DrawingStyleStrip {...props} />);
+  const order = () =>
+    screen
+      .getAllByRole('button')
+      .map((button) => button.getAttribute('aria-label'))
+      .filter((label) => label?.startsWith('Stroke color'));
+  const before = order();
+  view.rerender(<DrawingStyleStrip {...props} color="#1971c2" />);
+  expect(order()).toEqual(before);
+  expect(screen.getByRole('button', { name: 'Stroke color #1971c2' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+});

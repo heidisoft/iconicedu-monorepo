@@ -3,9 +3,9 @@ name: Release the dedicated live test meeting after a failed journey
 ---
 - runFlow:
     when:
-      visible: 'Return to video'
+      visible: 'Expand whiteboard to full screen'
     commands:
-      - tapOn: 'Return to video'
+      - runFlow: hide-classroom-whiteboard.yaml
 - runFlow:
     when:
       visible: 'Leave class|Leave or end class|End class'

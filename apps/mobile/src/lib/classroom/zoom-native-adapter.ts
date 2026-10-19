@@ -445,10 +445,11 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
       );
     },
     async devices() {
-      const [cameras, mirrored, audio] = await Promise.all([
+      const [cameras, mirrored, audio, microphones] = await Promise.all([
         zoom.videoHelper.getCameraList(),
         zoom.videoHelper.isMyVideoMirrored(),
         NativeModules.ClassroomDevices?.getAudioRoutes() ?? Promise.resolve([]),
+        NativeModules.ClassroomDevices?.getAudioInputs?.() ?? Promise.resolve(null),
       ]);
       return {
         cameras: cameras.map((device) => ({
@@ -458,6 +459,16 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
         })),
         mirrored,
         audio: audio as NativeMediaDevice[],
+        microphones: (microphones ??
+          (audio as NativeMediaDevice[]).map((device) => ({
+            ...device,
+            label: ['Speaker', 'Earpiece'].includes(device.label)
+              ? `Built-in microphone (${device.label.toLowerCase()})`
+              : device.label === 'MicrophoneBuiltIn'
+                ? 'Built-in microphone'
+                : device.label,
+          }))) as NativeMediaDevice[],
+        microphoneRouting: microphones ? 'independent' : 'linked',
       };
     },
     async selectCamera(id) {
@@ -475,6 +486,23 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
           PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
         );
       checked(await NativeModules.ClassroomDevices.selectAudioRoute(id));
+    },
+    async selectMicrophone(id) {
+      if (NativeModules.ClassroomDevices?.selectAudioInput) {
+        if (Platform.OS === 'ios')
+          checked(await zoom.audioHelper.setSDKAudioSessionEnv());
+        checked(await NativeModules.ClassroomDevices.selectAudioInput(id));
+      } else {
+        if (!NativeModules.ClassroomDevices?.selectAudioRoute)
+          throw new Error('Update the app to select audio devices.');
+        if (Platform.OS === 'ios')
+          checked(await zoom.audioHelper.setSDKAudioSessionEnv());
+        if (Platform.OS === 'android' && Number(Platform.Version) >= 31)
+          await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+          );
+        checked(await NativeModules.ClassroomDevices.selectAudioRoute(id));
+      }
     },
     async switchCamera() {
       checked(await zoom.videoHelper.switchCamera());

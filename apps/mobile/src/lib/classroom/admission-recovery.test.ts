@@ -65,3 +65,17 @@ it('rotates request identity when the signed-in account changes', async () => {
   } as Awaited<ReturnType<typeof supabase.auth.getSession>>);
   expect(await nativeAdmissionToken('meeting', 'Same name')).not.toBe(first);
 });
+
+it('binds approval recovery to the complete student set, independent of selection order', async () => {
+  const first = await nativeAdmissionToken('meeting', 'Parent', [
+    'student-one',
+    'student-two',
+  ]);
+  jest
+    .mocked(SecureStore.getItemAsync)
+    .mockResolvedValue(jest.mocked(SecureStore.setItemAsync).mock.calls[0][1]);
+  expect(
+    await nativeAdmissionToken('meeting', 'Parent', ['student-two', 'student-one']),
+  ).toBe(first);
+  expect(await nativeAdmissionToken('meeting', 'Parent', 'student-one')).not.toBe(first);
+});

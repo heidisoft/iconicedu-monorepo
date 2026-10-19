@@ -162,3 +162,34 @@ it('allows a student to start and stop their own presentation without enabling d
   );
   expect(result.current.active).toBe(false);
 });
+
+it('does not allow a tutor to stop another participant presentation', async () => {
+  const f = fixture('teacher', {
+    ...snapshot,
+    actorId: 'tutor',
+    presentationActive: true,
+    document: {
+      ...snapshot.document,
+      presentation: {
+        presenterId: 'student',
+        presentationId: 'share',
+        sessionId: 'session',
+      },
+    },
+  });
+  const { result } = renderHook(() =>
+    useNativeWhiteboardFeature(
+      { provider: 'excalidraw', token: 'capability', role: 'teacher' },
+      true,
+      true,
+      f.repository,
+      f.collaboration,
+    ),
+  );
+  expect(result.current.canStop).toBe(false);
+  await act(async () => result.current.stop());
+  expect(f.repository.save).not.toHaveBeenCalled();
+  await act(async () => result.current.toggle());
+  expect(result.current.open).toBe(false);
+  expect(result.current.active).toBe(true);
+});

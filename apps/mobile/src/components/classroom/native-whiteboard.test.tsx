@@ -154,6 +154,7 @@ describe('native collaborative whiteboard recovery', () => {
         },
       });
     });
+    fireEvent.press(screen.getByLabelText('More whiteboard actions'));
     await waitFor(() => expect(screen.getByText('Retry saving')).toBeTruthy());
     expect(FileSystem.writeAsStringAsync).not.toHaveBeenCalled();
     expect(Sharing.shareAsync).not.toHaveBeenCalled();
@@ -168,6 +169,7 @@ describe('native collaborative whiteboard recovery', () => {
     fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
       nativeEvent: { data: JSON.stringify({ type: 'elements', elements: [element] }) },
     });
+    fireEvent.press(screen.getByLabelText('More whiteboard actions'));
     await waitFor(() => expect(screen.getByText('Retry saving')).toBeTruthy());
     const first = jest.mocked(capabilityPost).mock.calls[0][2];
     fireEvent.press(screen.getByText('Retry saving'));
@@ -225,13 +227,13 @@ it('fills the board without a heading and exposes options through floating contr
   await waitFor(() => expect(screen.getByTestId('drawing-canvas')).toBeTruthy());
   expect(screen.queryByText('Class whiteboard')).toBeNull();
   expect(screen.queryByText('Allow student editing')).toBeNull();
-  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   expect(screen.getByText('Allow student editing')).toBeTruthy();
   expect(screen.getByLabelText('Library')).toBeTruthy();
-  fireEvent.press(screen.getByLabelText('Close whiteboard options'));
+  fireEvent.press(screen.getByLabelText('Close More whiteboard actions'));
   expect(screen.queryByText('Allow student editing')).toBeNull();
-  fireEvent.press(screen.getByLabelText('Return to video'));
-  expect(onClose).toHaveBeenCalledTimes(1);
+  expect(screen.queryByLabelText('Return to video')).toBeNull();
+  expect(onClose).not.toHaveBeenCalled();
 });
 
 it('routes native library and export options to the canvas without sharing capabilities', async () => {
@@ -246,7 +248,7 @@ it('routes native library and export options to the canvas without sharing capab
   expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
     'window.classroomCommand?.({"type":"library"}); true;',
   );
-  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   fireEvent.press(screen.getByText('Export whiteboard image'));
   expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
     'window.classroomAction?.("export"); true;',
@@ -261,7 +263,7 @@ it('explains view-only permissions without showing teacher editing controls', as
   });
   const screen = render(<NativeWhiteboard token="synthetic" embedded />);
   await waitFor(() => expect(screen.getByTestId('drawing-canvas')).toBeTruthy());
-  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   expect(screen.getByText('View only. Ask the host to allow editing.')).toBeTruthy();
   expect(screen.queryByText('Allow student editing')).toBeNull();
 });
@@ -324,7 +326,7 @@ it.each(['drawing', 'retrying', 'saving'] as const)(
       expect(repository.load).toHaveBeenCalledTimes(2);
       if (phase === 'retrying')
         expect(screen.getByRole('alert')).toHaveTextContent(
-          'Changes are waiting to save. Keep this board open and tap Retry.',
+          /Changes are waiting to save\. Keep this board open and tap Retry\./,
         );
       await act(async () =>
         finishSave({ ...value, revision: 1, presentationActive: true }),
@@ -365,29 +367,27 @@ it('offers tutor following by default and participant or free navigation choices
   });
   await act(async () => {});
   expect(mockInjectJavaScript).toHaveBeenCalledWith(
-    expect.stringContaining('classroomViewport?.({"centerX":30,"centerY":40,"zoom":2})'),
+    expect.stringContaining(
+      'classroomViewport?.({"centerX":30,"centerY":40,"zoom":2}, "tutor:1")',
+    ),
   );
-  fireEvent.press(screen.getByLabelText('Whiteboard options'));
-  expect(
-    screen.getByRole('radio', { name: '✓ Follow tutor (default)', checked: true }),
-  ).toBeTruthy();
-  fireEvent.press(screen.getByLabelText('Follow Peer'));
-  expect(screen.getByRole('radio', { name: 'Follow Peer', checked: true })).toBeTruthy();
-  fireEvent.press(screen.getByRole('radio', { name: 'Explore freely' }));
-  expect(
-    screen.getByRole('radio', { name: '✓ Explore freely', checked: true }),
-  ).toBeTruthy();
+  expect(screen.queryByLabelText('Follow viewport')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Focus tutor'));
   await act(async () => {});
+  expect(repository.viewports).toHaveBeenCalledTimes(2);
 });
 
-it('keeps save status and participant presence visible outside options', async () => {
+it('keeps save status and participant presence inside More', async () => {
   jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
   jest.mocked(capabilityGet).mockResolvedValue({
     ...snapshot,
     presence: [{ id: 'teacher', name: 'Teacher Person', role: 'teacher' }],
   });
   const screen = render(<NativeWhiteboard token="fixture" />);
-  await waitFor(() => expect(screen.getByText('Saved')).toBeTruthy());
+  await act(async () => {});
+  expect(screen.queryByText('Saved')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
+  expect(screen.getByText('Saved')).toBeTruthy();
   expect(screen.getByLabelText('Whiteboard participants: Teacher Person')).toBeTruthy();
   expect(screen.getByText('TP')).toBeTruthy();
 });
@@ -396,7 +396,7 @@ it('exports SVG through a separate canvas action', async () => {
   jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
   const screen = render(<NativeWhiteboard token="fixture" />);
   await act(async () => {});
-  fireEvent.press(screen.getByLabelText('Whiteboard options'));
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   fireEvent.press(screen.getByLabelText('Export whiteboard SVG'));
   expect(mockInjectJavaScript).toHaveBeenCalledWith(
     'window.classroomAction?.("export-svg"); true;',
@@ -429,8 +429,8 @@ it('exports queued edits and discards them only after confirmation and successfu
   fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
     nativeEvent: { data: JSON.stringify({ type: 'elements', elements: [element] }) },
   });
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   await waitFor(() => expect(screen.getByText('Unsaved · retrying')).toBeTruthy());
-  fireEvent.press(screen.getByLabelText('Whiteboard options'));
   await act(async () => fireEvent.press(screen.getByLabelText('Download unsaved edits')));
   expect(FileSystem.writeAsStringAsync).toHaveBeenCalledWith(
     expect.stringMatching(/\.json$/),
@@ -446,14 +446,98 @@ it('exports queued edits and discards them only after confirmation and successfu
   expect(AsyncStorage.removeItem).toHaveBeenCalledWith('classroom-drawing:board:teacher');
   alert.mockRestore();
 });
-it('explores freely and resumes tutor follow without opening board options', async () => {
+it('toggles tutor following directly from the toolbar without opening More', async () => {
   jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
   jest.mocked(capabilityGet).mockResolvedValue(snapshot);
   const screen = render(<NativeWhiteboard token="fixture" />);
   await act(async () => {});
-  fireEvent.press(screen.getByLabelText('Explore whiteboard freely'));
-  expect(screen.getByText('Exploring freely')).toBeTruthy();
-  expect(screen.queryByLabelText('Close whiteboard options')).toBeNull();
-  fireEvent.press(screen.getByLabelText('Resume following tutor'));
-  expect(screen.getByText('Following tutor · waiting for their view')).toBeTruthy();
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: { data: '{"type":"ready"}' },
+  });
+  expect(
+    screen.getByLabelText('Focus tutor').props.accessibilityState.selected,
+  ).toBeUndefined();
+  fireEvent.press(screen.getByLabelText('Focus tutor'));
+  expect(
+    screen.getByLabelText('Focus tutor').props.accessibilityState.selected,
+  ).toBeUndefined();
+  expect(screen.queryByLabelText('Close More whiteboard actions')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Focus tutor'));
+  expect(
+    screen.getByLabelText('Focus tutor').props.accessibilityState.selected,
+  ).toBeUndefined();
+});
+
+it('does not offer tutors a stop action for another participant board', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue({
+    ...snapshot,
+    role: 'teacher',
+    actorId: 'tutor',
+    presentationActive: true,
+    document: {
+      ...snapshot.document,
+      presentation: {
+        presenterId: 'student',
+        presentationId: 'share',
+        sessionId: 'session',
+      },
+    },
+  });
+  const screen = render(<NativeWhiteboard token="synthetic" />);
+  await act(async () => {});
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
+  expect(screen.queryByText('Stop sharing for everyone')).toBeNull();
+  expect(screen.queryByText('Present board')).toBeNull();
+});
+
+it('keeps the WebView source stable while drawing updates toolbar state', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  const screen = render(<NativeWhiteboard token="synthetic" />);
+  await waitFor(() => expect(screen.getByTestId('drawing-canvas')).toBeTruthy());
+  const source = screen.getByTestId('drawing-canvas').props.source;
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: { data: JSON.stringify({ type: 'ready' }) },
+  });
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: {
+      data: JSON.stringify({
+        type: 'tool-state',
+        tool: 'freedraw',
+        color: '#e03131',
+        width: 2,
+        fill: 'transparent',
+      }),
+    },
+  });
+  expect(screen.getByTestId('drawing-canvas').props.source).toBe(source);
+  fireEvent.press(screen.getByLabelText('Close drawing styles'));
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: {
+      data: JSON.stringify({
+        type: 'tool-state',
+        tool: 'freedraw',
+        color: '#e03131',
+        width: 3,
+        fill: 'transparent',
+      }),
+    },
+  });
+  expect(screen.queryByLabelText('Stroke color #e03131')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Pen'));
+  expect(screen.getByLabelText('Stroke color #e03131')).toBeTruthy();
+  expect(screen.getByTestId('drawing-canvas').props.source).toBe(source);
+});
+
+it('offers expand and collapse using the fullscreen control without an on-canvas hide action', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  const onExpand = jest.fn();
+  const props = { token: 'synthetic', onExpand };
+  const screen = render(<NativeWhiteboard {...props} />);
+  await waitFor(() => expect(screen.getByTestId('drawing-canvas')).toBeTruthy());
+  fireEvent.press(screen.getByLabelText('Expand whiteboard to full screen'));
+  expect(onExpand).toHaveBeenCalledTimes(1);
+  screen.rerender(<NativeWhiteboard {...props} expanded />);
+  fireEvent.press(screen.getByLabelText('Collapse whiteboard'));
+  expect(onExpand).toHaveBeenCalledTimes(2);
+  expect(screen.queryByLabelText('Return to video')).toBeNull();
 });

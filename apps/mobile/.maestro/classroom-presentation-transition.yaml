@@ -11,9 +11,9 @@ name: Remote whiteboard stop followed by a peer screen share
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
-    visible: 'Draw'
+    visible: 'Pen'
     timeout: 30000
-- tapOn: 'Draw'
+- tapOn: 'Pen'
 - swipe:
     start: '30%,40%'
     end: '45%,50%'
@@ -23,14 +23,14 @@ name: Remote whiteboard stop followed by a peer screen share
     timeout: 10000
 - tapOn: 'Fixture remote whiteboard stop'
 - extendedWaitUntil:
-    notVisible: 'Return to video'
+    notVisible: 'Expand whiteboard to full screen'
     timeout: 10000
 - tapOn: 'Fixture start peer screen share'
 - extendedWaitUntil:
     visible:
       id: 'classroom-shared-screen'
     timeout: 10000
-- assertNotVisible: 'Return to video'
+- assertNotVisible: 'Expand whiteboard to full screen'
 - tapOn: 'Expand shared screen to full screen'
 - assertVisible: 'Collapse shared screen'
 - tapOn: 'Collapse shared screen'

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { LaserPointerIcon } from '@iconicedu/ui-web/ui/laser-pointer-icon';
 import {
   ArrowUpRight,
@@ -64,6 +64,8 @@ export function WhiteboardToolbar({
   canClear = editable,
   onLibrary,
   libraryOpen,
+  followControl,
+  moreContent,
 }: {
   engine: WhiteboardEngine | null;
   editable: boolean;
@@ -73,6 +75,8 @@ export function WhiteboardToolbar({
   canClear?: boolean;
   onLibrary?: () => void;
   libraryOpen?: boolean;
+  followControl?: ReactNode;
+  moreContent?: ReactNode;
 }) {
   const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
   const [snap, setSnap] = useState(false);
@@ -251,6 +255,7 @@ export function WhiteboardToolbar({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {followControl}
       <DropdownMenu {...menuProps('more')}>
         <DropdownMenuTrigger asChild>
           <Button
@@ -269,6 +274,8 @@ export function WhiteboardToolbar({
           align="end"
         >
           <DropdownMenuLabel>More actions</DropdownMenuLabel>
+          {moreContent}
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             className="min-h-11"
             disabled={!engine || !editable}

@@ -25,16 +25,19 @@ import {
   Square,
   ShieldCheck,
   Maximize2,
-  ChevronRight,
 } from 'lucide-react-native';
 import { NativeMeetingSheet } from './native-meeting-sheets';
 import { useTheme } from '@/providers/theme-provider';
 
 const primary = (label: string) => {
   if (label === 'Mute microphone') return { Icon: Mic, active: true };
-  if (label === 'Unmute microphone') return { Icon: MicOff, active: false };
+  if (label === 'Unmute microphone') return { Icon: MicOff, active: false, muted: true };
   if (label === 'Stop video') return { Icon: Video, active: true };
-  if (label === 'Start video') return { Icon: VideoOff, active: false };
+  if (label === 'Start video') return { Icon: VideoOff, active: false, muted: true };
+  if (label === 'Whiteboard' || label === 'Return to whiteboard')
+    return { Icon: Presentation, active: false };
+  if (label === 'Annotate screen' || label === 'Stop annotating')
+    return { Icon: Pencil, active: label.startsWith('Stop') };
   if (label === 'Share screen') return { Icon: MonitorUp, active: false };
   if (label === 'Stop sharing screen') return { Icon: MonitorX, active: true };
   if (label === 'Leave class' || label === 'Leave or end class')
@@ -92,18 +95,15 @@ type ActionProps = {
   accessibilityLabel: string;
   onPress: () => void;
   disabled?: boolean;
+  accessibilityState?: { selected?: boolean };
 };
 /** Keep the call bar compact; secondary actions live in a native sheet. */
 export function NativeMeetingToolbar({
   children,
   more,
-  onAudioSettings,
-  onVideoSettings,
 }: {
   children: React.ReactNode;
   more?: React.ReactNode;
-  onAudioSettings?: () => void;
-  onVideoSettings?: () => void;
 }) {
   const { colors } = useTheme();
   const [expanded, setExpanded] = useState(false);
@@ -115,117 +115,97 @@ export function NativeMeetingToolbar({
   };
   const actions = Children.toArray(children).filter(isValidElement<ActionProps>);
   const pinned = (label: string) =>
-    /^(Mute microphone|Unmute microphone|Stop video|Start video|Share screen|Stop sharing screen|Leave class|Leave or end class|End class)/.test(
+    /^(Mute microphone|Unmute microphone|Stop video|Start video|Share screen|Stop sharing screen|Whiteboard|Return to whiteboard|Annotate screen|Stop annotating|Leave class|Leave or end class|End class)/.test(
       label,
     );
+  const priority = (label: string) =>
+    label.includes('microphone')
+      ? 0
+      : label === 'Start video' || label === 'Stop video'
+        ? 1
+        : label.includes('whiteboard') || label === 'Whiteboard'
+          ? 2
+          : label.includes('annotat')
+            ? 3
+            : label.includes('screen')
+              ? 4
+              : 5;
+  actions.sort(
+    (a, b) => priority(a.props.accessibilityLabel) - priority(b.props.accessibilityLabel),
+  );
   const secondary = actions.filter((action) => !pinned(action.props.accessibilityLabel));
+  const menuPriority = (label: string) =>
+    label.toLowerCase().includes('recording')
+      ? 0
+      : label.includes('whiteboard')
+        ? 1
+        : label === 'Open floating call'
+          ? 2
+          : label.includes('captions')
+            ? 3
+            : label === 'Settings'
+              ? 10
+              : 5;
+  secondary.sort(
+    (a, b) =>
+      menuPriority(a.props.accessibilityLabel) - menuPriority(b.props.accessibilityLabel),
+  );
+  const renderControl = (action: (typeof actions)[number]) => {
+    const control = primary(action.props.accessibilityLabel);
+    if (!control || !pinned(action.props.accessibilityLabel)) return null;
+    const { Icon } = control;
+    const active = action.props.accessibilityState?.selected ?? control.active;
+    const emphasized =
+      !!control.danger ||
+      !!control.muted ||
+      (active && action.props.accessibilityLabel === 'Whiteboard');
+    return (
+      <Pressable
+        key={action.key}
+        accessibilityRole="button"
+        accessibilityLabel={action.props.accessibilityLabel}
+        accessibilityState={{
+          disabled: !!action.props.disabled,
+          selected: active,
+        }}
+        disabled={action.props.disabled}
+        onPress={action.props.onPress}
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          gap: 4,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor:
+            control.danger || control.muted
+              ? colors.red
+              : emphasized
+                ? colors.action
+                : colors.actionSubtle,
+          opacity: action.props.disabled ? 0.5 : 1,
+        }}
+      >
+        <NativeControlPop value={active}>
+          <Icon size={22} color={emphasized ? colors.primaryForeground : colors.text} />
+        </NativeControlPop>
+      </Pressable>
+    );
+  };
   return (
     <View style={{ gap: 8 }}>
-      {(onAudioSettings || onVideoSettings) && (
-        <View
-          accessibilityLabel="Device settings"
-          style={{ flexDirection: 'row', gap: 8 }}
-        >
-          {(
-            [
-              ['Audio settings', Mic, onAudioSettings],
-              ['Video settings', Video, onVideoSettings],
-            ] as const
-          ).map(
-            ([label, Icon, onPress]) =>
-              onPress && (
-                <Pressable
-                  key={label}
-                  accessibilityRole="button"
-                  accessibilityLabel={label}
-                  onPress={onPress}
-                  style={{
-                    flex: 1,
-                    minHeight: 44,
-                    paddingHorizontal: 12,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    borderRadius: 22,
-                    backgroundColor: colors.actionSubtle,
-                  }}
-                >
-                  <Icon size={18} color={colors.text} />
-                  <Text style={{ color: colors.text, flex: 1 }}>{label}</Text>
-                  <ChevronRight size={16} color={colors.text} />
-                </Pressable>
-              ),
-          )}
-        </View>
-      )}
       <View
         accessibilityRole="toolbar"
         style={{
           flexDirection: 'row',
           flexWrap: 'nowrap',
-          justifyContent: 'space-around',
+          justifyContent: 'center',
           gap: 4,
         }}
       >
-        {actions.map((action) => {
-          const control = primary(action.props.accessibilityLabel);
-          if (!control || !pinned(action.props.accessibilityLabel)) return null;
-          const { Icon } = control;
-          return (
-            <Pressable
-              key={action.key}
-              accessibilityRole="button"
-              accessibilityLabel={action.props.accessibilityLabel}
-              accessibilityState={{
-                disabled: !!action.props.disabled,
-                selected: control.active,
-              }}
-              disabled={action.props.disabled}
-              onPress={action.props.onPress}
-              style={{
-                flex: 1,
-                minHeight: 56,
-                borderRadius: 16,
-                gap: 4,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: control.danger ? colors.red : colors.actionSubtle,
-                opacity: action.props.disabled ? 0.5 : 1,
-              }}
-            >
-              <NativeControlPop value={control.active}>
-                <Icon
-                  size={22}
-                  color={control.danger ? colors.primaryForeground : colors.text}
-                />
-              </NativeControlPop>
-              <Text
-                numberOfLines={1}
-                style={{
-                  fontSize: 11,
-                  color: control.danger ? colors.primaryForeground : colors.text,
-                }}
-              >
-                {action.props.accessibilityLabel.includes('microphone')
-                  ? control.active
-                    ? 'Mute'
-                    : 'Unmute'
-                  : action.props.accessibilityLabel.includes('video')
-                    ? control.active
-                      ? 'Stop video'
-                      : 'Start video'
-                    : action.props.accessibilityLabel.startsWith('Messages')
-                      ? 'Chat'
-                      : action.props.accessibilityLabel.includes('sharing') ||
-                          action.props.accessibilityLabel === 'Share screen'
-                        ? control.active
-                          ? 'Stop share'
-                          : 'Share'
-                        : 'Leave'}
-              </Text>
-            </Pressable>
-          );
-        })}
+        {actions
+          .filter((action) => !primary(action.props.accessibilityLabel)?.danger)
+          .map(renderControl)}
         {(!!secondary.length || !!more) && (
           <Pressable
             accessibilityRole="button"
@@ -233,9 +213,9 @@ export function NativeMeetingToolbar({
             accessibilityState={{ expanded }}
             onPress={() => setExpanded(!expanded)}
             style={{
-              flex: 1,
-              minHeight: 56,
-              borderRadius: 16,
+              width: 48,
+              height: 48,
+              borderRadius: 24,
               gap: 4,
               alignItems: 'center',
               justifyContent: 'center',
@@ -243,9 +223,11 @@ export function NativeMeetingToolbar({
             }}
           >
             <Ellipsis size={22} color={colors.text} />
-            <Text style={{ color: colors.text, fontSize: 11 }}>More</Text>
           </Pressable>
         )}
+        {actions
+          .filter((action) => primary(action.props.accessibilityLabel)?.danger)
+          .map(renderControl)}
       </View>
       <NativeMeetingSheet
         open={expanded}
@@ -259,93 +241,60 @@ export function NativeMeetingToolbar({
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20, gap: 12 }}
         >
           {more}
-          {[false, true].map((host) => {
-            const group = secondary.filter(
-              (action) => !!menuItem(action.props.accessibilityLabel).host === host,
-            );
-            if (!group.length) return null;
+          {secondary.map((action) => {
+            const item = menuItem(action.props.accessibilityLabel);
             return (
-              <View key={String(host)} style={{ gap: 8 }}>
-                {host && (
-                  <Text
-                    style={{
-                      color: colors.textMuted,
-                      fontSize: 12,
-                      fontWeight: '600',
-                      paddingTop: 8,
-                    }}
-                  >
-                    HOST CONTROLS
-                  </Text>
-                )}
+              <Pressable
+                key={action.key}
+                accessibilityRole="button"
+                accessibilityLabel={action.props.accessibilityLabel}
+                accessibilityState={{
+                  disabled: !!action.props.disabled,
+                  selected: !!item.active,
+                }}
+                disabled={action.props.disabled}
+                onPress={() => {
+                  pendingAction.current = action.props.onPress;
+                  setExpanded(false);
+                  if (Platform.OS !== 'ios') completeDismissal();
+                }}
+                style={{
+                  width: '100%',
+                  minHeight: 48,
+                  padding: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'flex-start',
+                  gap: 8,
+                  opacity: action.props.disabled ? 0.45 : 1,
+                }}
+              >
                 <View
                   style={{
-                    flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    ...(host ? { borderTopWidth: 1, borderTopColor: colors.border } : {}),
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    backgroundColor: item.active ? colors.action : colors.actionSubtle,
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
                 >
-                  {group.map((action) => {
-                    const item = menuItem(action.props.accessibilityLabel);
-                    return (
-                      <Pressable
-                        key={action.key}
-                        accessibilityRole="button"
-                        accessibilityLabel={action.props.accessibilityLabel}
-                        accessibilityState={{
-                          disabled: !!action.props.disabled,
-                          selected: !!item.active,
-                        }}
-                        disabled={action.props.disabled}
-                        onPress={() => {
-                          pendingAction.current = action.props.onPress;
-                          setExpanded(false);
-                          if (Platform.OS !== 'ios') completeDismissal();
-                        }}
-                        style={{
-                          width: host ? '100%' : '33.333%',
-                          minHeight: host ? 48 : 84,
-                          padding: 8,
-                          flexDirection: host ? 'row' : 'column',
-                          alignItems: 'center',
-                          justifyContent: host ? 'flex-start' : 'center',
-                          gap: 8,
-                          opacity: action.props.disabled ? 0.45 : 1,
-                        }}
-                      >
-                        <View
-                          style={{
-                            width: host ? 28 : 44,
-                            height: host ? 28 : 44,
-                            borderRadius: 14,
-                            backgroundColor: item.active
-                              ? colors.action
-                              : colors.actionSubtle,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <item.Icon
-                            size={20}
-                            color={item.active ? colors.actionForeground : colors.text}
-                          />
-                        </View>
-                        <Text
-                          style={{
-                            color: colors.text,
-                            fontSize: 12,
-                            textAlign: host ? 'left' : 'center',
-                            ...(host ? { flex: 1 } : {}),
-                          }}
-                        >
-                          {item.title}
-                        </Text>
-                        {host && <ChevronRight size={16} color={colors.textMuted} />}
-                      </Pressable>
-                    );
-                  })}
+                  <item.Icon
+                    size={20}
+                    color={item.active ? colors.actionForeground : colors.text}
+                  />
                 </View>
-              </View>
+                <Text
+                  style={{
+                    color: colors.text,
+                    fontSize: 16,
+                    textAlign: 'left',
+                    flex: 1,
+                  }}
+                >
+                  {item.title}
+                </Text>
+              </Pressable>
             );
           })}
         </ScrollView>

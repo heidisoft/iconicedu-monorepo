@@ -20,19 +20,40 @@ jest.mock('@/providers/theme-provider', () => ({
 }));
 jest.mock('./native-classroom', () => {
   const Text = require('react-native').Text;
+  const NativeDevicePreview = require('./native-device-preview').NativeDevicePreview;
   return {
     NativeClassroom: jest.fn(
-      ({
-        sessionId,
-        credentials,
-        hostEligible,
-      }: {
+      (props: {
         sessionId: string;
-        credentials: { displayName: string };
+        credentials?: { displayName: string };
         hostEligible: boolean;
-      }) => (
-        <Text testID="preview">{`${sessionId}|${credentials.displayName}|${hostEligible}`}</Text>
-      ),
+        previewDisplayName?: string;
+        studentChoices?: React.ReactNode;
+        joinDisabled?: boolean;
+        authorize?: (name: string) => Promise<unknown>;
+      }) =>
+        props.credentials ? (
+          <Text testID="preview">{`${props.sessionId}|${props.credentials.displayName}|${props.hostEligible}`}</Text>
+        ) : (
+          <NativeDevicePreview
+            displayName={props.previewDisplayName ?? ''}
+            sessionName="Class"
+            camera={false}
+            microphone={false}
+            joining={false}
+            joinDisabled={props.joinDisabled}
+            onDisplayName={jest.fn()}
+            onCamera={jest.fn()}
+            onMicrophone={jest.fn()}
+            onSettings={jest.fn()}
+            studentChoices={props.studentChoices}
+            onJoin={() => {
+              void props.authorize?.(props.previewDisplayName ?? '');
+            }}
+          >
+            <Text>Shared classroom preview</Text>
+          </NativeDevicePreview>
+        ),
     ),
   };
 });
@@ -86,8 +107,8 @@ describe('native real link-entry contract', () => {
     expect(screen.queryByPlaceholderText(/password|name/i)).toBeNull();
   });
   it('renews credentials at Join and forwards an explicit display-name override', async () => {
-    render(<NativeClassroomEntry sessionId="short-code" />);
-    await waitFor(() => expect(NativeClassroom).toHaveBeenCalled());
+    const screen = render(<NativeClassroomEntry sessionId="short-code" />);
+    await waitFor(() => expect(screen.getByTestId('preview')).toBeTruthy());
     const preview = jest.mocked(NativeClassroom).mock.calls.at(-1)![0];
     const renewed = { ...credentials, token: 'renewed-synthetic-token' };
     jest.mocked(classroomApi.join).mockResolvedValueOnce(renewed);
@@ -130,6 +151,8 @@ describe('native real link-entry contract', () => {
     await waitFor(() => expect(screen.getByText('Child two')).toBeTruthy());
     expect(classroomApi.join).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText('Child two'));
+    expect(classroomApi.join).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('Join now'));
     await waitFor(() =>
       expect(classroomApi.join).toHaveBeenCalledWith(
         'canonical-session',
@@ -293,5 +316,52 @@ it('binds admission to the automatically selected single student before the firs
     'Parent',
     'student-one',
     undefined,
+  );
+});
+
+it('joins both selected students under a combined editable name and preserves both on reauthorization', async () => {
+  jest.clearAllMocks();
+  jest.mocked(classroomApi.info).mockResolvedValue({
+    ...info,
+    participant: {
+      displayName: 'Parent',
+      students: [
+        { profileId: 'child-1', displayName: 'Student One' },
+        { profileId: 'child-2', displayName: 'Student Two' },
+      ],
+    },
+  });
+  const screen = render(<NativeClassroomEntry sessionId="code" />);
+  await waitFor(() => expect(screen.getByText('Student One')).toBeTruthy());
+  fireEvent.press(screen.getByRole('checkbox', { name: 'Student One' }));
+  fireEvent.press(screen.getByRole('checkbox', { name: 'Student Two' }));
+  expect(
+    screen.getByLabelText('Change display name, currently Student One & Student Two'),
+  ).toBeTruthy();
+  fireEvent.press(screen.getByRole('checkbox', { name: 'Student One' }));
+  expect(
+    screen.getByLabelText('Change display name, currently Student Two'),
+  ).toBeTruthy();
+  fireEvent.press(screen.getByRole('checkbox', { name: 'Student One' }));
+  expect(classroomApi.join).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByLabelText('Join now'));
+  await waitFor(() => expect(screen.getByTestId('preview')).toBeTruthy());
+  expect(classroomApi.join).toHaveBeenCalledWith(
+    'canonical-session',
+    expect.objectContaining({
+      studentProfileIds: ['child-2', 'child-1'],
+      displayNameOverride: 'Student One & Student Two',
+    }),
+  );
+  const props = jest.mocked(NativeClassroom).mock.calls.at(-1)![0];
+  await act(async () => {
+    await props.authorize?.('Study buddies');
+  });
+  expect(classroomApi.join).toHaveBeenLastCalledWith(
+    'canonical-session',
+    expect.objectContaining({
+      studentProfileIds: ['child-2', 'child-1'],
+      displayNameOverride: 'Study buddies',
+    }),
   );
 });

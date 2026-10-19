@@ -54,3 +54,21 @@ it('does not let a delayed device response replace a newer selection', async () 
   expect(result.current.devices.mirrored).toBe(true);
   unmount();
 });
+
+it('selects the microphone and refreshes both input and output after a route change', async () => {
+  const adapter = {
+    devices: jest
+      .fn()
+      .mockResolvedValue({ cameras: [], audio: [], microphones: [], mirrored: false }),
+    selectMicrophone: jest.fn().mockResolvedValue(undefined),
+  };
+  const { result, unmount } = renderHook(() =>
+    useNativeMediaDevices(adapter as unknown as NativeMeetingAdapter, true),
+  );
+  await act(async () => {
+    await result.current.select('microphone', 'headset');
+  });
+  expect(adapter.selectMicrophone).toHaveBeenCalledWith('headset');
+  expect(adapter.devices).toHaveBeenCalledTimes(2);
+  unmount();
+});

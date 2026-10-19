@@ -1,4 +1,4 @@
-import { NativeWhiteboardFollowStatus } from './native-whiteboard-follow-status';
+import { NativeClassroomError } from './native-classroom-error';
 import { useReducedMotion } from './use-reduced-motion';
 import { NativeWhiteboardToolbar, type Tool } from './native-whiteboard-toolbar';
 import { useNativeWhiteboardFollow } from './use-native-whiteboard-follow';
@@ -9,28 +9,24 @@ import {
 } from '@/lib/classroom/export-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, findNodeHandle, Modal, Pressable, Text, View } from 'react-native';
 import {
-  Alert,
-  findNodeHandle,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from 'react-native';
-import {
-  Minimize2,
-  Maximize2,
-  SlidersHorizontal,
+  Maximize,
+  Minimize,
   Download,
   RotateCcw,
   Trash2,
   Presentation,
+  Square,
   Users,
   Eye,
   Pencil,
 } from 'lucide-react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import type {
   WhiteboardElementVM,
@@ -56,6 +52,8 @@ export interface NativeWhiteboardRepository {
 }
 
 /** Offline canvas only; capability and API transport never enter the WebView. */
+const CANVAS_SOURCE = { html: classroomCanvasHtml };
+
 export function NativeWhiteboard({
   token,
   repository,
@@ -63,8 +61,8 @@ export function NativeWhiteboard({
   onPending,
   visible = true,
   onClose,
-  closeLabel = 'Return to video',
   onExpand,
+  expanded = false,
   controls,
   embedded = false,
   onPublisher,
@@ -78,18 +76,19 @@ export function NativeWhiteboard({
   onPending?: (pending: boolean) => void;
   visible?: boolean;
   onClose?: () => void;
-  closeLabel?: string;
   onExpand?: () => void;
+  expanded?: boolean;
   controls?: React.ReactNode;
   embedded?: boolean;
 }) {
   const { colors, isDark } = useTheme();
   const reducedMotion = useReducedMotion();
+  const safeArea = useSafeAreaInsets();
   const webview = useRef<WebView>(null);
   const shareView = useRef<View>(null);
   const [snapshot, setSnapshot] = useState<WhiteboardSnapshotVM | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [toolbarMenu, setToolbarMenu] = useState<string | null>(null);
   const [boardWidth, setBoardWidth] = useState(0);
   const [ready, setReady] = useState(false);
   const [styleState, setStyleState] = useState<{
@@ -111,12 +110,15 @@ export function NativeWhiteboard({
     onPublisher?.(publisher);
     return () => onPublisher?.(null);
   }, [onPublisher, publisher]);
-  const receiveViewport = useCallback((viewport: WhiteboardViewportVM) => {
-    if (drawing.current) return;
-    webview.current?.injectJavaScript(
-      `window.classroomViewport?.(${JSON.stringify(viewport)}); true;`,
-    );
-  }, []);
+  const receiveViewport = useCallback(
+    (viewport: WhiteboardViewportVM, sourceKey?: string) => {
+      if (drawing.current) return;
+      webview.current?.injectJavaScript(
+        `window.classroomViewport?.(${JSON.stringify(viewport)}, ${JSON.stringify(sourceKey ?? null)}); true;`,
+      );
+    },
+    [],
+  );
   const follow = useNativeWhiteboardFollow(
     token,
     repository,
@@ -124,6 +126,10 @@ export function NativeWhiteboard({
     ready && visible,
     receiveViewport,
   );
+  useEffect(() => {
+    if (follow.following === 'free')
+      webview.current?.injectJavaScript('window.classroomCancelFollow?.(); true;');
+  }, [follow.following]);
   const actorId = snapshot?.actorId;
   const receiveLasers = useCallback(
     (presence: WhiteboardLaserPresenceVM[]) => {
@@ -307,14 +313,15 @@ export function NativeWhiteboard({
     onPending?.(saving);
   }, [saving, onPending]);
   const button = (label: string, onPress: () => void) => {
-    const Icon =
-      label.startsWith('Export') || label.startsWith('Download')
+    const Icon = label.startsWith('Stop sharing')
+      ? Square
+      : label.startsWith('Export') || label.startsWith('Download')
         ? Download
         : label.startsWith('Discard')
           ? Trash2
           : label.startsWith('Retry')
             ? RotateCcw
-            : label.includes('present')
+            : label.toLowerCase().includes('present')
               ? Presentation
               : label.includes('editing') || label.includes('annotate')
                 ? Pencil
@@ -356,319 +363,247 @@ export function NativeWhiteboard({
           accessibilityLabel="Class whiteboard"
           onLayout={(event) => setBoardWidth(event.nativeEvent.layout.width)}
         >
-          {error && (
-            <Text accessibilityRole="alert" style={{ color: colors.text }}>
-              {error}
-            </Text>
-          )}
+          {error && <NativeClassroomError message={error} />}
           <View
-            accessibilityLiveRegion="polite"
+            pointerEvents="box-none"
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 10,
-              padding: 10,
-              flexWrap: 'wrap',
+              position: 'absolute',
+              left: 12,
+              right: 12,
+              top: 12 + (embedded ? 0 : (safeArea?.top ?? 0)),
+              zIndex: 4,
             }}
           >
-            <Text accessibilityRole="text" style={{ color: colors.text }}>
-              {error
-                ? saving
-                  ? 'Unsaved · retrying'
-                  : 'Reconnecting…'
-                : saving
-                  ? 'Saving…'
-                  : snapshot
-                    ? 'Saved'
-                    : 'Connecting…'}
-            </Text>
-            <View
-              accessible
-              accessibilityLabel={`Whiteboard participants: ${snapshot?.presence.map((person) => person.name).join(', ') || 'Waiting for participants'}`}
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-            >
-              <Users size={16} color={colors.text} />
-              {snapshot?.presence.slice(0, 4).map((person) => (
-                <View
-                  key={person.id}
-                  style={{
-                    borderRadius: 16,
-                    minWidth: 28,
-                    minHeight: 28,
-                    padding: 4,
-                    backgroundColor: colors.actionSubtle,
-                  }}
-                >
-                  <Text style={{ color: colors.text }}>
-                    {person.name
-                      .trim()
-                      .split(/\s+/)
-                      .slice(0, 2)
-                      .map((part) => part[0])
-                      .join('')
-                      .toUpperCase() || '?'}
-                  </Text>
-                </View>
-              ))}
-              {!!snapshot && snapshot.presence.length > 4 && (
-                <Text style={{ color: colors.text }}>
-                  +{snapshot.presence.length - 4}
-                </Text>
-              )}
-            </View>
-          </View>
-          <NativeWhiteboardFollowStatus
-            following={follow.following !== 'free'}
-            status={follow.status}
-            label={
-              follow.following === 'tutor'
-                ? 'Following tutor'
-                : `Following ${snapshot?.presence.find((person) => person.id === follow.following)?.name ?? 'participant'}`
-            }
-            onExplore={() => follow.setFollowing('free')}
-            onTutor={() => follow.setFollowing('tutor')}
-          />
-          {error &&
-            button('Retry saving', () => {
-              void flush();
-            })}
-          {optionsOpen && (
-            <ScrollView
-              style={{
-                position: 'absolute',
-                zIndex: 3,
-                bottom: 132,
-                maxHeight: '65%',
-                right: 12,
-                width: Math.min(300, Math.max(0, boardWidth - 24)),
-                padding: 12,
-                borderRadius: 16,
-                backgroundColor: colors.card,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={{ gap: 4, paddingBottom: 12 }}
-            >
-              {snapshot?.role === 'student' && !snapshot.document.studentEditing && (
-                <Text
-                  accessibilityLiveRegion="polite"
-                  style={{ color: colors.textMuted, padding: 12 }}
-                >
-                  View only. Ask the host to allow editing.
-                </Text>
-              )}
-              <Text style={{ color: colors.text, padding: 12 }}>Follow viewport</Text>
-              {follow.following !== 'free' && (
-                <Text
-                  accessibilityLiveRegion="polite"
-                  style={{ color: colors.textMuted, padding: 12 }}
-                >
-                  {follow.status === 'following'
-                    ? 'Following participant’s view'
-                    : follow.status === 'reconnecting'
-                      ? 'Unable to sync views. Check your connection.'
-                      : 'Waiting for participant’s view…'}
-                </Text>
-              )}
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ checked: follow.following === 'tutor' }}
-                onPress={() => follow.setFollowing('tutor')}
-                style={{ padding: 12 }}
-              >
-                <Text style={{ color: colors.text }}>
-                  {follow.following === 'tutor' ? '✓ ' : ''}Follow tutor (default)
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ checked: follow.following === 'free' }}
-                onPress={() => follow.setFollowing('free')}
-                style={{ padding: 12 }}
-              >
-                <Text style={{ color: colors.text }}>
-                  {follow.following === 'free' ? '✓ ' : ''}Explore freely
-                </Text>
-              </Pressable>
-              {snapshot?.presence
-                .filter((person) => person.id !== snapshot.actorId)
-                .map((person) => (
-                  <Pressable
-                    key={person.id}
-                    accessibilityRole="radio"
-                    accessibilityLabel={`Follow ${person.name}`}
-                    accessibilityState={{ checked: follow.following === person.id }}
-                    onPress={() => follow.setFollowing(person.id)}
-                    style={{ padding: 12 }}
-                  >
-                    <Text style={{ color: colors.text }}>
-                      {follow.following === person.id ? '✓ ' : ''}Follow {person.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              {button('Export whiteboard image', () => {
-                webview.current?.injectJavaScript(
-                  'window.classroomAction?.("export"); true;',
-                );
-                setOptionsOpen(false);
-              })}
-              {button('Export whiteboard SVG', () => {
-                webview.current?.injectJavaScript(
-                  'window.classroomAction?.("export-svg"); true;',
-                );
-                setOptionsOpen(false);
-              })}
-              {saving && (
+            <NativeWhiteboardToolbar
+              menu={toolbarMenu}
+              onMenuChange={setToolbarMenu}
+              moreContent={
                 <>
-                  {button('Download unsaved edits', () => {
-                    void exportClassroomDocument(
-                      JSON.stringify({
-                        schemaVersion: 1,
-                        boardId: snapshot?.id,
-                        savedAt: Date.now(),
-                        operations: queue.current,
-                      }),
-                      'json',
-                    ).catch(() =>
-                      Alert.alert(
-                        'Export failed',
-                        'Unable to export unsaved edits. Please retry.',
-                      ),
+                  <View
+                    accessibilityLiveRegion="polite"
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      padding: 10,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Text accessibilityRole="text" style={{ color: colors.text }}>
+                      {error
+                        ? saving
+                          ? 'Unsaved · retrying'
+                          : 'Reconnecting…'
+                        : saving
+                          ? 'Saving…'
+                          : snapshot
+                            ? 'Saved'
+                            : 'Connecting…'}
+                    </Text>
+                    <View
+                      accessible
+                      accessibilityLabel={`Whiteboard participants: ${snapshot?.presence.map((person) => person.name).join(', ') || 'Waiting for participants'}`}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    >
+                      <Users size={16} color={colors.text} />
+                      {snapshot?.presence.slice(0, 4).map((person) => (
+                        <View
+                          key={person.id}
+                          style={{
+                            borderRadius: 16,
+                            minWidth: 28,
+                            minHeight: 28,
+                            padding: 4,
+                            backgroundColor: colors.actionSubtle,
+                          }}
+                        >
+                          <Text style={{ color: colors.text }}>
+                            {person.name
+                              .trim()
+                              .split(/\s+/)
+                              .slice(0, 2)
+                              .map((part) => part[0])
+                              .join('')
+                              .toUpperCase() || '?'}
+                          </Text>
+                        </View>
+                      ))}
+                      {!!snapshot && snapshot.presence.length > 4 && (
+                        <Text style={{ color: colors.text }}>
+                          +{snapshot.presence.length - 4}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  {error &&
+                    button('Retry saving', () => {
+                      void flush();
+                    })}
+                  {snapshot?.role === 'student' && !snapshot.document.studentEditing && (
+                    <Text
+                      accessibilityLiveRegion="polite"
+                      style={{ color: colors.textMuted, padding: 12 }}
+                    >
+                      View only. Ask the host to allow editing.
+                    </Text>
+                  )}
+                  {button('Export whiteboard image', () => {
+                    webview.current?.injectJavaScript(
+                      'window.classroomAction?.("export"); true;',
                     );
+                    setToolbarMenu(null);
                   })}
-                  {button('Discard unsaved edits', () =>
-                    Alert.alert(
-                      'Discard unsaved edits?',
-                      'This removes only your pending changes. Saved class drawings remain.',
-                      [
-                        { text: 'Cancel', style: 'cancel' },
-                        {
-                          text: 'Discard',
-                          style: 'destructive',
-                          onPress: () => {
-                            if (busy.current || drawing.current) {
-                              Alert.alert(
-                                'Please wait',
-                                'Wait until the current save or stroke finishes, then retry.',
-                              );
-                              return;
-                            }
-                            busy.current = true;
-                            setDiscarding(true);
-                            void (async () => {
-                              try {
-                                const value = repository
-                                  ? await repository.load()
-                                  : await capabilityGet<WhiteboardSnapshotVM>(
-                                      '/whiteboards/current',
-                                      token,
+                  {button('Export whiteboard SVG', () => {
+                    webview.current?.injectJavaScript(
+                      'window.classroomAction?.("export-svg"); true;',
+                    );
+                    setToolbarMenu(null);
+                  })}
+                  {saving && (
+                    <>
+                      {button('Download unsaved edits', () => {
+                        void exportClassroomDocument(
+                          JSON.stringify({
+                            schemaVersion: 1,
+                            boardId: snapshot?.id,
+                            savedAt: Date.now(),
+                            operations: queue.current,
+                          }),
+                          'json',
+                        ).catch(() =>
+                          Alert.alert(
+                            'Export failed',
+                            'Unable to export unsaved edits. Please retry.',
+                          ),
+                        );
+                      })}
+                      {button('Discard unsaved edits', () =>
+                        Alert.alert(
+                          'Discard unsaved edits?',
+                          'This removes only your pending changes. Saved class drawings remain.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Discard',
+                              style: 'destructive',
+                              onPress: () => {
+                                if (busy.current || drawing.current) {
+                                  Alert.alert(
+                                    'Please wait',
+                                    'Wait until the current save or stroke finishes, then retry.',
+                                  );
+                                  return;
+                                }
+                                busy.current = true;
+                                setDiscarding(true);
+                                void (async () => {
+                                  try {
+                                    const value = repository
+                                      ? await repository.load()
+                                      : await capabilityGet<WhiteboardSnapshotVM>(
+                                          '/whiteboards/current',
+                                          token,
+                                        );
+                                    const key = recoveryKey();
+                                    if (key && !repository)
+                                      await AsyncStorage.removeItem(key);
+                                    queue.current = [];
+                                    setSaving(false);
+                                    setError(null);
+                                    setSnapshot(value);
+                                  } catch {
+                                    setError(
+                                      'Unable to discard unsaved edits. Please retry.',
                                     );
-                                const key = recoveryKey();
-                                if (key && !repository)
-                                  await AsyncStorage.removeItem(key);
-                                queue.current = [];
-                                setSaving(false);
-                                setError(null);
-                                setSnapshot(value);
-                              } catch {
-                                setError(
-                                  'Unable to discard unsaved edits. Please retry.',
-                                );
-                              } finally {
-                                busy.current = false;
-                                setDiscarding(false);
-                              }
-                            })();
-                          },
-                        },
-                      ],
-                    ),
+                                  } finally {
+                                    busy.current = false;
+                                    setDiscarding(false);
+                                  }
+                                })();
+                              },
+                            },
+                          ],
+                        ),
+                      )}
+                    </>
+                  )}
+                  {snapshot &&
+                    (!snapshot.presentationActive ||
+                      (!!snapshot.actorId &&
+                        snapshot.actorId ===
+                          snapshot.document.presentation?.presenterId)) && (
+                      <>
+                        {button(
+                          snapshot.presentationActive
+                            ? 'Stop sharing for everyone'
+                            : 'Present board',
+                          () =>
+                            save({
+                              id: generateClientMessageId(),
+                              type: 'presentation',
+                              enabled: !snapshot.presentationActive,
+                            }),
+                        )}
+                      </>
+                    )}
+                  {snapshot?.role === 'teacher' && (
+                    <>
+                      {button(
+                        snapshot.document.studentEditing
+                          ? 'Disable student editing'
+                          : 'Allow student editing',
+                        () =>
+                          save({
+                            id: generateClientMessageId(),
+                            type: 'student-editing',
+                            enabled: !snapshot.document.studentEditing,
+                          }),
+                      )}
+                    </>
                   )}
                 </>
-              )}
-              {snapshot &&
-                (!snapshot.presentationActive ||
-                  snapshot.role === 'teacher' ||
-                  snapshot.actorId === snapshot.document.presentation?.presenterId) && (
-                  <>
-                    {button(
-                      snapshot.presentationActive
-                        ? 'Stop presenting board'
-                        : 'Present board',
-                      () =>
+              }
+              onFollow={follow.focusTutor}
+              styleState={styleState}
+              ready={ready}
+              editable={
+                snapshot?.role === 'teacher' || snapshot?.document.studentEditing === true
+              }
+              canClear={snapshot?.role === 'teacher'}
+              onCommand={(command) =>
+                webview.current?.injectJavaScript(
+                  `window.classroomCommand?.(${JSON.stringify(command)}); true;`,
+                )
+              }
+              onClear={() =>
+                Alert.alert('Clear whiteboard?', 'This clears the class drawing.', [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Clear',
+                    style: 'destructive',
+                    onPress: () => {
+                      if (snapshot)
                         save({
                           id: generateClientMessageId(),
-                          type: 'presentation',
-                          enabled: !snapshot.presentationActive,
-                        }),
-                    )}
-                  </>
-                )}
-              {snapshot?.role === 'teacher' && (
-                <>
-                  {button(
-                    snapshot.document.studentEditing
-                      ? 'Disable student editing'
-                      : 'Allow student editing',
-                    () =>
-                      save({
-                        id: generateClientMessageId(),
-                        type: 'student-editing',
-                        enabled: !snapshot.document.studentEditing,
-                      }),
-                  )}
-                </>
-              )}
-            </ScrollView>
-          )}
-          <NativeWhiteboardToolbar
-            onFollow={() => setOptionsOpen(true)}
-            followLabel={
-              follow.following === 'tutor'
-                ? 'Follow tutor'
-                : follow.following === 'free'
-                  ? 'Explore freely'
-                  : `Follow ${snapshot?.presence.find((person) => person.id === follow.following)?.name ?? 'participant'}`
-            }
-            styleState={styleState}
-            ready={ready}
-            editable={
-              snapshot?.role === 'teacher' || snapshot?.document.studentEditing === true
-            }
-            canClear={snapshot?.role === 'teacher'}
-            onCommand={(command) =>
-              webview.current?.injectJavaScript(
-                `window.classroomCommand?.(${JSON.stringify(command)}); true;`,
-              )
-            }
-            onClear={() =>
-              Alert.alert('Clear whiteboard?', 'This clears the class drawing.', [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Clear',
-                  style: 'destructive',
-                  onPress: () => {
-                    if (snapshot)
-                      save({
-                        id: generateClientMessageId(),
-                        type: 'clear-page',
-                        pageId: snapshot.document.pages[0].id,
-                      });
+                          type: 'clear-page',
+                          pageId: snapshot.document.pages[0].id,
+                        });
+                    },
                   },
-                },
-              ])
-            }
-          />
+                ])
+              }
+            />
+          </View>
           <View
             ref={shareView}
+            onTouchStart={() => setToolbarMenu(null)}
             collapsable={false}
             pointerEvents={discarding ? 'none' : 'auto'}
             style={{ flex: 1 }}
           >
             <WebView
               ref={webview}
-              source={{ html: classroomCanvasHtml }}
+              source={CANVAS_SOURCE}
               originWhitelist={['about:blank']}
               javaScriptEnabled
               scrollEnabled={false}
@@ -803,7 +738,9 @@ export function NativeWhiteboard({
             {onExpand && (
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Expand whiteboard to full screen"
+                accessibilityLabel={
+                  expanded ? 'Collapse whiteboard' : 'Expand whiteboard to full screen'
+                }
                 onPress={() => {
                   if (drawing.current) {
                     Alert.alert(
@@ -825,48 +762,13 @@ export function NativeWhiteboard({
                   borderColor: colors.border,
                 }}
               >
-                <Maximize2 size={20} color={colors.text} />
+                {expanded ? (
+                  <Minimize size={20} color={colors.text} />
+                ) : (
+                  <Maximize size={20} color={colors.text} />
+                )}
               </Pressable>
             )}
-            {onClose && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={closeLabel}
-                onPress={close}
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 22,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: colors.card,
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                }}
-              >
-                <Minimize2 size={20} color={colors.text} />
-              </Pressable>
-            )}
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                optionsOpen ? 'Close whiteboard options' : 'Whiteboard options'
-              }
-              accessibilityState={{ expanded: optionsOpen }}
-              onPress={() => setOptionsOpen((previous) => !previous)}
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: colors.card,
-                borderWidth: 1,
-                borderColor: colors.border,
-              }}
-            >
-              <SlidersHorizontal size={20} color={colors.text} />
-            </Pressable>
           </View>
           {controls && (
             <View style={{ position: 'absolute', zIndex: 2, left: 12, bottom: 76 }}>

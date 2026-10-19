@@ -211,6 +211,9 @@ importers:
       '@react-native-community/datetimepicker':
         specifier: 8.6.0
         version: 8.6.0(expo@55.0.5)(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)
+      '@react-native-picker/picker':
+        specifier: 2.11.4
+        version: 2.11.4(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)
       '@react-navigation/native':
         specifier: ^7.1.33
         version: 7.1.33(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)
@@ -4143,6 +4146,12 @@ packages:
         optional: true
       react-native-windows:
         optional: true
+
+  '@react-native-picker/picker@2.11.4':
+    resolution: {integrity: sha512-Kf8h1AMnBo54b1fdiVylP2P/iFcZqzpMYcglC28EEFB1DEnOjsNr6Ucqc+3R9e91vHxEDnhZFbYDmAe79P2gjA==}
+    peerDependencies:
+      react: 19.2.4
+      react-native: '*'
 
   '@react-native/assets-registry@0.83.2':
     resolution: {integrity: sha512-9I5l3pGAKnlpQ15uVkeB9Mgjvt3cZEaEc8EDtdexvdtZvLSjtwBzgourrOW4yZUijbjJr8h3YO2Y0q+THwUHTA==}
@@ -16149,6 +16158,11 @@ snapshots:
       react-native: 0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4)
     optionalDependencies:
       expo: 55.0.5(@babel/core@7.29.7)(@expo/dom-webview@55.0.3)(@expo/metro-runtime@55.0.6)(expo-router@55.0.4)(react-dom@19.2.4(react@19.2.4))(react-native-webview@13.16.1(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4))(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)(typescript@5.9.3)
+
+  '@react-native-picker/picker@2.11.4(react-native@0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4))(react@19.2.4)':
+    dependencies:
+      react: 19.2.4
+      react-native: 0.83.2(@babel/core@7.29.7)(@types/react@19.3.0)(react@19.2.4)
 
   '@react-native/assets-registry@0.83.2': {}
 

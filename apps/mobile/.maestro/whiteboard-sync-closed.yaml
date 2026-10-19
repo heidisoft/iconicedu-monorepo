@@ -1,6 +1,6 @@
 appId: com.heidisoft.iconicedu
 ---
 - extendedWaitUntil:
-    notVisible: 'Return to video'
+    notVisible: 'Expand whiteboard to full screen'
     timeout: 30000
 - assertVisible: 'Cross-client classroom'

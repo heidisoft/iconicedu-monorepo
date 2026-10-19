@@ -66,7 +66,6 @@ it.each([
   'Audio settings',
   'Switch camera',
   'Messages',
-  'Whiteboard',
   'Participants',
   'Invite',
   'Turn captions on',
@@ -85,12 +84,12 @@ it.each([
 it('closes More without invoking an action', () => {
   const onPress = jest.fn();
   const screen = render(
-    <NativeMeetingToolbar>{action('Whiteboard', onPress)}</NativeMeetingToolbar>,
+    <NativeMeetingToolbar>{action('Settings', onPress)}</NativeMeetingToolbar>,
   );
   press(screen.getByLabelText('More controls'));
   press(screen.getByLabelText('Close More controls'));
   expect(onPress).not.toHaveBeenCalled();
-  expect(screen.queryByLabelText('Whiteboard')).toBeNull();
+  expect(screen.queryByLabelText('Settings')).toBeNull();
 });
 
 it('waits for native dismissal before opening a destination panel on iOS', () => {
@@ -123,25 +122,33 @@ it('places screen sharing third with chat in More', () => {
     'Mute microphone',
     'Stop video',
     'Share screen',
-    'Leave class',
     'More controls',
+    'Leave class',
   ]);
 });
-it('opens audio and video settings directly without toggling media or opening More', () => {
-  const audio = jest.fn(),
-    video = jest.fn(),
-    microphone = jest.fn(),
-    camera = jest.fn();
+it('keeps whiteboard beside media and device settings in unified Settings', () => {
   const screen = render(
-    <NativeMeetingToolbar onAudioSettings={audio} onVideoSettings={video}>
-      {action('Mute microphone', microphone)}
-      {action('Stop video', camera)}
+    <NativeMeetingToolbar>
+      {action('Mute microphone')}
+      {action('Stop video')}
+      {action('Whiteboard')}
+      {action('Share screen')}
+      {action('Settings')}
+      {action('Leave class')}
     </NativeMeetingToolbar>,
   );
-  fireEvent.press(screen.getByLabelText('Audio settings'));
-  fireEvent.press(screen.getByLabelText('Video settings'));
-  expect(audio).toHaveBeenCalledTimes(1);
-  expect(video).toHaveBeenCalledTimes(1);
-  expect(microphone).not.toHaveBeenCalled();
-  expect(camera).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText('Audio settings')).toBeNull();
+  expect(screen.queryByLabelText('Video settings')).toBeNull();
+  expect(
+    screen.getAllByRole('button').map((button) => button.props.accessibilityLabel),
+  ).toEqual([
+    'Mute microphone',
+    'Stop video',
+    'Whiteboard',
+    'Share screen',
+    'More controls',
+    'Leave class',
+  ]);
+  press(screen.getByLabelText('More controls'));
+  expect(screen.getByLabelText('Settings')).toBeTruthy();
 });

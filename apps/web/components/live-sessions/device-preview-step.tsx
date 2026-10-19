@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  ArrowLeft,
   Loader2,
   Mic,
   MicOff,
@@ -37,6 +38,7 @@ const PreviewSettings = lazy(() =>
   })),
 );
 import { Button } from '@iconicedu/ui-web/ui/button';
+import { Alert, AlertTitle, AlertDescription } from '@iconicedu/ui-web/ui/alert';
 import { cn, getInitials } from '@iconicedu/ui-web/lib/utils';
 
 // Start with browser capture; use Zoom’s local preview only when background
@@ -49,6 +51,7 @@ export function DevicePreviewStep({
   joinDisabled = false,
   busy = false,
   error,
+  onBack,
 }: {
   displayName: string;
   sessionTitle: string;
@@ -56,6 +59,7 @@ export function DevicePreviewStep({
   joinDisabled?: boolean;
   busy?: boolean;
   error?: string | null;
+  onBack?: () => void;
   onJoin: (preferences: {
     muted: boolean;
     videoOff: boolean;
@@ -372,11 +376,17 @@ export function DevicePreviewStep({
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-5 px-6 py-10">
+      <Button
+        variant="ghost"
+        className="self-start"
+        disabled={busy}
+        onClick={onBack ?? (() => window.history.back())}
+      >
+        <ArrowLeft className="size-4" />
+        Back
+      </Button>
       <div className="space-y-1 text-center">
         <h1 className="text-xl font-semibold">{sessionTitle}</h1>
-        <p className="text-sm text-muted-foreground">
-          Check your camera and microphone before joining.
-        </p>
       </div>
 
       {children}
@@ -620,9 +630,10 @@ export function DevicePreviewStep({
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
+        <Alert variant="destructive">
+          <AlertTitle>Unable to join</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
       )}
       <Button
         type="button"

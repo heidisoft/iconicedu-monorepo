@@ -40,10 +40,14 @@ export function useNativeMediaDevices(adapter: NativeMeetingAdapter, open: boole
     };
   }, [open, refresh, invalidate]);
   const select = useCallback(
-    async (kind: 'camera' | 'audio', id: string) => {
+    async (kind: 'camera' | 'audio' | 'microphone', id: string) => {
       try {
         if (kind === 'camera') await adapter.selectCamera?.(id);
-        else await adapter.selectAudioRoute?.(id);
+        else if (kind === 'microphone') {
+          if (!adapter.selectMicrophone)
+            throw new Error('Microphone selection is unavailable in this app version.');
+          await adapter.selectMicrophone(id);
+        } else await adapter.selectAudioRoute?.(id);
       } finally {
         await refresh();
       }

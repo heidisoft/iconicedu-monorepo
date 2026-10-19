@@ -14,7 +14,8 @@ import type {
   LiveSessionMemberAccessVM,
   PublicLiveSessionInfoVM,
 } from '@iconicedu/shared-types';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { formatMeetingStudentNames } from '@iconicedu/utils';
 
 import {
   BadRequestException,
@@ -721,26 +722,45 @@ export class LiveSessionsService {
         throw new ForbiddenException('Incorrect passcode');
       }
     }
-    if (input.studentProfileId && students === undefined)
+    const requestedStudents =
+      input.studentProfileIds ??
+      (input.studentProfileId ? [input.studentProfileId] : undefined);
+    if (requestedStudents && students === undefined)
       throw new ForbiddenException(
         'Student selection is only available to linked parents',
       );
-    const student =
+    const selectedStudents =
       students === undefined
-        ? undefined
-        : input.studentProfileId
-          ? students.find((item) => item.profileId === input.studentProfileId)
+        ? []
+        : requestedStudents
+          ? students.filter((student) => requestedStudents.includes(student.profileId))
           : students.length === 1
-            ? students[0]
-            : undefined;
-    if (students !== undefined && !student) {
-      if (input.studentProfileId || !students.length)
+            ? students
+            : [];
+    if (
+      students !== undefined &&
+      (!selectedStudents.length ||
+        (requestedStudents && selectedStudents.length !== requestedStudents.length))
+    ) {
+      if (requestedStudents || !students.length)
         throw new ForbiddenException(
           'No linked student enrolled in this class was selected',
         );
-      throw new BadRequestException('Choose which student is joining');
+      throw new BadRequestException('Choose which students are joining');
     }
-    const joiningProfileId = student?.profileId ?? identity?.profileId;
+    const student = selectedStudents.length === 1 ? selectedStudents[0] : undefined;
+    const sharedStudents = selectedStudents.length > 1;
+    const selectedIds = selectedStudents.map((student) => student.profileId).sort();
+    const joiningProfileId =
+      student?.profileId ??
+      (sharedStudents
+        ? `shared:${createHash('sha256')
+            .update(JSON.stringify([identity?.authUserId, selectedIds]))
+            .digest('hex')
+            .slice(0, 28)}`
+        : identity?.profileId);
+    // guardianStudents has already checked every selected child's active class enrollment.
+    const membershipProfileId = selectedStudents[0]?.profileId ?? identity?.profileId;
     if (!settings.invite.enabled && !isHost && !isStaff) {
       if (!joiningProfileId || !session.channel_id)
         throw new ForbiddenException('Shared invitations are disabled');
@@ -749,7 +769,7 @@ export class LiveSessionsService {
         .select('id')
         .eq('org_id', session.org_id)
         .eq('channel_id', session.channel_id)
-        .eq('profile_id', joiningProfileId)
+        .eq('profile_id', membershipProfileId)
         .is('deleted_at', null)
         .maybeSingle();
       if (membership.error)
@@ -759,7 +779,11 @@ export class LiveSessionsService {
     }
     const displayName =
       input.displayNameOverride ??
-      student?.displayName ??
+      (selectedStudents.length
+        ? formatMeetingStudentNames(
+            selectedStudents.map((student) => student.displayName),
+          )
+        : undefined) ??
       identity?.displayName ??
       input.displayName;
     const mode = settings.access?.mode ?? 'open';
@@ -771,7 +795,7 @@ export class LiveSessionsService {
           .select('id')
           .eq('org_id', session.org_id)
           .eq('channel_id', session.channel_id)
-          .eq('profile_id', joiningProfileId)
+          .eq('profile_id', membershipProfileId)
           .is('deleted_at', null)
           .maybeSingle();
         if (membership.error)
@@ -784,7 +808,7 @@ export class LiveSessionsService {
           input.admissionToken,
           JSON.stringify([
             identity?.authUserId ?? 'guest',
-            student?.profileId ?? null,
+            sharedStudents ? selectedIds : (student?.profileId ?? null),
             input.displayName,
             storedPasscode,
           ]),
@@ -815,13 +839,16 @@ export class LiveSessionsService {
           }
         : {}),
       ...(identity ? { meetingPasscode: storedPasscode } : {}),
+      ...(selectedStudents.length ? { studentProfileIds: selectedIds } : {}),
       ...(student ? { studentProfileId: student.profileId } : {}),
       ...(!identity?.profileId ||
-      student ||
+      selectedStudents.length > 0 ||
       link?.purpose === 'access' ||
       (!isHost && input.displayNameOverride)
         ? {
-            annotationToken: await (link?.purpose === 'access' && !student && identity
+            annotationToken: await (link?.purpose === 'access' &&
+            !selectedStudents.length &&
+            identity
               ? issueAnnotationAccess(session.id, displayName, identity.authUserId)
               : issueAnnotationAccess(session.id, displayName)),
           }

@@ -74,7 +74,7 @@ export function AnnotationOverlay({
     () => new AnnotationCoordinateService({ width, height }),
     [width, height],
   );
-  const [tool, setToolState] = useState<AnnotationTool>('cursor');
+  const [tool, setToolState] = useState<AnnotationTool>('vanishingPen');
   const [chosenColor, setChosenColor] = useState<string | null>(null);
   const setColor = setChosenColor;
   const color =
@@ -83,6 +83,7 @@ export function AnnotationOverlay({
       engine.context?.actor.userId ?? 'participant',
       engine.context?.actors.map((person) => person.userId),
     );
+  const [backgroundColor, setBackgroundColor] = useState<string | undefined>(undefined);
   const [lineWidth, setLineWidth] = useState(3);
   const [opacity, setOpacity] = useState(1);
   const [fontSize, setFontSize] = useState(24);
@@ -183,7 +184,15 @@ export function AnnotationOverlay({
       clearInterval(timer);
     };
   }, [flush]);
+  const defaultAnnotationTool = useRef(false);
   useEffect(() => {
+    defaultAnnotationTool.current = false;
+  }, [shareKey]);
+  useEffect(() => {
+    if (engine.canDraw && !defaultAnnotationTool.current) {
+      defaultAnnotationTool.current = true;
+      setToolState('vanishingPen');
+    }
     if (!engine.canDraw) {
       active.current = null;
       pendingPoints.current = [];
@@ -193,7 +202,7 @@ export function AnnotationOverlay({
       setTextEditor(null);
       setToolState('cursor');
     }
-  }, [engine.canDraw, releasePointer]);
+  }, [engine.canDraw, releasePointer, shareKey]);
   useEffect(() => {
     if (!transformer.current || !stage.current) return;
     transformer.current.nodes(
@@ -303,7 +312,15 @@ export function AnnotationOverlay({
       creatorName: actor.name,
       creatorRole: actor.role,
       points: [point],
-      style: { color, width: lineWidth, opacity, fontSize, bold, italic },
+      style: {
+        color,
+        backgroundColor,
+        width: lineWidth,
+        opacity,
+        fontSize,
+        bold,
+        italic,
+      },
       rotation: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -865,7 +882,10 @@ export function AnnotationOverlay({
           showNames={showNames}
           setShowNames={setShowNames}
           onDelete={deleteSelection}
+          backgroundColor={backgroundColor}
           onQuickStyle={(style) => {
+            if (style.backgroundColor !== undefined)
+              setBackgroundColor(style.backgroundColor);
             for (const object of engine.objects)
               if (selected.includes(object.id) && canEdit(object))
                 swallow(
@@ -873,6 +893,9 @@ export function AnnotationOverlay({
                     ...object,
                     style: {
                       ...object.style,
+                      ...(style.backgroundColor !== undefined
+                        ? { backgroundColor: style.backgroundColor }
+                        : {}),
                       ...(style.strokeColor !== undefined && {
                         color: style.strokeColor,
                       }),
@@ -889,7 +912,15 @@ export function AnnotationOverlay({
                 swallow(
                   put({
                     ...object,
-                    style: { color, width: lineWidth, opacity, fontSize, bold, italic },
+                    style: {
+                      color,
+                      backgroundColor,
+                      width: lineWidth,
+                      opacity,
+                      fontSize,
+                      bold,
+                      italic,
+                    },
                   }),
                 );
           }}

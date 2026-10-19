@@ -1,4 +1,5 @@
 import React from 'react';
+import { Text } from 'react-native';
 import { fireEvent, render } from '@testing-library/react-native';
 import { NativeWhiteboardToolbar } from './native-whiteboard-toolbar';
 jest.mock('@/providers/theme-provider', () => ({
@@ -86,4 +87,54 @@ it('edits selected shapes with the same contextual stroke and fill controls as w
     type: 'style',
     style: { backgroundColor: '#1971c2' },
   });
+});
+it('keeps Follow tutor and More in the toolbar while their options stay in menus', () => {
+  const follow = jest.fn();
+  const screen = render(
+    <NativeWhiteboardToolbar
+      ready
+      editable
+      canClear
+      onCommand={jest.fn()}
+      onClear={jest.fn()}
+      onFollow={follow}
+      moreContent={<Text>Saved</Text>}
+    />,
+  );
+  expect(screen.queryByText('Saved')).toBeNull();
+  expect(screen.queryByText('Follow tutor')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Focus tutor'));
+  expect(follow).toHaveBeenCalledTimes(1);
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
+  expect(screen.getByText('Saved')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Close More whiteboard actions'));
+  expect(screen.queryByText('Saved')).toBeNull();
+});
+
+it('toggles the picker from the selected tool and preserves closure across style updates', () => {
+  const props = {
+    ready: true,
+    editable: true,
+    canClear: false,
+    onCommand: jest.fn(),
+    onClear: jest.fn(),
+    styleState: {
+      tool: 'freedraw' as const,
+      color: '#e03131',
+      width: 2,
+      fill: 'transparent',
+    },
+  };
+  const screen = render(<NativeWhiteboardToolbar {...props} />);
+  fireEvent.press(screen.getByLabelText('Pen'));
+  expect(screen.queryByLabelText('Close drawing styles')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Pen'));
+  expect(screen.getByLabelText('Close drawing styles')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Close drawing styles'));
+  screen.rerender(
+    <NativeWhiteboardToolbar {...props} styleState={{ ...props.styleState, width: 4 }} />,
+  );
+  expect(screen.queryByLabelText('Close drawing styles')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Text'));
+  expect(screen.getByLabelText('Close drawing styles')).toBeTruthy();
 });

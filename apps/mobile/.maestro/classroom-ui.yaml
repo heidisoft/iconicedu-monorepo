@@ -23,15 +23,17 @@ name: Native classroom UI lifecycle on iPad and Android tablets
 - tapOn: 'Settings'
 - tapOn: 'Video settings tab'
 - assertVisible: 'Choose background image'
-- tapOn: 'Camera device: Back camera'
-- assertVisible:
-    id: 'camera-device-back-selected'
-- tapOn: 'Camera device: Front camera'
+- tapOn: 'Camera: Front camera'
+- tapOn: 'Back camera'
+- assertVisible: 'Camera: Back camera'
+- tapOn: 'Camera: Back camera'
+- tapOn: 'Front camera'
 - tapOn: 'Audio settings tab'
-- tapOn: 'Audio device: Test headset'
-- assertVisible:
-    id: 'audio-device-headset-selected'
-- tapOn: 'Audio device: Speaker'
+- tapOn: 'Audio output: Speaker'
+- tapOn: 'Test headset'
+- assertVisible: 'Audio output: Test headset'
+- tapOn: 'Audio output: Test headset'
+- tapOn: 'Speaker'
 - scrollUntilVisible:
     element: 'Test speakers'
 - tapOn: 'Test speakers'
@@ -104,14 +106,14 @@ name: Native classroom UI lifecycle on iPad and Android tablets
     direction: UP
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
-- tapOn: 'Whiteboard options'
+- tapOn: 'More whiteboard actions'
 - scrollUntilVisible:
     element: 'Allow student editing'
 - tapOn: 'Allow student editing'
 - assertVisible: 'Disable student editing'
-- assertVisible: 'Stop presenting board'
-- tapOn: 'Return to video'
-- assertNotVisible: 'Return to video'
+- assertVisible: 'Stop sharing for everyone'
+- runFlow: hide-classroom-whiteboard.yaml
+- assertNotVisible: 'Expand whiteboard to full screen'
 - tapOn: 'Leave or end class'
 - tapOn: 'Leave'
 - assertVisible: 'You left the classroom'

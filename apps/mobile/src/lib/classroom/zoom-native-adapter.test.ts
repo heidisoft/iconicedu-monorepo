@@ -82,7 +82,12 @@ function fixture() {
     joinSession: jest.fn().mockResolvedValue(undefined),
     isInSession: jest.fn().mockResolvedValue(false),
     leaveSession: jest.fn(),
-    audioHelper: { unmuteAudio: success(), muteAudio: success(), setSpeaker: success() },
+    audioHelper: {
+      setSDKAudioSessionEnv: success(),
+      unmuteAudio: success(),
+      muteAudio: success(),
+      setSpeaker: success(),
+    },
     videoHelper: {
       startVideo: success(),
       stopVideo: success(),
@@ -246,6 +251,10 @@ describe('Zoom native bridge adapter', () => {
       cameras: [{ id: 'front', label: 'Front camera', selected: true }],
       mirrored: true,
       audio: [{ id: 'speaker', label: 'Speaker', selected: true }],
+      microphones: [
+        { id: 'speaker', label: 'Built-in microphone (speaker)', selected: true },
+      ],
+      microphoneRouting: 'linked',
     });
     await f.adapter.selectCamera!('front');
     expect(f.zoom.videoHelper.switchCamera).toHaveBeenCalledTimes(1);
@@ -614,4 +623,32 @@ it('enters the classroom before optional recording status resolves on first join
     expect.objectContaining({ type: 'joined', selfId: '1' }),
   );
   dispose();
+});
+
+it('uses iOS microphone input selection separately from the output route', async () => {
+  const f = fixture();
+  const os = jest.replaceProperty(Platform, 'OS', 'ios');
+  NativeModules.ClassroomDevices.getAudioInputs = jest
+    .fn()
+    .mockResolvedValue([
+      { id: 'built-in', label: 'Built-in microphone', selected: true },
+    ]);
+  NativeModules.ClassroomDevices.selectAudioInput = jest.fn().mockResolvedValue(true);
+  const devices = await f.adapter.devices!();
+  expect(devices.microphones).toEqual([
+    { id: 'built-in', label: 'Built-in microphone', selected: true },
+  ]);
+  expect(devices.microphoneRouting).toBe('independent');
+  await f.adapter.selectMicrophone!('built-in');
+  expect(f.zoom.audioHelper.setSDKAudioSessionEnv).toHaveBeenCalled();
+  expect(NativeModules.ClassroomDevices.selectAudioInput).toHaveBeenCalledWith(
+    'built-in',
+  );
+  expect(NativeModules.ClassroomDevices.selectAudioRoute).not.toHaveBeenCalled();
+  os.restore();
+});
+it('uses the communication route when independent microphone selection is unavailable', async () => {
+  const f = fixture();
+  await f.adapter.selectMicrophone!('speaker');
+  expect(NativeModules.ClassroomDevices.selectAudioRoute).toHaveBeenCalledWith('speaker');
 });

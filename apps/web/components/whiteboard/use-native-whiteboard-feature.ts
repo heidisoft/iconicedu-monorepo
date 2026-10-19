@@ -89,7 +89,7 @@ export function useNativeWhiteboardFeature(
     }
   }, [enabled, repo, active]);
   const stop = useCallback(async () => {
-    if (!repo || pending.current || (!presenting && role !== 'teacher')) return;
+    if (!repo || pending.current || !presenting) return;
     pending.current = true;
     setError(null);
     try {
@@ -104,13 +104,13 @@ export function useNativeWhiteboardFeature(
     } finally {
       pending.current = false;
     }
-  }, [repo, presenting, role]);
+  }, [repo, presenting]);
   return {
     open,
     role,
     presenting,
     active,
-    canStop: active && (presenting || role === 'teacher'),
+    canStop: active && presenting,
     stop,
     error,
     toggle,

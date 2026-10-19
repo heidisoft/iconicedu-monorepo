@@ -84,7 +84,9 @@ export class ExcalidrawWhiteboardEngine implements WhiteboardEngine {
     this.history.record(before, this.getElements());
     this.changed(this.getElements());
   }
+  onToolSelected?: (sameTool: boolean) => void;
   setTool(tool: WhiteboardTool) {
+    this.onToolSelected?.(this.api.getAppState().activeTool.type === tool);
     this.api.setActiveTool({ type: tool });
     this.api.updateScene({
       appState: { openMenu: ['hand', 'eraser', 'laser'].includes(tool) ? null : 'shape' },

@@ -1,7 +1,7 @@
 appId: com.heidisoft.iconicedu
 ---
 - extendedWaitUntil:
-    visible: 'Return to video'
+    visible: 'Expand whiteboard to full screen'
     timeout: 30000
 - extendedWaitUntil:
     visible:

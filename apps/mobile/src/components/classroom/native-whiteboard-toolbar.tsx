@@ -1,6 +1,6 @@
 import { DrawingStyleStrip, LaserPointerIcon } from '@iconicedu/ui-native';
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import {
   Hand,
   MousePointer2,
@@ -24,9 +24,10 @@ import {
   ZoomOut,
   RotateCcw,
   Trash2,
+  Binoculars,
+  X,
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
-
 export type Tool =
   | 'hand'
   | 'laser'
@@ -40,6 +41,7 @@ export type Tool =
   | 'ellipse'
   | 'diamond'
   | 'frame';
+type IconType = React.ComponentType<{ size?: number; color?: string }>;
 export function NativeWhiteboardToolbar({
   editable,
   ready,
@@ -48,7 +50,9 @@ export function NativeWhiteboardToolbar({
   onClear,
   styleState,
   onFollow,
-  followLabel,
+  moreContent,
+  menu: controlledMenu,
+  onMenuChange,
 }: {
   editable: boolean;
   ready: boolean;
@@ -63,55 +67,32 @@ export function NativeWhiteboardToolbar({
   onCommand: (command: Record<string, unknown>) => void;
   onClear: () => void;
   onFollow?: () => void;
-  followLabel?: string;
+  moreContent?: React.ReactNode;
+  menu?: string | null;
+  onMenuChange?: (menu: string | null) => void;
 }) {
   const { colors } = useTheme();
-  const [chosenTool, setTool] = useState<Tool>('selection');
+  const [focusHint, setFocusHint] = useState(false);
+  const { height } = useWindowDimensions();
+  const [chosenTool, setTool] = useState<Tool>('laser');
+  const [localMenu, setLocalMenu] = useState<string | null>(null);
+  const menu = controlledMenu === undefined ? localMenu : controlledMenu;
+  const setMenu = (value: string | null) => {
+    setLocalMenu(value);
+    onMenuChange?.(value);
+  };
+  const toggle = (value: string) => setMenu(menu === value ? null : value);
   const tool = styleState?.tool ?? chosenTool;
   const styleTool = styleState?.selectionType ?? tool;
-  const [menu, setMenu] = useState<string | null>(null);
   const [grid, setGrid] = useState('dots');
   const [snap, setSnap] = useState(false);
-  const button = (
-    label: string,
-    Icon: React.ComponentType<{ size?: number; color?: string }>,
-    action: () => void,
-    disabled = false,
-    selected = false,
-    dropdown = false,
-  ) => (
-    <Pressable
-      key={label}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{
-        disabled,
-        selected,
-        ...(dropdown ? { expanded: menu === label } : {}),
-      }}
-      disabled={disabled}
-      onPress={action}
-      style={{
-        minWidth: 44,
-        height: 44,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderRadius: 22,
-        backgroundColor: selected ? colors.actionSubtle : undefined,
-        opacity: disabled ? 0.4 : 1,
-      }}
-    >
-      <Icon size={20} color={colors.text} />
-      {dropdown && <ChevronDown size={12} color={colors.text} />}
-    </Pressable>
-  );
+  const [stylesVisible, setStylesVisible] = useState(true);
   const choose = (value: Tool) => {
+    setStylesVisible((visible) => (value === tool ? !visible : true));
     setTool(value);
     setMenu(null);
     onCommand({ type: 'tool', tool: value });
   };
-  const toggle = (value: string) => setMenu(menu === value ? null : value);
   const primary = [
     ['hand', 'Pan', Hand],
     ['laser', 'Laser pointer', LaserPointerIcon],
@@ -128,140 +109,280 @@ export function NativeWhiteboardToolbar({
     ['diamond', 'Diamond', Diamond],
     ['frame', 'Frame', Frame],
   ] as const;
+  const button = (
+    label: string,
+    Icon: IconType,
+    action: () => void,
+    disabled = false,
+    selected = false,
+    dropdown = false,
+    item = false,
+  ) => (
+    <Pressable
+      key={label}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{
+        disabled,
+        selected,
+        ...(dropdown ? { expanded: menu === label } : {}),
+      }}
+      disabled={disabled}
+      onPress={action}
+      style={{
+        minWidth: 44,
+        minHeight: 44,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: item ? 'flex-start' : 'center',
+        gap: 8,
+        paddingHorizontal: item ? 12 : 4,
+        borderRadius: item ? 12 : 22,
+        backgroundColor: selected ? colors.actionSubtle : undefined,
+        opacity: disabled ? 0.4 : 1,
+      }}
+    >
+      <Icon size={16} color={colors.text} />
+      {item && <Text style={{ color: colors.text, flexShrink: 1 }}>{label}</Text>}
+      {dropdown && Icon !== ChevronDown && Icon !== Ellipsis && (
+        <ChevronDown size={10} color={colors.text} />
+      )}
+    </Pressable>
+  );
+  const item = (
+    label: string,
+    Icon: IconType,
+    action: () => void,
+    disabled = false,
+    selected = false,
+  ) => button(label, Icon, action, disabled, selected, false, true);
   return (
-    <View style={{ backgroundColor: colors.card, zIndex: 4 }}>
-      <ScrollView
-        horizontal
+    <View style={{ zIndex: 4 }}>
+      <View
+        accessibilityRole="toolbar"
         accessibilityLabel="Whiteboard tools"
-        contentContainerStyle={{ gap: 2, padding: 4 }}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          borderRadius: 28,
+          borderWidth: 1,
+          borderColor: colors.border,
+          backgroundColor: colors.card,
+          padding: 4,
+        }}
       >
-        {primary.map(([value, label, Icon]) =>
-          button(
-            label,
-            Icon,
-            () => choose(value),
-            !ready || (!editable && value !== 'hand'),
-            tool === value,
-          ),
-        )}
-        {button(
-          'Shapes',
-          Shapes,
-          () => toggle('Shapes'),
-          !ready || !editable,
-          shapes.some(([value]) => value === tool),
-          true,
-        )}
-        {button('Library', Library, () => onCommand({ type: 'library' }), !ready)}
-        {button('Undo', Undo2, () => onCommand({ type: 'undo' }), !ready || !editable)}
-        {button(
-          'View controls',
-          Scan,
-          () => toggle('View controls'),
-          !ready,
-          false,
-          true,
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ flex: 1, minWidth: 0 }}
+          contentContainerStyle={{ alignItems: 'center', gap: 2 }}
+        >
+          {primary.map(([value, label, Icon]) =>
+            button(
+              label,
+              Icon,
+              () => choose(value),
+              !ready || (!editable && value !== 'hand'),
+              tool === value,
+            ),
+          )}
+          {button(
+            'Shapes',
+            shapes.find(([value]) => value === tool)?.[2] ?? Shapes,
+            () => toggle('Shapes'),
+            !ready || !editable,
+            shapes.some(([value]) => value === tool),
+            true,
+          )}
+          {button('Library', Library, () => onCommand({ type: 'library' }), !ready)}
+          <View
+            style={{
+              width: 1,
+              height: 24,
+              backgroundColor: colors.border,
+              marginHorizontal: 4,
+            }}
+          />
+          {button('Undo', Undo2, () => onCommand({ type: 'undo' }), !ready || !editable)}
+          {button(
+            'View controls',
+            Scan,
+            () => toggle('View controls'),
+            !ready,
+            false,
+            true,
+          )}
+        </ScrollView>
+        {onFollow && (
+          <>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Focus tutor"
+              accessibilityHint="Center on the tutor’s current view once"
+              onLongPress={() => setFocusHint((value) => !value)}
+              accessibilityState={{ disabled: !ready }}
+              disabled={!ready}
+              onPress={() => {
+                setFocusHint(false);
+                onFollow?.();
+              }}
+              style={{
+                minHeight: 44,
+                minWidth: 44,
+                justifyContent: 'center',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                borderRadius: 22,
+              }}
+            >
+              <Binoculars size={16} color={colors.text} />
+            </Pressable>
+          </>
         )}
         {button(
           'More whiteboard actions',
           Ellipsis,
           () => toggle('More whiteboard actions'),
-          !ready,
+          false,
           false,
           true,
         )}
-        {onFollow && (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Follow viewport"
-            disabled={!ready}
-            onPress={onFollow}
-            style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 12 }}
-          >
-            <Text style={{ color: colors.text }}>{followLabel ?? 'Follow tutor'}</Text>
-          </Pressable>
-        )}
-      </ScrollView>
+      </View>
+      {focusHint && (
+        <Text
+          style={{
+            color: colors.text,
+            padding: 8,
+            backgroundColor: colors.card,
+            borderRadius: 12,
+            position: 'absolute',
+            top: 54,
+            right: 12,
+            zIndex: 20,
+          }}
+        >
+          Focus tutor’s current view
+        </Text>
+      )}
       {editable && !['hand', 'laser', 'eraser', 'selection'].includes(styleTool) && (
         <DrawingStyleStrip
+          open={stylesVisible}
+          onOpenChange={setStylesVisible}
           color={styleState?.color ?? '#1e293b'}
           width={styleState?.width ?? 2}
           fill={styleState?.fill}
           foreground={colors.text}
+          background={colors.card}
+          borderColor={colors.border}
           showWidth={styleTool !== 'text'}
           showFill={['rectangle', 'ellipse', 'diamond'].includes(styleTool)}
           onStyle={(style) => onCommand({ type: 'style', style })}
+          onClose={() => onCommand({ type: 'close-style-options' })}
           onMore={() => onCommand({ type: 'style-options' })}
         />
       )}
       {menu && (
-        <ScrollView
-          horizontal
-          accessibilityLabel={menu}
-          contentContainerStyle={{ gap: 4, padding: 4 }}
+        <View
+          style={{
+            position: 'absolute',
+            top: 58,
+            right: 0,
+            width: '100%',
+            maxWidth: 320,
+            maxHeight: height * 0.5,
+            padding: 8,
+            borderRadius: 16,
+            backgroundColor: colors.card,
+            borderWidth: 1,
+            borderColor: colors.border,
+          }}
         >
-          {menu === 'Shapes' &&
-            shapes.map(([value, label, Icon]) =>
-              button(label, Icon, () => choose(value), !editable, tool === value),
-            )}
-          {menu === 'View controls' && (
-            <>
-              {(['none', 'dots', 'lines'] as const).map((value) => (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text
+              accessibilityRole="header"
+              style={{ flex: 1, color: colors.text, paddingHorizontal: 8 }}
+            >
+              {menu}
+            </Text>
+            {button(`Close ${menu}`, X, () => setMenu(null))}
+          </View>
+          <ScrollView
+            accessibilityLabel={`${menu} menu`}
+            keyboardShouldPersistTaps="handled"
+          >
+            {menu === 'Shapes' &&
+              shapes.map(([value, label, Icon]) =>
+                item(label, Icon, () => choose(value), !editable, tool === value),
+              )}
+            {menu === 'View controls' && (
+              <>
+                {(['none', 'dots', 'lines'] as const).map((value) => (
+                  <Pressable
+                    key={value}
+                    accessibilityRole="radio"
+                    accessibilityLabel={
+                      value === 'none'
+                        ? 'No grid'
+                        : value === 'dots'
+                          ? 'Dot grid'
+                          : 'Line grid'
+                    }
+                    accessibilityState={{ checked: grid === value }}
+                    onPress={() => {
+                      setGrid(value);
+                      onCommand({ type: 'grid', grid: value, snap });
+                    }}
+                    style={{ minHeight: 44, padding: 12 }}
+                  >
+                    <Text style={{ color: colors.text }}>
+                      {grid === value ? '✓ ' : ''}
+                      {value === 'none'
+                        ? 'No grid'
+                        : value === 'dots'
+                          ? 'Dot grid'
+                          : 'Line grid'}
+                    </Text>
+                  </Pressable>
+                ))}
                 <Pressable
-                  key={value}
-                  accessibilityRole="radio"
-                  accessibilityLabel={
-                    value === 'none'
-                      ? 'No grid'
-                      : value === 'dots'
-                        ? 'Dot grid'
-                        : 'Line grid'
-                  }
-                  accessibilityState={{ checked: grid === value }}
+                  accessibilityRole="checkbox"
+                  accessibilityLabel="Snap to grid"
+                  accessibilityState={{ checked: snap }}
                   onPress={() => {
-                    setGrid(value);
-                    onCommand({ type: 'grid', grid: value, snap });
+                    setSnap(!snap);
+                    onCommand({ type: 'grid', grid, snap: !snap });
                   }}
-                  style={{ padding: 12 }}
+                  style={{ minHeight: 44, padding: 12 }}
                 >
                   <Text style={{ color: colors.text }}>
-                    {value === 'none'
-                      ? 'No grid'
-                      : value === 'dots'
-                        ? 'Dot grid'
-                        : 'Line grid'}
+                    {snap ? '✓ ' : ''}Snap to grid
                   </Text>
                 </Pressable>
-              ))}
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityLabel="Snap to grid"
-                accessibilityState={{ checked: snap }}
-                onPress={() => {
-                  setSnap(!snap);
-                  onCommand({ type: 'grid', grid, snap: !snap });
-                }}
-                style={{ padding: 12 }}
-              >
-                <Text style={{ color: colors.text }}>Snap to grid</Text>
-              </Pressable>
-              {button('Fit content', Scan, () => onCommand({ type: 'fit' }))}
-              {button('Zoom in', ZoomIn, () => onCommand({ type: 'zoom', delta: 0.1 }))}
-              {button('Zoom out', ZoomOut, () =>
-                onCommand({ type: 'zoom', delta: -0.1 }),
-              )}
-              {button('Reset zoom to 100%', RotateCcw, () =>
-                onCommand({ type: 'reset-zoom' }),
-              )}
-            </>
-          )}
-          {menu === 'More whiteboard actions' && (
-            <>
-              {button('Redo', Redo2, () => onCommand({ type: 'redo' }), !editable)}
-              {canClear && button('Clear board', Trash2, onClear, !editable)}
-            </>
-          )}
-        </ScrollView>
+                {item('Fit content', Scan, () => onCommand({ type: 'fit' }))}
+                {item('Zoom in', ZoomIn, () => onCommand({ type: 'zoom', delta: 0.1 }))}
+                {item('Zoom out', ZoomOut, () =>
+                  onCommand({ type: 'zoom', delta: -0.1 }),
+                )}
+                {item('Reset zoom to 100%', RotateCcw, () =>
+                  onCommand({ type: 'reset-zoom' }),
+                )}
+              </>
+            )}
+            {menu === 'More whiteboard actions' && (
+              <>
+                {moreContent}
+                {item(
+                  'Redo',
+                  Redo2,
+                  () => onCommand({ type: 'redo' }),
+                  !ready || !editable,
+                )}
+                {canClear && item('Clear board', Trash2, onClear, !ready || !editable)}
+              </>
+            )}
+          </ScrollView>
+        </View>
       )}
     </View>
   );

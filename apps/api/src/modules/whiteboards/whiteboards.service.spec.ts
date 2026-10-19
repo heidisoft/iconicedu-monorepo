@@ -135,29 +135,36 @@ describe('whiteboard API capabilities and atomic persistence', () => {
       },
     });
   });
-  it('prevents a participant from stopping or replacing another live presenter', async () => {
-    const { db, current, grant } = mockDb('student');
-    current.single.mockResolvedValue({
-      data: {
-        ...board,
-        document: {
-          ...board.document,
-          presenting: true,
-          presentation: { presenterId: 'other', sessionId: 'session' },
+  it.each(['student', 'teacher'])(
+    'prevents a %s from stopping or replacing another live presenter',
+    async (role) => {
+      const { db, current, grant } = mockDb(role);
+      current.single.mockResolvedValue({
+        data: {
+          ...board,
+          document: {
+            ...board.document,
+            presenting: true,
+            presentation: { presenterId: 'other', sessionId: 'session' },
+          },
         },
-      },
-      error: null,
-    });
-    grant.then = builder([{ token_hash: 'other', role: 'student' }]).then;
-    const service = new WhiteboardsService();
-    await expect(
-      service.mutate(token, { id: 'stop-other', type: 'presentation', enabled: false }),
-    ).rejects.toThrow('Only the presenter');
-    await expect(
-      service.mutate(token, { id: 'replace-other', type: 'presentation', enabled: true }),
-    ).rejects.toThrow('Another participant');
-    expect(db.rpc).not.toHaveBeenCalled();
-  });
+        error: null,
+      });
+      grant.then = builder([{ token_hash: 'other', role: 'student' }]).then;
+      const service = new WhiteboardsService();
+      await expect(
+        service.mutate(token, { id: 'stop-other', type: 'presentation', enabled: false }),
+      ).rejects.toThrow('Only the person who started');
+      await expect(
+        service.mutate(token, {
+          id: 'replace-other',
+          type: 'presentation',
+          enabled: true,
+        }),
+      ).rejects.toThrow('Another participant');
+      expect(db.rpc).not.toHaveBeenCalled();
+    },
+  );
   it('allows the participant presenter to stop their own presentation', async () => {
     const { db, current } = mockDb('student', true);
     current.single.mockResolvedValue({
@@ -411,4 +418,35 @@ describe('whiteboard viewport presence', () => {
     ).rejects.toThrow('Whiteboard access expired');
     expect(grant.update).not.toHaveBeenCalled();
   });
+});
+
+describe('whiteboard writing focus', () => {
+  beforeEach(() => jest.clearAllMocks());
+  it('keeps validated writing coordinates in ephemeral presence and strips extra data', async () => {
+    const { grant } = mockDb('teacher', true);
+    await new WhiteboardsService().publishViewport(token, {
+      centerX: 0,
+      centerY: 0,
+      zoom: 1,
+      writing: { x: 1200, y: -400, actorId: 'forged' },
+    });
+    expect(grant.update).toHaveBeenCalledWith({
+      viewport: { centerX: 0, centerY: 0, zoom: 1, writing: { x: 1200, y: -400 } },
+      viewport_updated_at: expect.any(String),
+    });
+  });
+  it.each([null, {}, { x: '1', y: 0 }, { x: 0, y: Infinity }, { x: 10000001, y: 0 }])(
+    'rejects invalid writing focus %p',
+    async (writing) => {
+      await expect(
+        new WhiteboardsService().publishViewport(token, {
+          centerX: 0,
+          centerY: 0,
+          zoom: 1,
+          writing,
+        }),
+      ).rejects.toThrow('Invalid whiteboard viewport');
+      expect(createSupabaseServiceClient).not.toHaveBeenCalled();
+    },
+  );
 });

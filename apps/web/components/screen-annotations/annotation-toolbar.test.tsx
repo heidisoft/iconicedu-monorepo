@@ -247,3 +247,13 @@ describe('screen annotation toolbar', () => {
     expect(props.setTool).toHaveBeenLastCalledWith('cursor');
   });
 });
+
+it('closes quick styles fully and reopens them from the selected Pen tool', () => {
+  setup({ tool: 'pen', autoExpand: true });
+  click('Close drawing styles');
+  expect(screen.queryByRole('toolbar', { name: 'Drawing styles' })).toBeNull();
+  click('Pen');
+  expect(screen.getByRole('toolbar', { name: 'Drawing styles' })).toBeTruthy();
+  click('Pen');
+  expect(screen.queryByRole('toolbar', { name: 'Drawing styles' })).toBeNull();
+});

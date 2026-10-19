@@ -1,3 +1,4 @@
+import { NativeClassroomError } from './native-classroom-error';
 import { X } from 'lucide-react-native';
 import { NativeAnnotationBar } from './native-annotation-bar';
 import { DrawingStyleStrip } from '@iconicedu/ui-native';
@@ -106,7 +107,10 @@ function ShapeContent({
         y={top}
         width={w}
         height={h}
-        fill={object.type === 'rectangle' ? 'none' : object.style.color}
+        fill={
+          object.style.backgroundColor ??
+          (object.type === 'rectangle' ? 'none' : object.style.color)
+        }
       />
     );
   if (object.type.startsWith('ellipse'))
@@ -117,13 +121,17 @@ function ShapeContent({
         cy={top + h / 2}
         rx={w / 2}
         ry={h / 2}
-        fill={object.type === 'ellipse' ? 'none' : object.style.color}
+        fill={
+          object.style.backgroundColor ??
+          (object.type === 'ellipse' ? 'none' : object.style.color)
+        }
       />
     );
   if (object.type === 'diamond')
     return (
       <Polygon
         {...style}
+        fill={object.style.backgroundColor ?? 'none'}
         points={`${left + w / 2},${top} ${left + w},${top + h / 2} ${left + w / 2},${top + h} ${left},${top + h / 2}`}
       />
     );
@@ -279,9 +287,10 @@ export function NativeScreenAnnotations({
   useEffect(() => {
     setOptionsPanel(null);
     setSelected(null);
-    setTool(active ? 'pen' : 'cursor');
-  }, [active]);
-  const [tool, setTool] = useState<AnnotationTool>('pen');
+    setTool(active ? 'vanishingPen' : 'cursor');
+  }, [active, shareKey]);
+  const [tool, setTool] = useState<AnnotationTool>('vanishingPen');
+  const [stylesVisible, setStylesVisible] = useState(true);
   const [lasers, setLasers] = useState<AnnotationLaserStroke[]>([]);
   const outgoingLasers = useRef<AnnotationLaserStroke[]>([]);
   const laserSending = useRef(false);
@@ -860,9 +869,7 @@ export function NativeScreenAnnotations({
                 void flush();
               }}
             >
-              <Text accessibilityRole="alert" style={{ color: colors.text }}>
-                {error} Retry
-              </Text>
+              <NativeClassroomError message={`${error} Retry`} />
             </Pressable>
           )}
           {context?.actor.role === 'student' && !context.snapshot.studentsEnabled && (
@@ -888,6 +895,7 @@ export function NativeScreenAnnotations({
               tool={tool}
               editable={editable}
               onTool={(value) => {
+                setStylesVisible((visible) => (value === tool ? !visible : true));
                 setOptionsPanel(null);
                 setTool(value);
                 if (value !== 'select') setSelected(null);
@@ -906,13 +914,34 @@ export function NativeScreenAnnotations({
           </NativeAnnotationBar>
           {active && editable && !['cursor', 'eraser'].includes(tool) && (
             <DrawingStyleStrip
+              open={stylesVisible}
+              onOpenChange={setStylesVisible}
               color={style.color}
               width={style.width}
               widths={[1, 3, 6]}
+              fill={
+                style.backgroundColor ??
+                (tool.includes('Filled') || tool.includes('Highlight')
+                  ? style.color
+                  : 'transparent')
+              }
+              showFill={[
+                'rectangle',
+                'rectangleFilled',
+                'ellipse',
+                'ellipseFilled',
+                'diamond',
+              ].includes(tool)}
               foreground={colors.text}
+              background={colors.card}
+              borderColor={colors.border}
+              onClose={() => setOptionsPanel(null)}
               showWidth={tool !== 'text'}
               onStyle={(patch) => {
                 changeStyle({
+                  ...(patch.backgroundColor !== undefined
+                    ? { backgroundColor: patch.backgroundColor }
+                    : {}),
                   ...(patch.strokeColor ? { color: patch.strokeColor } : {}),
                   ...(patch.strokeWidth ? { width: patch.strokeWidth } : {}),
                 });

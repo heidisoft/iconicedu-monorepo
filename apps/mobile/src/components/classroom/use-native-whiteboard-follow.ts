@@ -13,15 +13,21 @@ export function useNativeWhiteboardFollow(
   repository: NativeWhiteboardRepository | undefined,
   snapshot: WhiteboardSnapshotVM | null,
   enabled: boolean,
-  receive: (viewport: WhiteboardViewportVM) => void,
+  receive: (viewport: WhiteboardViewportVM, sourceKey?: string) => void,
 ) {
   const [following, setFollowing] = useState('tutor');
+  const [focusRequest, setFocusRequest] = useState(0);
+  const focusTutor = useCallback(() => {
+    setFollowing('tutor');
+    setFocusRequest((value) => value + 1);
+  }, []);
   const [status, setStatus] = useState<'waiting' | 'following' | 'reconnecting'>(
     'waiting',
   );
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
   const latest = useRef<WhiteboardViewportVM | null>(null);
+  const generation = useRef(0);
   const target =
     following === 'tutor'
       ? snapshot?.presence.find(
@@ -43,12 +49,14 @@ export function useNativeWhiteboardFollow(
       (repository && (!repository.viewports || !repository.publishViewport))
     )
       return;
+    const epoch = ++generation.current;
     let active = true,
       reading = false,
-      writing = false;
+      writing = false,
+      focused = false;
     setStatus('waiting');
     const read = async () => {
-      if (reading) return;
+      if (reading || focused || following === 'free') return;
       reading = true;
       try {
         const peers = repository
@@ -74,7 +82,17 @@ export function useNativeWhiteboardFollow(
             : candidates.find((person) => person.actorId === target);
         if (active) {
           setStatus(peer ? 'following' : 'waiting');
-          if (peer) receive(peer.viewport);
+          if (peer) {
+            focused = true;
+            const viewport = peer.viewport.writing
+              ? {
+                  ...peer.viewport,
+                  centerX: peer.viewport.writing.x,
+                  centerY: peer.viewport.writing.y,
+                }
+              : peer.viewport;
+            receive(viewport, `${peer.actorId}:${epoch}`);
+          }
         }
       } catch {
         if (active) setStatus('reconnecting');
@@ -104,6 +122,6 @@ export function useNativeWhiteboardFollow(
       active = false;
       clearInterval(timer);
     };
-  }, [token, repository, enabled, target, following, receive]);
-  return { following, setFollowing, publish, status };
+  }, [token, repository, enabled, target, following, receive, focusRequest]);
+  return { following, setFollowing, focusTutor, publish, status };
 }

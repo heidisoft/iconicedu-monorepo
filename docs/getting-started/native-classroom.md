@@ -49,7 +49,7 @@ Register each test iPad before creating the iOS build so its provisioning profil
 - The ended screen states why the session closed (left, ended by host, removed, network). SDK errors use actionable copy, and camera/microphone access revoked mid-class offers Settings. Quality events use web's vocabulary: `good`/`bad` network transitions and `reconnecting`/`fail` connection states.
 - Background photos are downscaled copies of `apps/web/public/live-session-backgrounds` in `apps/mobile/assets/live-session-backgrounds` (longest side 1920px), named by the shared `buildMeetingBackgroundCatalog`. Add or remove a photo in both directories and register it in `src/lib/classroom/background-catalog.ts`. The chosen effect is remembered locally and applied after joining; camera-library photos are not remembered.
 - Recording a visible app-owned whiteboard publishes its canvas through Zoom's native view-sharing API. Screen sharing composites saved annotation objects into outgoing frames: Android uses Zoom share preprocessing and iOS uses the ReplayKit extension. UI controls and selection handles are excluded from the annotation overlay. Native publishers announce composition only after outgoing frames are composed; web and native expire silent announcements after six seconds. Recording start/resume requires all active screen presenters to publish composed content, and loss of content pauses recording (or stops it if pause fails). Stale annotation overlays stop screen sharing rather than continuing with missing annotations. Signed-device verification of the actual cloud video remains required; component tests and simulator builds cannot certify recorded pixels.
-- Whiteboards expose persistent save/reconnect status and participant initials, PNG/SVG exports, and user-accessible download/discard of pending edits. Discard requires confirmation and reloads the saved scene before removing the local queue. The educational library groups assets by category and reports empty search results.
+- Whiteboard toolbar More contains save/reconnect status, participant initials, PNG/SVG exports, and user-accessible download/discard of pending edits. Discard requires confirmation and reloads the saved scene before removing the local queue. The educational library groups assets by category and reports empty search results.
 - Invite opens a native sheet with separate copy actions for the join link and passcode, plus the operating-system invitation share chooser. Chat keeps the full received in-call history for parity with web; leaving clears the meeting state.
 - Native sheets, focused video, whiteboards, settings, reaction trajectories and control-pop animations respect the system reduced-motion preference. Canvas tools and meeting actions use semantic Lucide icons with accessible labels and selected/disabled state.
 
@@ -59,7 +59,7 @@ Audio settings and Video settings are available directly from the call bar. Each
 
 While publishing a screen or whiteboard, a persistent notice identifies the outbound content and exposes Stop sharing. Expanded whiteboards retain this action. Stopping whiteboard publishing first stops outbound SDK media, then ends the app board presentation; if the latter fails, the classroom reports that the board remains open so the host can retry. Stop failures keep the action available and repeated taps cannot issue concurrent stops.
 
-Whiteboard follow state stays visible beside the board status. Explore freely and Follow tutor are reachable without opening options; participant-specific follow remains in options. Following controls viewport navigation only; editing permission stays under the existing teacher control.
+The whiteboard uses the same rounded toolbar, tool order, icons and labeled menus on web and mobile. The icon-only Focus tutor button centers the tutor’s current writing location (or viewport) once; it does not continuously follow their movements. Its tooltip or native long-press hint explains the action. Each board initially fits saved content or centers the blank scene, and makes one initial tutor focus when a live tutor view is available. More contains save status, participants, export and editing permissions. Mobile keeps Focus tutor and More visible while drawing tools scroll, preserving 44-point touch targets. Local drawing/text editing interrupts camera movement and reduced-motion preferences disable interpolation. Writing focus is ephemeral, API-validated, and independent of editing authorization. Whiteboards and screen annotations default to the laser pointer. Both drawing style strips have Close and Show controls; screen annotation shapes support a separate fill color, including transparent fill.
 
 These controls follow the discoverability principles in [Meet's device controls](https://support.google.com/meet/answer/10409699), [Meet's presentation guidance](https://support.google.com/meet/answer/9308856) and [Zoom's participant-follow controls](https://support.zoom.com/hc/en/article?id=zm_kb&sysparm_article=KB0061925). Web captions retain a polite, atomic live region while enabled, including between caption messages, for screen-reader announcements.
 
@@ -67,9 +67,9 @@ These controls follow the discoverability principles in [Meet's device controls]
 
 The in-class screen follows web's call layout rather than a scrolling page: a header with the class title, attendee count, timer and recording badge; a stage that the gallery or shared content fills; and pinned controls. Chat ("In-call Messages", with "You" and web's relative times), People and the Zoom-hosted whiteboard open as sheets. Joining plays web's two-note chime, rendered natively as a system sound on iOS and on the call-signalling stream on Android so it never changes the call's audio routing or focus. After leaving, people rate the session with web's five labelled choices and can Submit or Skip.
 
-The phone call bar keeps labelled microphone, camera, screen share, leave and More controls in one row. More opens a compact bottom sheet (bounded in width on tablets, dismissible by tapping outside) with an icon grid for chat, collaboration tools, reactions and separate host controls. Camera switching, mirroring and self-view preferences live in Video settings; share policy and automatic floating calls live in Meeting settings. Audio settings contain device routes, microphone activity and microphone/speaker tests. Chat accounts for the iOS sheet inset so the keyboard leaves the composer and Send action visible. Chat preserves unsent drafts on failure, prevents duplicate sends while a request is pending and keeps newly typed text after the previous message sends. Recording status is accessible to screen readers and stays visible in expanded whiteboards. Web and native preview show a single Settings entry instead of a separate device-test shortcut. Closing native settings stops active audio tests even if cleanup reports an error.
+The phone call bar uses icon controls ordered microphone, camera, whiteboard, screen share, More, and leave. Whiteboard controls stay beside camera and microphone. More opens a compact bottom sheet (bounded in width on tablets, dismissible by tapping outside) with labeled action rows for chat, collaboration tools, reactions and host controls. Audio and video are tabs inside the single Settings entry, rather than separate meeting menu actions. Camera switching, mirroring and self-view preferences live in the Video tab; share policy and automatic floating calls live in Meeting settings. Audio settings contain device routes, microphone activity and microphone/speaker tests. Chat accounts for the iOS sheet inset so the keyboard leaves the composer and Send action visible. Chat preserves unsent drafts on failure, prevents duplicate sends while a request is pending and keeps newly typed text after the previous message sends. Recording status is accessible to screen readers and stays visible in expanded whiteboards. Web and native preview show a single Settings entry instead of a separate device-test shortcut. Closing native settings stops active audio tests even if cleanup reports an error.
 
-The whiteboard fills the available drawing area without a title/header. The board occupies the same presentation area as a shared screen, with a participant filmstrip and the call controls available. In landscape, the presentation fills the left side and a scrollable participant rail sits on the right; portrait keeps the rail below. Both presentations offer a direct full-screen expansion control. Floating controls return to video or open board/library/export options. Expanding the board uses the full screen. Starting a board presents it to everyone; Return to video only hides it on this device. The presenter and teachers can explicitly stop presentation. Student drawing still follows the teacher’s editing permission, with view-only guidance in board options. Disabled participant screen annotations also explain the host’s permission setting. A new presentation automatically opens for connected participants, including when started on mobile. Presentation polling continues while drawing or retrying unsaved strokes so a remote stop closes the board promptly. Older save responses cannot reopen a stopped presentation. A new SDK screen share replaces the local whiteboard view, and stopping an expanded screen share returns to the call.
+The whiteboard fills the available drawing area without a title/header. The board occupies the same presentation area as a shared screen, with a participant filmstrip and the call controls available. In landscape, the presentation fills the left side and a scrollable participant rail sits on the right; portrait keeps the rail below. Both presentations offer a direct full-screen expansion control. Floating controls return to video or open board/library/export options. Expanding the board uses the full screen. Starting a board presents it to everyone; Return to video only hides it on this device. Only the participant who started the whiteboard can stop its presentation for everyone. Hiding it locally leaves sharing active. Student drawing still follows the teacher’s editing permission, with view-only guidance in board options. Disabled participant screen annotations also explain the host’s permission setting. A new presentation automatically opens for connected participants, including when started on mobile. Presentation polling continues while drawing or retrying unsaved strokes so a remote stop closes the board promptly. Older save responses cannot reopen a stopped presentation. A new SDK screen share replaces the local whiteboard view, and stopping an expanded screen share returns to the call.
 
 On iPhone/iPad, Share screen opens a native sheet with Apple's visible broadcast button. Tap it, then choose Start Broadcast in the system dialog. The app confirms sharing from SDK share events, not from opening the picker. Missing broadcast extensions or App Group entitlements produce an actionable error. This native control requires a new signed native build; an OTA update alone cannot add it. Device signing must include the classroom App Group for both targets, and receiving the broadcast must be verified in a live call on physical hardware.
 
@@ -238,12 +238,11 @@ The tests skip without `NATIVE_SYNC_DEVICE_ID`. Temporary capabilities stay in p
 
 ### Following the whiteboard viewport
 
-Whiteboard options on mobile and the Follow viewport selector on web let participants
-follow the tutor (the default), select another participant, or explore freely. Tutors
-can select participants too. Following shares the scene center and zoom, so different
-screen sizes stay centered on the same drawing area. Editing permissions do not change.
-If the selected person leaves or stops sharing updates, the board holds its last view;
-choose another participant or Explore freely to navigate independently.
+The Focus tutor icon on both platforms centers the current active writing location or
+tutor viewport once, including an initial focus on join. Participants then navigate
+independently; clicking the icon again requests a fresh location. Missing or expired
+tutor updates leave the participant’s viewport unchanged. A one-time focus shares the
+scene center and zoom across different screen sizes without changing editing permissions.
 
 Viewport updates use capability-authenticated API endpoints, are scoped to the current
 board and live session, and expire after ten seconds. They never change saved drawing
@@ -251,10 +250,13 @@ revisions. Apply migration `20261016120000_whiteboard_viewport_presence.sql` bef
 deploying the API. Web controls remain behind the catalogued, default-off
 `enable-classroom-whiteboard` flag.
 
-The web meeting toolbar opens the whiteboard when no presentation is active. The
-presenter or a tutor can click **Stop presenting whiteboard** to end it for everyone
-directly. Other participants see a disabled presentation indicator with an explanation
-of who can stop it. There is no local hide action or intermediate options menu.
+Any participant can start the whiteboard when no presentation is active. During a
+presentation, the web whiteboard button and mobile Whiteboard action offer **Hide
+whiteboard for me** or **Show whiteboard**. These only change the local view, including
+for the presenter, and do not stop outbound publishing. Only the person who started
+the presentation sees **Stop sharing for everyone**; the API enforces the same rule
+for students and tutors. Another participant cannot replace an active presentation.
+Once sharing stops, all participants return to the call and the saved board is retained.
 
 ### Drawing controls on mobile
 
@@ -286,3 +288,57 @@ duplicate/delete, export, permission-aware clearing, annotator names and toolbar
 position. The drag handle and dock selection persist position on the device. Touch
 targets remain at least 44 points; selecting an object shows its author where web
 uses hover.
+
+Ready-to-join screens provide Back before joining. Mobile uses a fixed, safe-area-aware
+“Ready to join?” header with the same centered title and chevron back control as other native pages.
+When the preview camera is off, mobile shows a centered initials avatar using the current display name.
+Single-participant and shared-device joins render the same native classroom preview and Settings sheet;
+the shared-device variation adds student selection. The preview controller may exist before
+credentials are issued, but it cannot connect to the SDK until Join obtains real API authorization.
+For multiple enrolled students,
+web and mobile show Who is joining inside the preview, allow selecting one or more students sharing a device,
+and allow a separate display-name edit with Save and Cancel. Changing the selection
+resets the displayed name to the selected names joined with an ampersand; the student profile and admission token
+remain separate from the editable display name. Mobile does not request admission
+until the student is chosen and Join is pressed. People uses avatar rows, host/co-host
+labels, microphone/camera indicators, hand state, and permission-gated contextual actions.
+Preview and classroom errors use styled, announced alert cards.
+
+A shared sibling connection submits `studentProfileIds`; the legacy `studentProfileId`
+remains supported for a single student. The API checks every selected child against
+active family links and this class’s enrollment, uses a separate shared SDK identity,
+and binds admission approval to the entire canonical set. Shared credentials include
+all verified profile IDs, rather than attributing the connection to only one child.
+Changing the selection rotates pending admission identity; selection order does not.
+
+Meeting Settings retains Audio, Video, and Meeting tabs. Microphone, audio output, and camera selectors
+show the SDK-selected device and refresh as devices connect or disconnect. The styled rows
+open an iOS system action sheet (anchored on iPad) or an Android native picker dialog.
+These controls do not use a styled JavaScript popup or portal. Android uses the Expo-compatible
+`@react-native-picker/picker` package; rebuild the native development client after installing it.
+Selection waits for the SDK result, prevents duplicate taps, and keeps failures recoverable
+below the selector. iOS lists available microphone inputs and sets the preferred input through
+AVAudioSession. Android uses the microphone associated with the selected communication
+route, so microphone and output changes are linked and the UI explains this. Bluetooth
+routes may couple input and output on either platform. The Audio tab also includes a microphone on/off switch;
+volume is adjusted with device buttons. Speaker and microphone tests stop when leaving
+the Audio tab or closing Settings.
+
+Video settings presents background effects in a responsive thumbnail grid with short
+captions, a selected checkmark, and a separate photo upload button. None and Blur use
+icons in the same thumbnail size as the bundled photos; narrow layouts use two columns.
+
+Post-class feedback uses the same themed star-rating treatment as the activity feed,
+with a five-point rating, explicit Submit, and an optional Skip action. The card uses
+the app’s light/dark surfaces and action colors; rating and navigation controls are
+disabled while feedback is being submitted.
+
+The ready-to-join preview omits the camera/audio reminder subtitle on web and mobile.
+Whiteboard and screen-share annotation palettes keep their color order fixed and mark
+the selected swatch. Closing drawing styles hides the whole picker; pressing the
+selected tool toggles it again. Picker visibility survives strokes and scene updates.
+Mobile keeps the offline WebView source stable, avoids replaying unchanged scenes,
+and uses a transparent canvas over the default dotted paper. The on-canvas fullscreen
+control uses the same expand/collapse icons as web; local Hide/Show is available only
+through the meeting Whiteboard control. Screen sharing and whiteboard presentation
+are mutually exclusive for hosts and participants, including when a board is hidden locally.

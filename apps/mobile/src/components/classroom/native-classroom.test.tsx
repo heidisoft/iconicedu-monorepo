@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal } from 'react-native';
+import { Modal, Text } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { DEFAULT_LIVE_SESSION_SETTINGS } from '@iconicedu/shared-types';
 import { NativeClassroom } from './native-classroom';
@@ -155,7 +155,11 @@ const meetingApi = {
   feedback: jest.fn().mockResolvedValue(undefined),
 };
 
-function setup(selfId = '2', whiteboardRepository?: NativeWhiteboardRepository) {
+function setup(
+  selfId = '2',
+  whiteboardRepository?: NativeWhiteboardRepository,
+  overrides: Partial<React.ComponentProps<typeof NativeClassroom>> = {},
+) {
   let emit: (event: NativeMeetingEvent) => void = () => {};
   const resolved = () => jest.fn().mockResolvedValue(undefined);
   const adapter: jest.Mocked<NativeMeetingAdapter> = {
@@ -208,6 +212,7 @@ function setup(selfId = '2', whiteboardRepository?: NativeWhiteboardRepository) 
         expiresAt: null,
         settings: DEFAULT_LIVE_SESSION_SETTINGS,
       }}
+      {...overrides}
     />,
   );
   const join = async () => {
@@ -501,7 +506,6 @@ it('starts a shared board and returns to video without stopping the presentation
   };
   const f = setup('1', repository);
   await f.join();
-  press(f.screen.getByLabelText('More controls'));
   press(f.screen.getByLabelText('Whiteboard'));
   await waitFor(() => expect(f.screen.getByText('Class whiteboard')).toBeTruthy());
   expect(repository.save).toHaveBeenCalledWith(
@@ -533,7 +537,7 @@ it('can close Settings even when stopping a device test fails', async () => {
     press(f.screen.getByLabelText('Close settings'));
   });
   await waitFor(() => expect(f.screen.queryByLabelText('Close settings')).toBeNull());
-  expect(f.screen.getByRole('alert')).toHaveTextContent('Unable to stop audio test');
+  expect(f.screen.getByRole('alert')).toHaveTextContent(/Unable to stop audio test/);
 });
 it('shows broadcast launch errors and allows retrying Share screen', async () => {
   const f = setup();
@@ -646,16 +650,18 @@ it('closes expanded sharing when the presenter stops sharing', async () => {
   expect(f.screen.UNSAFE_getByType(Focused).props.sharing).toBe(false);
   expect(f.screen.queryByTestId('share-stage')).toBeNull();
 });
-it('opens the requested device tab directly from the call controls', async () => {
+it('opens audio and video tabs from unified Settings', async () => {
   const f = setup('1');
   await f.join();
-  press(f.screen.getByLabelText('Video settings'));
+  expect(f.screen.queryByLabelText('Video settings')).toBeNull();
+  expect(f.screen.queryByLabelText('Audio settings')).toBeNull();
+  press(f.screen.getByLabelText('More controls'));
+  press(f.screen.getByLabelText('Settings'));
+  press(f.screen.getByLabelText('Video settings tab'));
   expect(
     f.screen.getByLabelText('Video settings tab').props.accessibilityState.selected,
   ).toBe(true);
-  press(f.screen.getByLabelText('Close settings'));
-  await act(async () => {});
-  press(f.screen.getByLabelText('Audio settings'));
+  press(f.screen.getByLabelText('Audio settings tab'));
   expect(
     f.screen.getByLabelText('Audio settings tab').props.accessibilityState.selected,
   ).toBe(true);
@@ -680,3 +686,145 @@ it('turns off only the camera when using poor-connection help', async () => {
   await waitFor(() => expect(f.adapter.camera).toHaveBeenLastCalledWith(false));
   expect(jest.mocked(f.adapter.microphone).mock.calls).toHaveLength(microphoneCalls);
 });
+
+it.each([true, false])(
+  'offers local visibility and only lets the owner stop a shared board (owner %s)',
+  async (owner) => {
+    const { Alert } = require('react-native');
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const repository = {
+      load: jest.fn().mockResolvedValue({
+        presentationActive: true,
+        actorId: 'self',
+        document: { presentation: { presenterId: owner ? 'self' : 'peer' } },
+      }),
+      save: jest.fn().mockResolvedValue({}),
+    };
+    const f = setup('1', repository);
+    await f.join();
+    press(f.screen.getByLabelText('More controls'));
+    press(f.screen.getByLabelText('Whiteboard'));
+    await waitFor(() =>
+      expect(alert).toHaveBeenCalledWith(
+        'Whiteboard',
+        expect.any(String),
+        expect.any(Array),
+      ),
+    );
+    const actions = alert.mock.calls[alert.mock.calls.length - 1][2] as {
+      text: string;
+      onPress?: () => void;
+    }[];
+    expect(actions.some((action) => action.text === 'Stop sharing for everyone')).toBe(
+      owner,
+    );
+    expect(repository.save).not.toHaveBeenCalled();
+    if (owner) {
+      await act(async () =>
+        actions
+          .find((action) => action.text === 'Stop sharing for everyone')
+          ?.onPress?.(),
+      );
+      await waitFor(() =>
+        expect(repository.save).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'presentation', enabled: false }),
+        ),
+      );
+    } else {
+      await act(async () =>
+        actions.find((action) => action.text === 'Show whiteboard')?.onPress?.(),
+      );
+      expect(repository.save).not.toHaveBeenCalled();
+    }
+    alert.mockRestore();
+  },
+);
+
+it('stops device tests when leaving the Audio settings tab', async () => {
+  const f = setup();
+  press(f.screen.getByLabelText('Settings'));
+  press(f.screen.getByLabelText('Test speakers'));
+  await waitFor(() => expect(f.adapter.testSpeaker).toHaveBeenCalledWith(true));
+  press(f.screen.getByLabelText('Video settings tab'));
+  await waitFor(() => expect(f.adapter.stopAudioTests).toHaveBeenCalled());
+  press(f.screen.getByLabelText('Audio settings tab'));
+  await waitFor(() => expect(f.screen.getByLabelText('Test speakers')).toBeTruthy());
+});
+
+it('uses the full preview and Settings before a shared-device identity is authorized', async () => {
+  const authorize = jest.fn().mockResolvedValue({
+    token: 'synthetic-group',
+    sessionName: 'Test',
+    displayName: 'Student One & Student Two',
+    expiresAt: null,
+  });
+  const f = setup('2', undefined, {
+    credentials: undefined,
+    previewDisplayName: 'Student One & Student Two',
+    studentChoices: <Text>Who is joining?</Text>,
+    authorize,
+  });
+  expect(f.screen.getByText('Who is joining?')).toBeTruthy();
+  expect(f.screen.getByRole('header', { name: 'Ready to join?' })).toBeTruthy();
+  press(f.screen.getByLabelText('Settings'));
+  expect(f.screen.getByLabelText('Test speakers')).toBeTruthy();
+  await act(async () => {
+    press(f.screen.getByLabelText('Video settings tab'));
+  });
+  expect(f.screen.getByLabelText('Choose background image')).toBeTruthy();
+  await act(async () => {
+    press(f.screen.getByLabelText('Close settings'));
+  });
+  await waitFor(() => expect(f.screen.queryByLabelText('Close settings')).toBeNull());
+  expect(authorize).not.toHaveBeenCalled();
+  expect(f.adapter.join).not.toHaveBeenCalled();
+  await f.join();
+  expect(authorize).toHaveBeenCalledTimes(1);
+  expect(f.adapter.join).toHaveBeenCalledWith(
+    expect.objectContaining({ token: 'synthetic-group' }),
+    expect.anything(),
+  );
+});
+
+it('offers microphone selection and mute in Audio settings before joining', async () => {
+  const f = setup();
+  press(f.screen.getByLabelText('Settings'));
+  expect(f.screen.getByLabelText('Microphone: System default')).toBeTruthy();
+  const toggle = f.screen.getByRole('switch', { name: 'Microphone on' });
+  fireEvent(toggle, 'valueChange', false);
+  expect(f.screen.getByRole('switch', { name: 'Microphone on' }).props.value).toBe(false);
+  expect(f.adapter.join).not.toHaveBeenCalled();
+});
+
+it.each(['1', '2'])(
+  'disables screen sharing during an active board even when locally hidden (user %s)',
+  async (userId) => {
+    const repository = {
+      load: jest.fn().mockResolvedValue({
+        presentationActive: true,
+        actorId: 'self',
+        document: { presentation: { presenterId: 'self' } },
+      }),
+      save: jest.fn().mockResolvedValue({}),
+    };
+    const f = setup(userId, repository);
+    await f.join();
+    act(() => mockBoardPresentation?.(true));
+    expect(f.screen.getByLabelText('Share screen')).toBeDisabled();
+    press(f.screen.getByLabelText('Return to video'));
+    expect(f.screen.getByLabelText('Share screen')).toBeDisabled();
+    press(f.screen.getByLabelText('Share screen'));
+    expect(f.adapter.share).not.toHaveBeenCalled();
+    act(() => mockBoardPresentation?.(false));
+    expect(f.screen.getByLabelText('Share screen')).toBeEnabled();
+  },
+);
+it.each(['1', '2'])(
+  'disables starting a whiteboard while someone shares their screen (user %s)',
+  async (userId) => {
+    const f = setup(userId);
+    await f.join();
+    f.emit({ type: 'share', userId: 'peer', active: true });
+    expect(f.screen.getByLabelText('Whiteboard')).toBeDisabled();
+  },
+);

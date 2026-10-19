@@ -140,7 +140,8 @@ export function NativeAnnotationToolbar({
       <ScrollView
         horizontal
         accessibilityLabel="Screen annotation tools"
-        contentContainerStyle={{ gap: 2, padding: 4 }}
+        style={{ height: 44 }}
+        contentContainerStyle={{ gap: 2, paddingHorizontal: 4, alignItems: 'center' }}
       >
         {primary.map(([value, label, Icon]) =>
           button(

@@ -592,21 +592,22 @@ export function ZoomVideoSessionEmbed({
   };
   const toggleWhiteboard = async () => {
     try {
+      if (
+        (isSomeoneSharing || isSharingScreen) &&
+        !whiteboard.active &&
+        !isPresentingWhiteboard
+      )
+        return;
       const opening = whiteboardStatus === WhiteboardStatus.Closed;
       if (
         opening &&
+        !whiteboard.active &&
         whiteboard.nativeToken &&
         isSelfHost &&
         recordingStatus === RecordingStatus.Recording
       )
         await publishWhiteboardForRecording();
       await toggleWhiteboardContent();
-      if (!opening && boardPublicationRef.current) {
-        await clientRef.current?.getMediaStream().stopShareScreen();
-        boardPublicationRef.current = false;
-        recordingComposition.setMode('annotations');
-        setIsSharingScreen(false);
-      }
     } catch (error) {
       setShareError(
         error instanceof Error
@@ -615,6 +616,37 @@ export function ZoomVideoSessionEmbed({
       );
     }
   };
+  const previousBoardActive = useRef(false);
+  useEffect(() => {
+    const wasActive = previousBoardActive.current;
+    previousBoardActive.current = whiteboard.active;
+    if (
+      !wasActive ||
+      !whiteboard.nativeToken ||
+      whiteboard.active ||
+      !boardPublicationRef.current
+    )
+      return;
+    boardPublicationRef.current = false;
+    void clientRef.current
+      ?.getMediaStream()
+      .stopShareScreen()
+      .then((result) => {
+        if (result !== '') {
+          setShareError(
+            'Unable to stop whiteboard publishing. Please stop screen sharing.',
+          );
+          return;
+        }
+        recordingComposition.setMode('annotations');
+        setIsSharingScreen(false);
+      })
+      .catch(() =>
+        setShareError(
+          'Unable to stop whiteboard publishing. Please stop screen sharing.',
+        ),
+      );
+  }, [whiteboard.nativeToken, whiteboard.active, recordingComposition]);
   useEffect(() => {
     if (
       isSelfHost &&
@@ -1406,6 +1438,13 @@ export function ZoomVideoSessionEmbed({
 
   const prepareShareForRecording = recordingComposition.prepare;
   const toggleScreenShare = useCallback(async () => {
+    if (
+      !isSharingScreen &&
+      (whiteboard.active || whiteboardStatus !== WhiteboardStatus.Closed)
+    ) {
+      setShareError('Stop sharing the whiteboard before sharing your screen.');
+      return;
+    }
     const client = clientRef.current;
     if (!client || !localShareVideoRef.current || !localShareCanvasRef.current) {
       return;
@@ -1452,6 +1491,8 @@ export function ZoomVideoSessionEmbed({
     }
   }, [
     isSharingScreen,
+    whiteboard.active,
+    whiteboardStatus,
     sharePrivilege,
     endShareAnnotations,
     recordingStatus,
@@ -1905,7 +1946,7 @@ export function ZoomVideoSessionEmbed({
             localVideoRef={localShareVideoRef}
             whiteboardContainerRef={whiteboardContainerRef}
             whiteboardContent={
-              whiteboard.nativeToken && isWhiteboardActive ? (
+              whiteboard.nativeToken && whiteboard.active ? (
                 <ClassroomWhiteboard
                   token={whiteboard.nativeToken}
                   title={sessionTitle}
@@ -2050,7 +2091,7 @@ export function ZoomVideoSessionEmbed({
                     ? 'Return to the call to start sharing'
                     : !supportsScreenShare
                       ? 'Screen sharing is not supported by this browser'
-                      : isWhiteboardActive
+                      : isWhiteboardActive || whiteboard.active
                         ? 'End the whiteboard to share your screen'
                         : 'Share screen'
                 }
@@ -2059,6 +2100,7 @@ export function ZoomVideoSessionEmbed({
                 aria-pressed={isSharingScreen}
                 disabled={
                   isWhiteboardActive ||
+                  whiteboard.active ||
                   !supportsScreenShare ||
                   (isPipActive && !isSharingScreen)
                 }
@@ -2114,12 +2156,14 @@ export function ZoomVideoSessionEmbed({
                 }
               />
 
-              {supportsWhiteboard && (!isSomeoneSharing || isPresentingWhiteboard) ? (
+              {supportsWhiteboard ? (
                 whiteboard.nativeToken ? (
                   <MeetingWhiteboardControl
                     visible={isWhiteboardActive}
                     presenting={isPresentingWhiteboard}
                     canStop={whiteboard.canStop}
+                    active={whiteboard.active}
+                    disabled={!whiteboard.active && (isSomeoneSharing || isSharingScreen)}
                     onToggle={() => void toggleWhiteboard()}
                     onStop={() => void whiteboard.stop()}
                   />
@@ -2137,7 +2181,8 @@ export function ZoomVideoSessionEmbed({
                     }
                     tone={isPresentingWhiteboard ? 'active' : 'neutral'}
                     disabled={
-                      !isPresentingWhiteboard && (isSomeoneSharing || isWhiteboardActive)
+                      !isPresentingWhiteboard &&
+                      (isSomeoneSharing || isSharingScreen || isWhiteboardActive)
                     }
                     onClick={() => void toggleWhiteboard()}
                   >

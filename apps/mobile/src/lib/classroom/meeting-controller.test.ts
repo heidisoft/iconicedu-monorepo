@@ -507,3 +507,12 @@ it('pauses once when a composed presenter stops publishing', async () => {
   expect(f.adapter.pauseRecording).toHaveBeenCalledTimes(1);
   expect(f.controller.snapshot().error).toContain('publishing stopped');
 });
+
+it('requires real authorization before a preview-only controller can join', async () => {
+  const f = fixture();
+  const controller = new NativeMeetingController(f.adapter);
+  await expect(controller.join()).rejects.toThrow('Join authorization is required.');
+  expect(f.adapter.join).not.toHaveBeenCalled();
+  expect(controller.snapshot().phase).toBe('preview');
+  await controller.dispose();
+});

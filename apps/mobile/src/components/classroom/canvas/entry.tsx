@@ -12,7 +12,13 @@ import {
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { WhiteboardViewportVM, WhiteboardElementVM } from '@iconicedu/shared-types';
-import { SceneHistory, sceneFingerprint, educationalAssets } from '@iconicedu/utils';
+import {
+  SceneHistory,
+  sceneFingerprint,
+  educationalAssets,
+  resolveWhiteboardFollow,
+  animateWhiteboardFollow,
+} from '@iconicedu/utils';
 import '@excalidraw/excalidraw/index.css';
 
 declare global {
@@ -26,7 +32,11 @@ declare global {
       delta?: number;
       style?: { strokeColor?: string; strokeWidth?: number; backgroundColor?: string };
     }) => void;
-    classroomViewport?: (viewport: WhiteboardViewportVM) => void;
+    classroomViewport?: (
+      viewport: WhiteboardViewportVM,
+      sourceKey?: string | null,
+    ) => void;
+    classroomCancelFollow?: () => void;
     classroomAction?: (action: 'export' | 'export-svg' | 'library') => void;
     classroomScene?: (message: {
       elements: WhiteboardElementVM[];
@@ -41,32 +51,80 @@ function Canvas() {
   const [styleOptions, setStyleOptions] = useState(false);
   const [library, setLibrary] = useState(false);
   const [search, setSearch] = useState('');
+  const centered = useRef(false);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   useClassroomLasers(api);
   const [editable, setEditable] = useState(false);
   const [dark, setDark] = useState(false);
   const lastStyle = useRef('');
   const lastViewport = useRef('');
+  const interacting = useRef(false);
+  const previousSource = useRef<string | null | undefined>(undefined);
+  const previousViewport = useRef<WhiteboardViewportVM | undefined>(undefined);
+  const writing = useRef<{ x: number; y: number } | undefined>(undefined);
+  const writingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cancelFollow = useRef<() => void>(() => {});
+  useEffect(
+    () => () => {
+      cancelFollow.current();
+      if (writingTimer.current) clearTimeout(writingTimer.current);
+    },
+    [],
+  );
   const history = useRef(new SceneHistory());
   const replaying = useRef(false);
   const historyScene = useRef<WhiteboardElementVM[]>([]);
   const [grid, setGrid] = useState('dots');
   const observed = useRef(new Map<string, string>());
+  const importedFingerprint = useRef('');
   const applying = useRef(false);
   const pending = useRef(new Map<string, ExcalidrawElement>());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const defaultToolApplied = useRef(false);
   useEffect(() => {
-    window.classroomViewport = (viewport) => {
+    if (!api || !editable || defaultToolApplied.current) return;
+    defaultToolApplied.current = true;
+    api.setActiveTool({ type: 'laser' });
+  }, [api, editable]);
+  useEffect(() => {
+    window.classroomCancelFollow = () => {
+      cancelFollow.current();
+      previousViewport.current = undefined;
+      previousSource.current = undefined;
+    };
+    window.classroomViewport = (viewport, sourceKey) => {
       if (!api) return;
       const state = api.getAppState();
-      api.updateScene({
-        appState: {
-          scrollX: state.width / (2 * viewport.zoom) - viewport.centerX,
-          scrollY: state.height / (2 * viewport.zoom) - viewport.centerY,
-          zoom: { value: viewport.zoom as typeof state.zoom.value },
+      if (interacting.current || state.editingTextElement) return;
+      cancelFollow.current();
+      if (previousSource.current !== sourceKey) previousViewport.current = undefined;
+      previousSource.current = sourceKey;
+      const from = {
+        centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+        centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+        zoom: state.zoom.value,
+      };
+      const to = resolveWhiteboardFollow(from, viewport, previousViewport.current, state);
+      previousViewport.current = viewport;
+      cancelFollow.current = animateWhiteboardFollow(
+        from,
+        to,
+        (next) =>
+          api.updateScene({
+            appState: {
+              scrollX: state.width / (2 * next.zoom) - next.centerX,
+              scrollY: state.height / (2 * next.zoom) - next.centerY,
+              zoom: { value: next.zoom as typeof state.zoom.value },
+            },
+            captureUpdate: CaptureUpdateAction.NEVER,
+          }),
+        {
+          request: (callback) => requestAnimationFrame(callback),
+          cancel: (id) => cancelAnimationFrame(id),
+          blocked: () => interacting.current || !!api.getAppState().editingTextElement,
+          reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
         },
-        captureUpdate: CaptureUpdateAction.NEVER,
-      });
+      );
     };
     window.classroomScene = (message) => {
       if (!api) return;
@@ -80,21 +138,50 @@ function Canvas() {
           `${element.version}:${element.nonce}:${element.deleted}`,
         ]),
       );
-      api.updateScene({
-        elements: restoreElements(
-          message.elements.map(
-            (element) => element.data,
-          ) as unknown as ExcalidrawElement[],
-          null,
-        ),
-        captureUpdate: CaptureUpdateAction.NEVER,
-      });
+      const fingerprint = sceneFingerprint(message.elements);
+      if (fingerprint !== importedFingerprint.current)
+        api.updateScene({
+          elements: restoreElements(
+            message.elements.map(
+              (element) => element.data,
+            ) as unknown as ExcalidrawElement[],
+            null,
+          ),
+          captureUpdate: CaptureUpdateAction.NEVER,
+        });
+      importedFingerprint.current = fingerprint;
+      if (api.getAppState().viewBackgroundColor !== 'transparent')
+        api.updateScene({
+          appState: { viewBackgroundColor: 'transparent' },
+          captureUpdate: CaptureUpdateAction.NEVER,
+        });
+      if (!centered.current) {
+        centered.current = true;
+        const elements = api.getSceneElements();
+        if (elements.length)
+          api.scrollToContent(elements, {
+            fitToContent: true,
+            animate: false,
+            maxZoom: 1,
+          });
+        else {
+          const state = api.getAppState();
+          api.updateScene({
+            appState: {
+              scrollX: state.width / (2 * state.zoom.value),
+              scrollY: state.height / (2 * state.zoom.value),
+            },
+            captureUpdate: CaptureUpdateAction.NEVER,
+          });
+        }
+      }
       applying.current = false;
     };
     if (api) send({ type: 'ready' });
     return () => {
       delete window.classroomScene;
       delete window.classroomViewport;
+      delete window.classroomCancelFollow;
     };
   }, [api]);
   const exportImage = useCallback(
@@ -198,6 +285,9 @@ function Canvas() {
           ),
           captureUpdate: CaptureUpdateAction.IMMEDIATELY,
         });
+      } else if (command.type === 'close-style-options') {
+        setStyleOptions(false);
+        api.updateScene({ appState: { openMenu: null } });
       } else if (command.type === 'style-options') {
         setStyleOptions((value) => !value);
         api.updateScene({
@@ -218,6 +308,16 @@ function Canvas() {
   return (
     <div
       className="native-classroom-canvas"
+      onPointerDownCapture={() => {
+        interacting.current = true;
+        cancelFollow.current();
+      }}
+      onPointerUpCapture={() => {
+        interacting.current = false;
+      }}
+      onPointerCancelCapture={() => {
+        interacting.current = false;
+      }}
       data-grid={grid}
       data-style-options={styleOptions}
       style={{
@@ -231,12 +331,47 @@ function Canvas() {
         .native-classroom-canvas .App-toolbar,.native-classroom-canvas .App-menu_bottom,.native-classroom-canvas .layer-ui__wrapper__top-right,.native-classroom-canvas .HelpButton,.native-classroom-canvas .sidebar-trigger,.native-classroom-canvas .welcome-screen,.native-classroom-canvas .App-menu_top__left > :not(.selected-shape-actions),.native-classroom-canvas .shapes-section,.native-classroom-canvas .App-top-bar { display:none!important; }
         .native-classroom-canvas .excalidraw { background:transparent; }
         .native-classroom-canvas[data-style-options="false"] .selected-shape-actions,.native-classroom-canvas[data-style-options="false"] .App-mobile-menu { display:none!important; }
-        .native-classroom-canvas[data-grid="dots"] { background-image:radial-gradient(#8885 0.7px, transparent 0.7px);background-size:24px 24px; }
+        .native-classroom-canvas[data-grid="dots"] { background-image:radial-gradient(circle,#8884 1px, transparent 1px);background-size:24px 24px; }
         .native-classroom-canvas[data-grid="lines"] { background-image:linear-gradient(to right,#8882 1px,transparent 1px),linear-gradient(to bottom,#8882 1px,transparent 1px);background-size:24px 24px; }
       `}</style>
       <Excalidraw
         excalidrawAPI={setApi}
         onPointerUpdate={(event) => {
+          if (
+            api &&
+            editable &&
+            event.button === 'down' &&
+            [
+              'freedraw',
+              'text',
+              'line',
+              'arrow',
+              'rectangle',
+              'ellipse',
+              'diamond',
+              'frame',
+            ].includes(api.getAppState().activeTool.type)
+          ) {
+            writing.current = { x: event.pointer.x, y: event.pointer.y };
+            const publish = () => {
+              const state = api.getAppState();
+              send({
+                type: 'viewport',
+                viewport: {
+                  centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+                  centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+                  zoom: state.zoom.value,
+                  ...(writing.current ? { writing: writing.current } : {}),
+                },
+              });
+            };
+            publish();
+            if (writingTimer.current) clearTimeout(writingTimer.current);
+            writingTimer.current = setTimeout(() => {
+              writing.current = undefined;
+              publish();
+            }, 1500);
+          }
           if (event.pointer.tool === 'laser')
             send({
               type: 'laser',
@@ -275,6 +410,7 @@ function Canvas() {
             centerX: state.width / (2 * state.zoom.value) - state.scrollX,
             centerY: state.height / (2 * state.zoom.value) - state.scrollY,
             zoom: state.zoom.value,
+            ...(writing.current ? { writing: writing.current } : {}),
           };
           const key = JSON.stringify(viewport);
           if (key !== lastViewport.current) {
@@ -329,6 +465,7 @@ function Canvas() {
             );
             for (const element of wrapped) scene.set(element.id, element);
             historyScene.current = [...scene.values()];
+            importedFingerprint.current = sceneFingerprint(historyScene.current);
             send({
               type: 'elements',
               elements: changes.map((element) => ({

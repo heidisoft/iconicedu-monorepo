@@ -104,3 +104,9 @@ export {
   changedElements,
   sceneFingerprint,
 } from './whiteboard/scene-history';
+export {
+  resolveWhiteboardFollow,
+  animateWhiteboardFollow,
+} from './whiteboard/follow-viewport';
+
+export { formatMeetingStudentNames } from './meeting-student-names';

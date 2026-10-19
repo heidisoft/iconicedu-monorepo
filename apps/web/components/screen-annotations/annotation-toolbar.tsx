@@ -250,6 +250,7 @@ export function AnnotationToolbar({
   setItalic,
   onFormat,
   onQuickStyle,
+  backgroundColor,
   onDuplicate,
   onDelete,
   onSave,
@@ -283,7 +284,12 @@ export function AnnotationToolbar({
   italic: boolean;
   setItalic: (value: boolean) => void;
   onFormat: () => void;
-  onQuickStyle?: (style: { strokeColor?: string; strokeWidth?: number }) => void;
+  backgroundColor?: string;
+  onQuickStyle?: (style: {
+    strokeColor?: string;
+    strokeWidth?: number;
+    backgroundColor?: string;
+  }) => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onSave: () => void;
@@ -299,6 +305,7 @@ export function AnnotationToolbar({
     if (autoExpand) setExpanded(true);
   }, [autoExpand]);
   const [panel, setPanel] = useState<string | null>(null);
+  const [stylesVisible, setStylesVisible] = useState(true);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const previousToolbarWidth = useRef<number | null>(null);
@@ -351,7 +358,8 @@ export function AnnotationToolbar({
       /* Browser storage is optional. */
     }
   };
-  const showQuickStyles = expanded && canDraw && !['cursor', 'eraser'].includes(tool);
+  const showQuickStyles =
+    expanded && canDraw && stylesVisible && !['cursor', 'eraser'].includes(tool);
   useEffect(() => {
     if (!surface || !toolbarRef.current) return;
     const measure = () => {
@@ -409,6 +417,7 @@ export function AnnotationToolbar({
     return () => document.removeEventListener('pointerdown', outside);
   }, [surface]);
   const choose = (next: AnnotationTool) => {
+    setStylesVisible((visible) => (next === tool ? !visible : true));
     setTool(next);
     setPanel(null);
   };
@@ -894,13 +903,27 @@ export function AnnotationToolbar({
           }
         >
           <DrawingStyleStrip
+            open={stylesVisible}
+            onOpenChange={setStylesVisible}
             className="pointer-events-auto w-fit"
+            onClose={() => setPanel(null)}
             color={color}
             width={width}
             widths={[1, 3, 6]}
-            fill="transparent"
+            fill={
+              backgroundColor ??
+              (tool.includes('Filled') || tool.includes('Highlight')
+                ? color
+                : 'transparent')
+            }
             showWidth={tool !== 'text'}
-            showFill={false}
+            showFill={[
+              'rectangle',
+              'rectangleFilled',
+              'ellipse',
+              'ellipseFilled',
+              'diamond',
+            ].includes(tool)}
             optionsOpen={panel === 'Format'}
             onStyle={(style) => {
               onQuickStyle?.(style);

@@ -1,40 +1,65 @@
 'use client';
 
-import { Presentation } from 'lucide-react';
+import { Eye, EyeOff, Presentation, Square } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@iconicedu/ui-web/ui/dropdown-menu';
 import { MeetingControlButton } from './zoom-meeting-controls';
 
-/** Start or stop the class presentation directly, preserving stop permissions. */
+/** Local visibility never changes the presentation shared with the class. */
 export function MeetingWhiteboardControl({
   visible,
   presenting,
   canStop,
+  active = visible || canStop,
+  disabled = false,
   onToggle,
   onStop,
 }: {
   visible: boolean;
   presenting: boolean;
   canStop: boolean;
+  active?: boolean;
+  disabled?: boolean;
   onToggle: () => void;
   onStop: () => void;
 }) {
-  const viewing = visible && !canStop;
+  if (!active)
+    return (
+      <MeetingControlButton
+        label="Start whiteboard"
+        onClick={onToggle}
+        disabled={disabled}
+      >
+        <Presentation className="size-4" />
+      </MeetingControlButton>
+    );
+  const VisibilityIcon = visible ? EyeOff : Eye;
   return (
-    <MeetingControlButton
-      label={
-        canStop
-          ? 'Stop presenting whiteboard'
-          : viewing
-            ? 'Whiteboard is being presented'
-            : 'Open whiteboard'
-      }
-      tooltip={
-        viewing ? 'Only the presenter or a tutor can stop the whiteboard' : undefined
-      }
-      tone={presenting ? 'active' : 'neutral'}
-      disabled={viewing}
-      onClick={canStop ? onStop : onToggle}
-    >
-      <Presentation className="size-4" />
-    </MeetingControlButton>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <MeetingControlButton
+          label="Whiteboard options"
+          tone={visible || presenting ? 'active' : 'neutral'}
+        >
+          <Presentation className="size-4" />
+        </MeetingControlButton>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="center" side="top">
+        <DropdownMenuItem onSelect={onToggle}>
+          <VisibilityIcon className="size-4" />
+          {visible ? 'Hide whiteboard for me' : 'Show whiteboard'}
+        </DropdownMenuItem>
+        {canStop && (
+          <DropdownMenuItem onSelect={onStop}>
+            <Square className="size-4" />
+            Stop sharing for everyone
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }

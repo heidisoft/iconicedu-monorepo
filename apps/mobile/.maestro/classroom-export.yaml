@@ -19,16 +19,16 @@ name: Native whiteboard assets and PNG export
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Whiteboard'
 - extendedWaitUntil:
-    visible: 'Draw'
+    visible: 'Pen'
     timeout: 30000
-- tapOn: 'Whiteboard options'
+- tapOn: 'More whiteboard actions'
 - tapOn: 'Educational library'
 - tapOn: 'Number line'
 - extendedWaitUntil:
     visible:
       id: 'whiteboard-saved-elements-[1-9][0-9]*'
     timeout: 20000
-- tapOn: 'Whiteboard options'
+- tapOn: 'More whiteboard actions'
 - tapOn: 'Export whiteboard image'
 - runFlow: assert-classroom-export.yaml
 - takeScreenshot: native-whiteboard-export

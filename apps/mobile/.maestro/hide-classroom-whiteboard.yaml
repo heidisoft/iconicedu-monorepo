@@ -1,0 +1,5 @@
+appId: com.heidisoft.iconicedu
+name: Hide the shared whiteboard through the meeting control
+---
+- tapOn: 'Whiteboard'
+- tapOn: 'Hide whiteboard for me'
