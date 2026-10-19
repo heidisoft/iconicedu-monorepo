@@ -342,3 +342,9 @@ and uses a transparent canvas over the default dotted paper. The on-canvas fulls
 control uses the same expand/collapse icons as web; local Hide/Show is available only
 through the meeting Whiteboard control. Screen sharing and whiteboard presentation
 are mutually exclusive for hosts and participants, including when a board is hidden locally.
+
+Feature-flag scope: the existing `enable-classroom-whiteboard` flag remains the web
+whiteboard gate and defaults off. The join-preview, guardian selection, device settings,
+and annotation-control corrections above are maintenance fixes to the existing Video SDK
+classroom experience. They use a maintenance exemption rather than introducing another
+web rollout flag; API authorization and admission still validate every selected student.
