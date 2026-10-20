@@ -13,8 +13,7 @@ name: Write and draw on the real native whiteboard canvas and reopen saved conte
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - extendedWaitUntil:
     visible: 'Expand whiteboard to full screen'
     timeout: 30000
@@ -38,8 +37,7 @@ name: Write and draw on the real native whiteboard canvas and reopen saved conte
     timeout: 30000
 - runFlow: hide-classroom-whiteboard.yaml
 - assertNotVisible: 'Expand whiteboard to full screen'
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - extendedWaitUntil:
     visible:
       id: 'whiteboard-saved-elements-2'

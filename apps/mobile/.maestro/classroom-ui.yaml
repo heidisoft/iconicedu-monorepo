@@ -16,7 +16,7 @@ name: Native classroom UI lifecycle on iPad and Android tablets
     visible: 'Ready to join\?'
     timeout: 30000
 - assertVisible: 'Native SDK [0-9].*'
-- assertVisible: 'Test teacher'
+- assertVisible: 'Change display name, currently Test teacher'
 - tapOn: 'Turn camera off'
 - scrollUntilVisible:
     element: 'Settings'
@@ -100,12 +100,7 @@ name: Native classroom UI lifecycle on iPad and Android tablets
     element: 'Stop recording'
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Stop recording'
-- runFlow: open-classroom-controls.yaml
-- scrollUntilVisible:
-    element: 'Whiteboard'
-    direction: UP
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - tapOn: 'More whiteboard actions'
 - scrollUntilVisible:
     element: 'Allow student editing'

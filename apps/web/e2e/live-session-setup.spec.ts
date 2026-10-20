@@ -50,7 +50,7 @@ test.describe('live session setup and leave navigation', () => {
     const join = page.getByRole('button', { name: 'Join session', exact: true });
     await expect(join).toBeDisabled();
     expect(requests).toBe(0);
-    await page.getByRole('radio', { name: 'Ben' }).check();
+    await page.getByRole('checkbox', { name: 'Ben' }).check();
     await expect(join).toBeEnabled();
     await join.click();
     await expect(page.getByRole('heading', { name: 'Meeting as Ben' })).toBeVisible();
@@ -61,7 +61,7 @@ test.describe('live session setup and leave navigation', () => {
 
   test('preview controls and editable name stay on the video tile', async ({ page }) => {
     await page.goto(`${fixture}?actor=parent&passcode=demo`);
-    await page.getByRole('radio', { name: 'Alice' }).check();
+    await page.getByRole('checkbox', { name: 'Alice' }).check();
     const tile = page.getByRole('group', { name: 'Your video preview' });
     await expect(tile.getByRole('button', { name: 'Turn microphone on' })).toBeVisible();
     await expect(tile.getByRole('button', { name: 'Turn camera on' })).toBeVisible();
@@ -77,14 +77,10 @@ test.describe('live session setup and leave navigation', () => {
     const settingsBox = await tile
       .getByRole('button', { name: 'Settings' })
       .boundingBox();
-    const audioTestBox = await tile
-      .getByRole('button', { name: 'Test audio and video' })
-      .boundingBox();
     expect(settingsBox!.width).toBe(32);
     expect(settingsBox!.height).toBe(cameraBox!.height);
     expect(settingsBox!.y).toBeCloseTo(cameraBox!.y, 0);
-    expect(audioTestBox!.x - (cameraBox!.x + cameraBox!.width)).toBeCloseTo(6, 0);
-    expect(settingsBox!.x - (audioTestBox!.x + audioTestBox!.width)).toBeCloseTo(6, 0);
+    expect(settingsBox!.x - (cameraBox!.x + cameraBox!.width)).toBeCloseTo(6, 0);
     expect(nameBox).not.toBeNull();
     expect(micBox).not.toBeNull();
     expect(cameraBox).not.toBeNull();
@@ -194,7 +190,7 @@ test.describe('live session setup and leave navigation', () => {
     });
     await page.goto(`${fixture}?actor=member&passcode=demo`);
     await expect(
-      page.getByText('Check your camera and microphone before joining.'),
+      page.getByRole('button', { name: 'Join session', exact: true }),
     ).toBeVisible();
     await expect(page.getByLabel('Your name')).toHaveCount(0);
     await expect(
@@ -218,7 +214,7 @@ test.describe('live session setup and leave navigation', () => {
   test('a signed-in host skips name and passcode entry', async ({ page }) => {
     await page.goto(`${fixture}?actor=host`);
     await expect(
-      page.getByText('Check your camera and microphone before joining.'),
+      page.getByRole('button', { name: 'Join session', exact: true }),
     ).toBeVisible();
     await expect(page.getByLabel('Your name')).toHaveCount(0);
     await expect(page.getByLabel('Session passcode')).toHaveCount(0);
@@ -235,7 +231,7 @@ test.describe('live session setup and leave navigation', () => {
     await page.getByLabel('Your name').fill('Guest Student');
     await page.getByRole('button', { name: 'Join session', exact: true }).click();
     await expect(
-      page.getByText('Check your camera and microphone before joining.'),
+      page.getByRole('button', { name: 'Join session', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Join session', exact: true }).click();
     await expect(
@@ -281,7 +277,7 @@ test.describe('live session setup and leave navigation', () => {
       `${fixture}?actor=host&returnTo=${encodeURIComponent('https://evil.invalid')}`,
     );
     await expect(
-      page.getByText('Check your camera and microphone before joining.'),
+      page.getByRole('button', { name: 'Join session', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Join session', exact: true }).click();
     await page.getByRole('button', { name: 'Leave meeting' }).click();
@@ -414,7 +410,7 @@ for (const actor of ['host', 'member', 'guest']) {
       await page.getByRole('button', { name: 'Join session', exact: true }).click();
     }
     await expect(
-      page.getByText('Check your camera and microphone before joining.'),
+      page.getByRole('button', { name: 'Join session', exact: true }),
     ).toBeVisible();
     await page.getByRole('button', { name: 'Join session', exact: true }).click();
     if (actor === 'host') {

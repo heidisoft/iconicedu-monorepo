@@ -14,11 +14,7 @@ name: Presentation visibility expansion and recording status
     element: 'Start recording'
 - tapOn: 'Start recording'
 - assertVisible: 'Recording active'
-- runFlow: open-classroom-controls.yaml
-- scrollUntilVisible:
-    element: 'Whiteboard'
-    direction: UP
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - extendedWaitUntil:
     visible: 'Pen'
     timeout: 30000
@@ -33,8 +29,7 @@ name: Presentation visibility expansion and recording status
 - assertVisible: 'More controls'
 - runFlow: hide-classroom-whiteboard.yaml
 - assertNotVisible: 'Expand whiteboard to full screen'
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - tapOn: 'Show whiteboard'
 - assertVisible: 'Expand whiteboard to full screen'
 - tapOn: 'More whiteboard actions'

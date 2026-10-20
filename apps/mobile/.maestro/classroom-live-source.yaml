@@ -96,11 +96,7 @@ name: Real signed-in source page to native classroom preview and meeting control
     timeout: 30000
 - tapOn: 'Stop sharing screen'
 - assertVisible: 'Share screen'
-- runFlow: open-classroom-controls.yaml
-- scrollUntilVisible:
-    element: 'Whiteboard'
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - extendedWaitUntil:
     visible: 'Expand whiteboard to full screen'
     timeout: 30000

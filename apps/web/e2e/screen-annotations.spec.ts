@@ -354,10 +354,9 @@ test('shows presenter tools and keeps a restored floating toolbar inside a resiz
   await page.getByRole('checkbox', { name: 'Presenter view' }).check();
   const toolbar = page.getByRole('toolbar', { name: 'Screen annotations' });
   await expect(toolbar).toHaveAttribute('data-expanded', 'true');
-  await expect(toolbar.getByRole('button', { name: 'Pan', exact: true })).toHaveAttribute(
-    'aria-pressed',
-    'true',
-  );
+  await expect(
+    toolbar.getByRole('button', { name: 'Laser pointer', exact: true }),
+  ).toHaveAttribute('aria-pressed', 'true');
   for (const width of [1200, 390, 800]) {
     await page.setViewportSize({ width, height: 900 });
     await expect

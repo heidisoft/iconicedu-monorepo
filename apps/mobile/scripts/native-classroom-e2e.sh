@@ -8,7 +8,7 @@ pnpm canvas:build
 pnpm exec expo prebuild --no-install > "$TASK_DIR/prebuild.log" 2>&1
 # A fixed runtime version keeps development manifests fast enough for the dev launcher.
 NATIVE_CLASSROOM_E2E_RUNTIME_VERSION=native-classroom-e2e \
-  REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 pnpm exec expo start --dev-client --port 8085 --lan > "$TASK_DIR/metro.log" 2>&1 &
+  EXPO_NO_METRO_LAZY=1 REACT_NATIVE_PACKAGER_HOSTNAME=127.0.0.1 pnpm exec expo start --dev-client --port 8085 --lan > "$TASK_DIR/metro.log" 2>&1 &
 METRO_PID=$!
 EMULATOR_PID=''
 LINK_API_PID=''
@@ -45,31 +45,41 @@ elif [[ "$PLATFORM" == android ]]; then
   fi
   (yes || true) | sdkmanager --licenses > "$TASK_DIR/sdk-licenses.log" 2>&1
   # API 36 images need a current emulator; the runner's preinstalled one can lag behind.
-  sdkmanager emulator platform-tools 'system-images;android-36;google_apis;x86_64' > "$TASK_DIR/sdk.log" 2>&1
+  IMAGE_ABI=x86_64
+  if [[ "$(uname -m)" == arm64 || "$(uname -m)" == aarch64 ]]; then IMAGE_ABI=arm64-v8a; fi
+  SYSTEM_IMAGE="system-images;android-36;google_apis;$IMAGE_ABI"
+  sdkmanager emulator platform-tools "$SYSTEM_IMAGE" > "$TASK_DIR/sdk.log" 2>&1
   # avdmanager and the emulator must agree on where AVDs live, or the emulator reports
   # "Unknown AVD name" and never reaches adb.
   export ANDROID_AVD_HOME="$HOME/.android/avd"
   mkdir -p "$ANDROID_AVD_HOME"
   if ! printf 'no\n' | avdmanager create avd --force -n IconicClassroomTablet \
-      -k 'system-images;android-36;google_apis;x86_64' -d pixel_tablet > "$TASK_DIR/avd.log" 2>&1; then
+      -k "$SYSTEM_IMAGE" -d pixel_tablet > "$TASK_DIR/avd.log" 2>&1; then
     cat "$TASK_DIR/avd.log"; exit 1
   fi
   if ! "$SDK_ROOT/emulator/emulator" -list-avds | grep -qx IconicClassroomTablet; then
     echo 'The tablet AVD was not created'; cat "$TASK_DIR/avd.log"; exit 1
   fi
-  "$ANDROID_HOME/emulator/emulator" -avd IconicClassroomTablet -no-window -no-snapshot -no-audio -gpu swiftshader_indirect > "$TASK_DIR/emulator.log" 2>&1 &
-  EMULATOR_PID=$!
-  if ! timeout 600 adb wait-for-device; then
-    echo 'Emulator did not connect to adb within 10 minutes'; tail -80 "$TASK_DIR/emulator.log"; exit 1
+  DEVICE_ID=emulator-5580
+  if adb -s "$DEVICE_ID" get-state > /dev/null 2>&1; then
+    echo "$DEVICE_ID is already in use; refusing to reuse another emulator"; exit 1
   fi
-  for attempt in $(seq 1 120); do
-    if [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then break; fi
+  "$SDK_ROOT/emulator/emulator" -port 5580 -avd IconicClassroomTablet -no-window -no-snapshot -no-audio -gpu swiftshader_indirect > "$TASK_DIR/emulator.log" 2>&1 &
+  EMULATOR_PID=$!
+  BOOTED=false
+  for attempt in $(seq 1 300); do
+    if [[ "$(adb -s "$DEVICE_ID" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" == 1 ]]; then BOOTED=true; break; fi
     sleep 2
   done
-  [[ "$(adb shell getprop sys.boot_completed | tr -d '\r')" == 1 ]] || { echo 'Emulator did not finish booting'; exit 1; }
-  adb shell settings put global window_animation_scale 0
-  adb shell settings put global transition_animation_scale 0
-  adb shell settings put global animator_duration_scale 0
+  [[ "$BOOTED" == true ]] || { echo 'Emulator did not finish booting within 10 minutes'; tail -80 "$TASK_DIR/emulator.log"; exit 1; }
+  # Google APIs x86 images advertise ARM support through their native bridge. Keep
+  # the entire app ARM64 so Android does not select x86 RN alongside ARM-only Zoom.
+  ABI=arm64-v8a
+  SUPPORTED_ABIS=$(adb -s "$DEVICE_ID" shell getprop ro.product.cpu.abilist | tr -d '\r')
+  [[ ",$SUPPORTED_ABIS," == *",$ABI,"* ]] || { echo "Emulator cannot run $ABI: $SUPPORTED_ABIS"; exit 1; }
+  adb -s "$DEVICE_ID" shell settings put global window_animation_scale 0
+  adb -s "$DEVICE_ID" shell settings put global transition_animation_scale 0
+  adb -s "$DEVICE_ID" shell settings put global animator_duration_scale 0
   # Reanimated links libworklets.so from its per-ABI CMake task, but only its aggregate
   # externalNativeBuild task waits for Worklets, so build Worklets' native library first.
   WORKLETS_ANDROID=$(node -p "require('path').dirname(require.resolve('react-native-worklets/package.json'))")/android
@@ -77,16 +87,16 @@ elif [[ "$PLATFORM" == android ]]; then
     echo 'libworklets.so outputs:'; find "$WORKLETS_ANDROID/build" -name libworklets.so 2>/dev/null || true
   }
   if ! (cd android && ./gradlew :react-native-worklets:externalNativeBuildDebug \
-      --no-parallel -PreactNativeArchitectures=x86_64) > "$TASK_DIR/worklets-build.log" 2>&1; then
+      --no-parallel -PreactNativeArchitectures=arm64-v8a) > "$TASK_DIR/worklets-build.log" 2>&1; then
     tail -120 "$TASK_DIR/worklets-build.log"; exit 1
   fi
   list_worklets_libraries
-  if ! (cd android && ./gradlew :app:assembleDebug --no-parallel -PreactNativeArchitectures=x86_64) \
+  if ! (cd android && ./gradlew :app:assembleDebug --no-parallel -PreactNativeArchitectures=arm64-v8a) \
       > "$TASK_DIR/build.log" 2>&1; then
     tail -120 "$TASK_DIR/build.log"; list_worklets_libraries; exit 1
   fi
-  DEVICE_ID=$(adb devices | awk '/emulator-/ {print $1; exit}')
-  adb -s "$DEVICE_ID" install -r android/app/build/outputs/apk/debug/app-debug.apk
+  node scripts/verify-classroom-apk.mjs android/app/build/outputs/apk/debug/app-debug.apk "$ABI"
+  adb -s "$DEVICE_ID" install --abi "$ABI" -r android/app/build/outputs/apk/debug/app-debug.apk
   adb -s "$DEVICE_ID" reverse tcp:8085 tcp:8085
 else
   echo 'Expected ios or android'; exit 1
@@ -100,7 +110,7 @@ curl --fail --silent http://127.0.0.1:8085/status > /dev/null
 # it. On cold CI runners these took longer than the dev client waits, failing every flow.
 fetch_manifest() {
   curl --fail --silent --show-error --max-time 900 -H "expo-platform: $PLATFORM" \
-    -H 'accept: application/expo+json,application/json' http://127.0.0.1:8085/
+    -H 'accept: application/expo+json,application/json' 'http://127.0.0.1:8085/?disableOnboarding=1'
 }
 STARTED=$SECONDS
 MANIFEST=$(fetch_manifest)
@@ -113,6 +123,8 @@ echo "Development bundle ready in $((SECONDS - STARTED))s"
 STARTED=$SECONDS
 fetch_manifest > /dev/null
 echo "Repeat manifest request took $((SECONDS - STARTED))s"
+# Fail once at startup rather than spending every flow's timeout on a broken dev client.
+maestro --device "$DEVICE_ID" test .maestro/bootstrap.yaml
 maestro --device "$DEVICE_ID" test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-link-entry.yaml .maestro/classroom-deep-links.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml .maestro/classroom-media-controls.yaml .maestro/classroom-whiteboard-write.yaml
 node scripts/verify-classroom-export.mjs "$PLATFORM" "$DEVICE_ID"
 

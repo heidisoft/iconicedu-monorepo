@@ -8,10 +8,7 @@ appId: com.heidisoft.iconicedu
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
-- tapOn: 'More controls'
-- scrollUntilVisible:
-    element: 'Whiteboard'
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - tapOn: 'More whiteboard actions'
 - extendedWaitUntil:
     visible: 'Stop sharing for everyone'

@@ -11,6 +11,8 @@ name: Native annotation drawing and versioned history
     timeout: 30000
 - assertVisible:
     id: 'annotation-saved-elements-0'
+# The default laser is transient; select a persistent tool to test saved history.
+- tapOn: 'Pen'
 - swipe:
     start: '25%,25%'
     end: '60%,30%'

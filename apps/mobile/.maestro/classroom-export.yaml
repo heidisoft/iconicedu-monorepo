@@ -13,11 +13,7 @@ name: Native whiteboard assets and PNG export
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
-- runFlow: open-classroom-controls.yaml
-- scrollUntilVisible:
-    element: 'Whiteboard'
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - extendedWaitUntil:
     visible: 'Pen'
     timeout: 30000

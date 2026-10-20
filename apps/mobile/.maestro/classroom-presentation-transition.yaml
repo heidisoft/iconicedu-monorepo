@@ -8,8 +8,7 @@ name: Remote whiteboard stop followed by a peer screen share
     timeout: 30000
 - tapOn: 'Turn camera off'
 - tapOn: 'Join now'
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - extendedWaitUntil:
     visible: 'Pen'
     timeout: 30000

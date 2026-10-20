@@ -29,12 +29,7 @@ name: Students cannot use host controls
 - assertNotVisible: 'Make host.*'
 - assertNotVisible: 'Mute Test student'
 - tapOn: 'Close People'
-- runFlow: open-classroom-controls.yaml
-- scrollUntilVisible:
-    element: 'Whiteboard'
-    direction: UP
-- runFlow: open-classroom-controls.yaml
-- tapOn: 'Whiteboard'
+- runFlow: open-classroom-whiteboard.yaml
 - extendedWaitUntil:
     visible: 'Expand whiteboard to full screen'
     timeout: 30000
