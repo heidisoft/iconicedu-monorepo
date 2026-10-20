@@ -26,7 +26,7 @@ name: OS link through secure recovery and real HTTP entry/preview
     element: 'Join now'
 - tapOn: 'Join now'
 - scrollUntilVisible:
-    element: '.*The meeting encountered a connection or device error\. Please retry\.'
+    element: '.*(Unable to join\. Check your connection and try again\.|The meeting encountered a connection or device error\. Please retry\.)'
     direction: UP
     timeout: 40000
 - assertVisible: 'Ready to join\?'
@@ -35,7 +35,7 @@ name: OS link through secure recovery and real HTTP entry/preview
     element: 'Join now'
 - tapOn: 'Join now'
 - scrollUntilVisible:
-    element: '.*The meeting encountered a connection or device error\. Please retry\.'
+    element: '.*(Unable to join\. Check your connection and try again\.|The meeting encountered a connection or device error\. Please retry\.)'
     direction: UP
     timeout: 40000
 - assertNotVisible: 'Leave class|Leave or end class|End class'
@@ -71,6 +71,6 @@ name: OS link through secure recovery and real HTTP entry/preview
 - assertNotVisible: 'Session passcode'
 - openLink: 'iconicedu://live/e2e-expired-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
 - extendedWaitUntil:
-    visible: 'Invalid or expired meeting link'
+    visible: '.*Invalid or expired meeting link'
     timeout: 30000
 - assertNotVisible: 'Join now'
