@@ -9,3 +9,6 @@ name: Open the whiteboard from the meeting toolbar
 - scrollUntilVisible:
     element: 'Whiteboard'
 - tapOn: 'Whiteboard'
+- tapOn:
+    text: 'Show whiteboard'
+    optional: true

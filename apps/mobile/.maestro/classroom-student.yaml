@@ -25,6 +25,7 @@ name: Students cannot use host controls
     direction: UP
 - runFlow: open-classroom-controls.yaml
 - tapOn: 'Participants'
+- assertNotVisible: 'More actions for Test student'
 - assertNotVisible: 'Make co-host.*'
 - assertNotVisible: 'Make host.*'
 - assertNotVisible: 'Mute Test student'

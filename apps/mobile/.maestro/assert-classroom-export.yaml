@@ -6,7 +6,8 @@ name: Export opens the operating system share sheet
       platform: iOS
     commands:
       - extendedWaitUntil:
-          visible: 'Copy|Save Image|Save to Files'
+          visible:
+            id: 'ActivityListView'
           timeout: 20000
 - runFlow:
     when:

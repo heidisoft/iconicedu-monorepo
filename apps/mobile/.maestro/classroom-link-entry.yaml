@@ -16,7 +16,7 @@ name: Real native entry, invitation refresh recovery and guest admission
 - extendedWaitUntil:
     visible: 'Ready to join\?'
     timeout: 10000
-- assertVisible: 'Tablet guest'
+- assertVisible: 'Change display name, currently Tablet guest'
 - assertNotVisible: 'Leave class|Leave or end class|End class'
 - openLink: 'iconicedu://classroom-link-fixture?mode=invited&resume=1'
 - tapOn:
@@ -27,13 +27,13 @@ name: Real native entry, invitation refresh recovery and guest admission
     timeout: 10000
 - assertNotVisible: 'Guest name'
 - assertNotVisible: 'Session passcode'
-- assertVisible: 'Tablet guest'
+- assertVisible: 'Change display name, currently Tablet guest'
 - openLink: 'iconicedu://classroom-link-fixture?mode=member'
 - tapOn:
     text: 'Open'
     optional: true
 - extendedWaitUntil:
-    visible: 'Signed-in student'
+    visible: 'Change display name, currently Signed-in student'
     timeout: 10000
 - assertNotVisible: 'Guest name'
 - assertNotVisible: 'Session passcode'
@@ -57,4 +57,4 @@ name: Real native entry, invitation refresh recovery and guest admission
 - extendedWaitUntil:
     visible: 'Ready to join\?'
     timeout: 10000
-- assertVisible: 'Waiting guest'
+- assertVisible: 'Change display name, currently Waiting guest'

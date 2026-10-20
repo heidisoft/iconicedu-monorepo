@@ -20,7 +20,7 @@ name: Native classroom failed join keeps preview usable
     element: 'Join now'
 - tapOn: 'Join now'
 - scrollUntilVisible:
-    element: 'Unable to join. Check your connection and try again.'
+    element: '.*Unable to join\. Check your connection and try again\.'
     direction: UP
 - assertVisible: 'Ready to join\?'
 - scrollUntilVisible:

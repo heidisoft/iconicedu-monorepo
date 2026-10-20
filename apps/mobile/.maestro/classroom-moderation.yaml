@@ -23,6 +23,9 @@ name: Teacher admits guests, assigns co-hosts and ends the classroom
 - tapOn: 'Admit Waiting guest'
 - assertNotVisible: 'Waiting guest is waiting'
 - scrollUntilVisible:
+    element: 'More actions for Test student'
+- tapOn: 'More actions for Test student'
+- scrollUntilVisible:
     element: 'Make co-host Test student'
 - tapOn: 'Make co-host Test student'
 - assertVisible: 'Remove co-host Test student'

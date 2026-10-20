@@ -30,7 +30,6 @@ name: Presentation visibility expansion and recording status
 - runFlow: hide-classroom-whiteboard.yaml
 - assertNotVisible: 'Expand whiteboard to full screen'
 - runFlow: open-classroom-whiteboard.yaml
-- tapOn: 'Show whiteboard'
 - assertVisible: 'Expand whiteboard to full screen'
 - tapOn: 'More whiteboard actions'
 - assertVisible: 'Stop sharing for everyone'

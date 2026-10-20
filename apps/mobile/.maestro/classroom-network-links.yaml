@@ -21,12 +21,12 @@ name: OS link through secure recovery and real HTTP entry/preview
     timeout: 30000
 - assertNotVisible: 'Guest name'
 - assertNotVisible: 'Session passcode'
-- assertVisible: 'Network guest'
+- assertVisible: 'Change display name, currently Network guest'
 - scrollUntilVisible:
     element: 'Join now'
 - tapOn: 'Join now'
 - scrollUntilVisible:
-    element: 'The meeting encountered a connection or device error. Please retry.'
+    element: '.*The meeting encountered a connection or device error\. Please retry\.'
     direction: UP
     timeout: 40000
 - assertVisible: 'Ready to join\?'
@@ -35,7 +35,7 @@ name: OS link through secure recovery and real HTTP entry/preview
     element: 'Join now'
 - tapOn: 'Join now'
 - scrollUntilVisible:
-    element: 'The meeting encountered a connection or device error. Please retry.'
+    element: '.*The meeting encountered a connection or device error\. Please retry\.'
     direction: UP
     timeout: 40000
 - assertNotVisible: 'Leave class|Leave or end class|End class'
@@ -66,7 +66,7 @@ name: OS link through secure recovery and real HTTP entry/preview
 - extendedWaitUntil:
     visible: 'Ready to join\?'
     timeout: 30000
-- assertVisible: 'Handoff teacher'
+- assertVisible: 'Change display name, currently Handoff teacher'
 - assertNotVisible: 'Guest name'
 - assertNotVisible: 'Session passcode'
 - openLink: 'iconicedu://live/e2e-expired-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'

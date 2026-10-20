@@ -27,6 +27,11 @@ name: Native annotation drawing and versioned history
 - tapOn: 'Redo annotation'
 - assertVisible:
     id: 'annotation-saved-elements-1'
+- swipe:
+    from:
+      text: 'Screen annotation tools'
+    direction: LEFT
+    duration: 600
 - tapOn: 'More annotation actions'
 - tapOn: 'Export annotations image'
 - runFlow: assert-classroom-export.yaml

@@ -17,8 +17,7 @@ name: Native whiteboard assets and PNG export
 - extendedWaitUntil:
     visible: 'Pen'
     timeout: 30000
-- tapOn: 'More whiteboard actions'
-- tapOn: 'Educational library'
+- tapOn: 'Library'
 - tapOn: 'Number line'
 - extendedWaitUntil:
     visible:
