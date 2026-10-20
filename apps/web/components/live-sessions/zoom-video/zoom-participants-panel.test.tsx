@@ -117,3 +117,42 @@ describe('ZoomParticipantsPanel', () => {
     ).not.toBeInTheDocument();
   });
 });
+
+it('hides empty participant menus and confirms removal before calling the SDK action', async () => {
+  const { fireEvent } = await import('@testing-library/react');
+  const onRemove = vi.fn();
+  const participant = {
+    userId: 2,
+    name: 'Learner',
+    isYou: false,
+    isHost: false,
+    muted: true,
+    videoOn: false,
+    handRaised: false,
+    isSpeaking: false,
+  };
+  const panel = (canMuteOthers: boolean) => (
+    <TooltipProvider>
+      <ZoomParticipantsPanel
+        open
+        canMuteOthers={canMuteOthers}
+        onRemove={onRemove}
+        participants={[participant]}
+        onOpenChange={vi.fn()}
+        onMute={vi.fn()}
+      />
+    </TooltipProvider>
+  );
+  const { rerender } = render(panel(false));
+  expect(screen.queryByLabelText('Options for Learner')).toBeNull();
+  rerender(panel(true));
+  fireEvent.keyDown(screen.getByLabelText('Options for Learner'), { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByText('Remove participant'));
+  expect(onRemove).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(onRemove).not.toHaveBeenCalled();
+  fireEvent.keyDown(screen.getByLabelText('Options for Learner'), { key: 'ArrowDown' });
+  fireEvent.click(await screen.findByText('Remove participant'));
+  fireEvent.click(screen.getByRole('button', { name: 'Remove', exact: true }));
+  expect(onRemove).toHaveBeenCalledExactlyOnceWith(2);
+});

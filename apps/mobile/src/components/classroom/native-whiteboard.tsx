@@ -1,3 +1,4 @@
+import { useMeetingAlert } from './use-meeting-alert';
 import { NativeClassroomError } from './native-classroom-error';
 import { useReducedMotion } from './use-reduced-motion';
 import { NativeWhiteboardToolbar, type Tool } from './native-whiteboard-toolbar';
@@ -9,7 +10,7 @@ import {
 } from '@/lib/classroom/export-image';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, findNodeHandle, Modal, Pressable, Text, View } from 'react-native';
+import { findNodeHandle, Modal, Pressable, Text, View } from 'react-native';
 import {
   Fullscreen,
   Scan,
@@ -85,6 +86,7 @@ export function NativeWhiteboard({
   embedded?: boolean;
 }) {
   const { colors, isDark } = useTheme();
+  const showAlert = useMeetingAlert();
   const reducedMotion = useReducedMotion();
   const safeArea = useSafeAreaInsets();
   const webview = useRef<WebView>(null);
@@ -290,7 +292,7 @@ export function NativeWhiteboard({
   }, [visible, embedded]);
   const close = () => {
     if (drawing.current) {
-      Alert.alert('Finishing your drawing', 'Wait a moment for the last stroke to save.');
+      showAlert('Finishing your drawing', 'Wait a moment for the last stroke to save.');
       return;
     }
     onClose?.();
@@ -474,14 +476,14 @@ export function NativeWhiteboard({
                           }),
                           'json',
                         ).catch(() =>
-                          Alert.alert(
+                          showAlert(
                             'Export failed',
                             'Unable to export unsaved edits. Please retry.',
                           ),
                         );
                       })}
                       {button('Discard unsaved edits', () =>
-                        Alert.alert(
+                        showAlert(
                           'Discard unsaved edits?',
                           'This removes only your pending changes. Saved class drawings remain.',
                           [
@@ -491,7 +493,7 @@ export function NativeWhiteboard({
                               style: 'destructive',
                               onPress: () => {
                                 if (busy.current || drawing.current) {
-                                  Alert.alert(
+                                  showAlert(
                                     'Please wait',
                                     'Wait until the current save or stroke finishes, then retry.',
                                   );
@@ -579,7 +581,7 @@ export function NativeWhiteboard({
                 )
               }
               onClear={() =>
-                Alert.alert('Clear whiteboard?', 'This clears the class drawing.', [
+                showAlert('Clear whiteboard?', 'This clears the class drawing.', [
                   { text: 'Cancel', style: 'cancel' },
                   {
                     text: 'Clear',
@@ -672,7 +674,7 @@ export function NativeWhiteboard({
                     return;
                   }
                   if (message.type === 'export-error') {
-                    Alert.alert(
+                    showAlert(
                       'Unable to export whiteboard',
                       'Please try exporting the drawing again.',
                     );
@@ -680,7 +682,7 @@ export function NativeWhiteboard({
                   }
                   if (message.type === 'export-svg' && typeof message.svg === 'string') {
                     void exportClassroomDocument(message.svg, 'svg').catch(() =>
-                      Alert.alert(
+                      showAlert(
                         'Export failed',
                         'Unable to export this drawing. Please retry.',
                       ),
@@ -780,7 +782,7 @@ export function NativeWhiteboard({
                 }
                 onPress={() => {
                   if (drawing.current) {
-                    Alert.alert(
+                    showAlert(
                       'Finishing your drawing',
                       'Wait a moment for the last stroke to save.',
                     );

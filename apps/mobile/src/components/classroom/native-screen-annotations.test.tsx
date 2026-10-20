@@ -382,3 +382,29 @@ it('keeps the color picker closed after drawing and toggles it from the selected
   fireEvent.press(screen.getByLabelText('Pen'));
   expect(screen.queryByLabelText('Close drawing styles')).toBeNull();
 });
+
+it('keeps save status outside toolbar flow while a stroke is being saved', async () => {
+  const { api, screen } = setup();
+  await waitFor(() =>
+    expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+      'auto',
+    ),
+  );
+  const save = api.save.getMockImplementation()!;
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  api.save.mockImplementationOnce(async (...args) => {
+    await pending;
+    return save(...args);
+  });
+  fireEvent.press(screen.getByLabelText('Pen'));
+  stroke(screen);
+  await waitFor(() => expect(api.save).toHaveBeenCalled());
+  expect(screen.getByText('Saving annotations…')).toHaveStyle({ position: 'absolute' });
+  await act(async () => {
+    release();
+  });
+  await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
+});

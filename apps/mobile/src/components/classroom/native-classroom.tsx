@@ -1,3 +1,4 @@
+import { useMeetingAlert } from './use-meeting-alert';
 import { NativePresentationControls } from './native-presentation-controls';
 import { NativeBackgroundPicker } from './native-background-picker';
 import { NativeSettingDeviceSelect } from './native-setting-device-select';
@@ -19,7 +20,6 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 import {
-  Alert,
   AppState,
   KeyboardAvoidingView,
   Linking,
@@ -183,6 +183,7 @@ export function NativeClassroom({
   const [invitationOpen, setInvitationOpen] = useState(false);
   const state = useSyncExternalStore(controller.subscribe, controller.snapshot);
   const { colors } = useTheme();
+  const showAlert = useMeetingAlert();
   const { width, height } = useWindowDimensions();
   const [cameraPermission, requestCamera, getCamera] = useCameraPermissions();
   const [micPermission, requestMic, getMic] = useMicrophonePermissions();
@@ -416,6 +417,54 @@ export function NativeClassroom({
     )
       void changeRecording(async () => {});
   }, [adapter, boardVisible, state.recording, state.recordingPaused, changeRecording]);
+  const recordingNotice = useRef<string | null>(null);
+  useEffect(() => {
+    const consent = state.recordingConsent;
+    if (!consent) {
+      recordingNotice.current = null;
+      return;
+    }
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const notify = () => {
+      if (recordingNotice.current === consent) return;
+      const shown = showAlert(
+        'This class is being recorded',
+        consent === 'traditional'
+          ? 'The host is recording this class. You can leave if you do not want to be recorded.'
+          : 'The host would like to include your audio and video in the recording.',
+        [
+          {
+            text: consent === 'traditional' ? 'Leave class' : "Don't record me",
+            style: 'cancel',
+            onPress: () => {
+              void controller
+                .respondToRecordingConsent(false)
+                .catch(() =>
+                  setError('Unable to update your recording preference. Try again.'),
+                );
+            },
+          },
+          {
+            text: 'OK',
+            onPress: () => {
+              void controller
+                .respondToRecordingConsent(true)
+                .catch(() =>
+                  setError('Unable to update your recording preference. Try again.'),
+                );
+            },
+          },
+        ],
+        { cancelable: false },
+      );
+      if (shown) recordingNotice.current = consent;
+      else retry = setTimeout(notify, 500);
+    };
+    notify();
+    return () => {
+      if (retry) clearTimeout(retry);
+    };
+  }, [state.recordingConsent, controller, showAlert]);
   const moderator = controller.self?.host || controller.self?.cohost;
   const selfSharing = !!state.selfId && state.sharingUserIds.includes(state.selfId);
   const participantCount = state.participants.length;
@@ -443,7 +492,7 @@ export function NativeClassroom({
     });
   const confirmLeave = () => {
     if (boardPending) {
-      Alert.alert(
+      showAlert(
         'Drawing changes are waiting to save',
         'Keep the board open and retry saving before leaving.',
       );
@@ -452,13 +501,13 @@ export function NativeClassroom({
     const leave = { text: 'Leave', onPress: () => void run(() => controller.leave()) };
     const cancel = { text: 'Cancel', style: 'cancel' as const };
     if (!controller.self?.host)
-      Alert.alert(
+      showAlert(
         'Leave the class?',
         'You can rejoin anytime while the class is still live.',
         [cancel, { ...leave, style: 'destructive' }],
       );
     else if (hostAlone)
-      Alert.alert(
+      showAlert(
         'End the class?',
         "You're the only one here, so this ends the class for good rather than just leaving it running.",
         [
@@ -471,7 +520,7 @@ export function NativeClassroom({
         ],
       );
     else
-      Alert.alert(
+      showAlert(
         'Leave or end the class?',
         'Leave and the class keeps going for everyone else. End it and every participant is disconnected immediately.',
         [
@@ -1224,6 +1273,7 @@ export function NativeClassroom({
       <NativeMeetingSheet
         open={inClass && panel === 'participants'}
         title="People"
+        sidePanel
         onClose={() => setPanel('none')}
       >
         <ScrollView contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}>
@@ -1278,9 +1328,48 @@ export function NativeClassroom({
                 user={user}
                 isYou={user.id === state.selfId}
                 handRaised={state.raisedHands.includes(user.id)}
-                canManage={!!moderator && user.id !== state.selfId}
+                canManage={user.id === state.selfId || (!!moderator && !user.host)}
               >
+                {user.id === state.selfId && (
+                  <>
+                    {button(
+                      state.microphone ? 'Mute microphone' : 'Unmute microphone',
+                      () => {
+                        void run(() => controller.microphone(!state.microphone));
+                      },
+                    )}
+                    {button(state.camera ? 'Stop video' : 'Start video', () => {
+                      void run(() => controller.camera(!state.camera));
+                    })}
+                    {state.raisedHands.includes(user.id) &&
+                      button('Lower hand', () => {
+                        void run(() => controller.raiseHand(false));
+                      })}
+                  </>
+                )}
                 {moderator &&
+                  !user.host &&
+                  user.id !== state.selfId &&
+                  (!user.cohost || controller.self?.host) &&
+                  button(`Remove ${user.name}`, () =>
+                    showAlert(
+                      'Remove participant?',
+                      `${user.name} will leave this class.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Remove',
+                          style: 'destructive',
+                          onPress: () => {
+                            void run(() => controller.removeParticipant(user.id));
+                          },
+                        },
+                      ],
+                    ),
+                  )}
+                {moderator &&
+                  !user.host &&
+                  !user.muted &&
                   user.id !== state.selfId &&
                   button(`Mute ${user.name}`, () => {
                     void run(async () => {
@@ -1290,7 +1379,7 @@ export function NativeClassroom({
                         .catch(() => {});
                     });
                   })}
-                {controller.self?.host && user.id !== state.selfId && (
+                {controller.self?.host && !user.host && user.id !== state.selfId && (
                   <>
                     {controller.settings.cohosts?.enabled &&
                       button(
@@ -1300,19 +1389,15 @@ export function NativeClassroom({
                         },
                       )}
                     {button(`Make host ${user.name}`, () =>
-                      Alert.alert(
-                        'Transfer host?',
-                        `${user.name} will become the host.`,
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          {
-                            text: 'Transfer',
-                            onPress: () => {
-                              void run(() => controller.transferHost(user.id));
-                            },
+                      showAlert('Transfer host?', `${user.name} will become the host.`, [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Transfer',
+                          onPress: () => {
+                            void run(() => controller.transferHost(user.id));
                           },
-                        ],
-                      ),
+                        },
+                      ]),
                     )}
                   </>
                 )}
@@ -1511,41 +1596,6 @@ export function NativeClassroom({
                 })}
               </View>
             )}
-            {state.recordingConsent && (
-              <View
-                accessibilityRole="alert"
-                style={{
-                  gap: 8,
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: colors.card,
-                }}
-              >
-                <Text style={{ color: colors.text }}>
-                  {state.recordingConsent === 'traditional'
-                    ? 'This class is being recorded. Stay to consent to the recording, or leave the class.'
-                    : 'The host wants to record you. You can stay in the class either way.'}
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {button(
-                    state.recordingConsent === 'traditional'
-                      ? 'Stay and consent'
-                      : 'Allow recording',
-                    () => {
-                      void run(() => controller.respondToRecordingConsent(true));
-                    },
-                  )}
-                  {button(
-                    state.recordingConsent === 'traditional'
-                      ? 'Decline and leave'
-                      : "Don't record me",
-                    () => {
-                      void run(() => controller.respondToRecordingConsent(false));
-                    },
-                  )}
-                </View>
-              </View>
-            )}
           </View>
           <View style={{ flex: 1, paddingHorizontal: 12, gap: 8 }}>
             {!boardVisible && state.sharingUserIds.length > 1 && (
@@ -1694,7 +1744,7 @@ export function NativeClassroom({
               {hostEligible &&
                 !controller.self?.host &&
                 button('Claim host', () =>
-                  Alert.alert(
+                  showAlert(
                     'Claim host access?',
                     'The current host will become a participant.',
                     [
@@ -1761,7 +1811,7 @@ export function NativeClassroom({
                           !!snapshot.actorId &&
                           snapshot.actorId ===
                             snapshot.document.presentation?.presenterId;
-                        Alert.alert('Whiteboard', 'Manage your whiteboard view.', [
+                        showAlert('Whiteboard', 'Manage your whiteboard view.', [
                           {
                             text: boardVisible
                               ? 'Hide whiteboard for me'
@@ -1952,41 +2002,7 @@ export function NativeClassroom({
                 })}
               </View>
             )}
-            {state.recordingConsent && (
-              <View
-                accessibilityRole="alert"
-                style={{
-                  gap: 8,
-                  padding: 12,
-                  borderRadius: 12,
-                  backgroundColor: colors.card,
-                }}
-              >
-                <Text style={{ color: colors.text }}>
-                  {state.recordingConsent === 'traditional'
-                    ? 'This class is being recorded. Stay to consent to the recording, or leave the class.'
-                    : 'The host wants to record you. You can stay in the class either way.'}
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {button(
-                    state.recordingConsent === 'traditional'
-                      ? 'Stay and consent'
-                      : 'Allow recording',
-                    () => {
-                      void run(() => controller.respondToRecordingConsent(true));
-                    },
-                  )}
-                  {button(
-                    state.recordingConsent === 'traditional'
-                      ? 'Decline and leave'
-                      : "Don't record me",
-                    () => {
-                      void run(() => controller.respondToRecordingConsent(false));
-                    },
-                  )}
-                </View>
-              </View>
-            )}
+
             {preview ? (
               <NativeDevicePreview
                 displayName={displayName}

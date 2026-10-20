@@ -330,6 +330,8 @@ function Canvas() {
       <style>{`
         .native-classroom-canvas .App-toolbar,.native-classroom-canvas .App-menu_bottom,.native-classroom-canvas .layer-ui__wrapper__top-right,.native-classroom-canvas .HelpButton,.native-classroom-canvas .sidebar-trigger,.native-classroom-canvas .welcome-screen,.native-classroom-canvas .App-menu_top__left > :not(.selected-shape-actions),.native-classroom-canvas .shapes-section,.native-classroom-canvas .App-top-bar { display:none!important; }
         .native-classroom-canvas .excalidraw { background:transparent; }
+        .native-classroom-canvas[data-style-options="true"] .selected-shape-actions { margin-top:120px!important; max-height:calc(100vh - 200px); overflow-y:auto; }
+        .native-classroom-canvas[data-style-options="true"] .App-mobile-menu { top:132px!important; max-height:calc(100vh - 200px); overflow-y:auto; }
         .native-classroom-canvas[data-style-options="false"] .selected-shape-actions,.native-classroom-canvas[data-style-options="false"] .App-mobile-menu { display:none!important; }
         .native-classroom-canvas[data-grid="dots"] { background-image:radial-gradient(circle,#8884 1px, transparent 1px);background-size:24px 24px; }
         .native-classroom-canvas[data-grid="lines"] { background-image:linear-gradient(to right,#8882 1px,transparent 1px),linear-gradient(to bottom,#8882 1px,transparent 1px);background-size:24px 24px; }

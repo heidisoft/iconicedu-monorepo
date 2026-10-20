@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { Children, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import {
   EllipsisVertical,
@@ -81,7 +81,7 @@ export function NativeParticipantRow({
             <VideoOff size={18} color={colors.textMuted} />
           )}
         </View>
-        {canManage && (
+        {canManage && Children.toArray(children).length > 0 && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={`More actions for ${user.name}`}

@@ -1,5 +1,16 @@
 import { NativeClassroomError } from './native-classroom-error';
-import { X } from 'lucide-react-native';
+import {
+  X,
+  Download,
+  Copy,
+  Trash2,
+  RotateCw,
+  ZoomIn,
+  ZoomOut,
+  Users,
+  Check,
+  PanelTop,
+} from 'lucide-react-native';
 import { NativeAnnotationBar } from './native-annotation-bar';
 import { DrawingStyleStrip } from '@iconicedu/ui-native';
 import { NativeAnnotationToolbar } from './native-annotation-toolbar';
@@ -881,7 +892,10 @@ export function NativeScreenAnnotations({
             </Text>
           )}
           {pending && (
-            <Text accessibilityLiveRegion="polite" style={{ color: colors.text }}>
+            <Text
+              accessibilityLiveRegion="polite"
+              style={{ position: 'absolute', top: -24, left: 12, color: colors.text }}
+            >
               Saving annotations…
             </Text>
           )}
@@ -974,6 +988,12 @@ export function NativeScreenAnnotations({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Close annotation options"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
                   onPress={() => setOptionsPanel(null)}
                 >
                   <X size={20} color={colors.text} />
@@ -1003,9 +1023,16 @@ export function NativeScreenAnnotations({
                           ),
                         );
                       }}
-                      style={{ padding: 12 }}
+                      style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                     >
-                      <Text style={{ color: colors.text }}>Export image</Text>
+                      <View
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                      >
+                        <Download size={18} color={colors.text} />
+                        <Text style={{ color: colors.text, fontSize: 14 }}>
+                          Export image
+                        </Text>
+                      </View>
                     </Pressable>
                     {selectedObject && (
                       <>
@@ -1037,9 +1064,20 @@ export function NativeScreenAnnotations({
                               },
                             });
                           }}
-                          style={{ padding: 12 }}
+                          style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                         >
-                          <Text style={{ color: colors.text }}>Duplicate selected</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                          >
+                            <Copy size={18} color={colors.text} />
+                            <Text style={{ color: colors.text, fontSize: 14 }}>
+                              Duplicate selected
+                            </Text>
+                          </View>
                         </Pressable>
                         <Pressable
                           accessibilityRole="button"
@@ -1060,9 +1098,20 @@ export function NativeScreenAnnotations({
                             });
                             setSelected(null);
                           }}
-                          style={{ padding: 12 }}
+                          style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                         >
-                          <Text style={{ color: colors.text }}>Delete selected</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                          >
+                            <Trash2 size={18} color={colors.text} />
+                            <Text style={{ color: colors.text, fontSize: 14 }}>
+                              Delete selected
+                            </Text>
+                          </View>
                         </Pressable>
                         <Pressable
                           accessibilityRole="button"
@@ -1074,9 +1123,20 @@ export function NativeScreenAnnotations({
                               rotation: (object.rotation + 15) % 360,
                             }))
                           }
-                          style={{ padding: 12 }}
+                          style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                         >
-                          <Text style={{ color: colors.text }}>Rotate</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                          >
+                            <RotateCw size={18} color={colors.text} />
+                            <Text style={{ color: colors.text, fontSize: 14 }}>
+                              Rotate
+                            </Text>
+                          </View>
                         </Pressable>
                         <Pressable
                           accessibilityRole="button"
@@ -1085,9 +1145,20 @@ export function NativeScreenAnnotations({
                           onPress={() =>
                             changeSelected((object) => scaleNativeAnnotation(object, 1.1))
                           }
-                          style={{ padding: 12 }}
+                          style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                         >
-                          <Text style={{ color: colors.text }}>Larger</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                          >
+                            <ZoomIn size={18} color={colors.text} />
+                            <Text style={{ color: colors.text, fontSize: 14 }}>
+                              Larger
+                            </Text>
+                          </View>
                         </Pressable>
                         <Pressable
                           accessibilityRole="button"
@@ -1096,9 +1167,20 @@ export function NativeScreenAnnotations({
                           onPress={() =>
                             changeSelected((object) => scaleNativeAnnotation(object, 0.9))
                           }
-                          style={{ padding: 12 }}
+                          style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                         >
-                          <Text style={{ color: colors.text }}>Smaller</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 12,
+                            }}
+                          >
+                            <ZoomOut size={18} color={colors.text} />
+                            <Text style={{ color: colors.text, fontSize: 14 }}>
+                              Smaller
+                            </Text>
+                          </View>
                         </Pressable>
                       </>
                     )}
@@ -1154,7 +1236,7 @@ export function NativeScreenAnnotations({
                         accessibilityLabel={`Annotation stroke width ${width}`}
                         disabled={pending}
                         onPress={() => setStyle((previous) => ({ ...previous, width }))}
-                        style={{ padding: 12 }}
+                        style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                       >
                         <Text style={{ color: colors.text }}>{width}px</Text>
                       </Pressable>
@@ -1171,7 +1253,7 @@ export function NativeScreenAnnotations({
                               bold: !previous.bold,
                             }))
                           }
-                          style={{ padding: 12 }}
+                          style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                         >
                           <Text style={{ color: colors.text }}>Bold</Text>
                         </Pressable>
@@ -1185,7 +1267,7 @@ export function NativeScreenAnnotations({
                               italic: !previous.italic,
                             }))
                           }
-                          style={{ padding: 12 }}
+                          style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                         >
                           <Text style={{ color: colors.text }}>Italic</Text>
                         </Pressable>
@@ -1198,7 +1280,7 @@ export function NativeScreenAnnotations({
                             onPress={() =>
                               setStyle((previous) => ({ ...previous, fontSize }))
                             }
-                            style={{ padding: 12 }}
+                            style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                           >
                             <Text style={{ color: colors.text }}>{fontSize}pt</Text>
                           </Pressable>
@@ -1267,7 +1349,7 @@ export function NativeScreenAnnotations({
                       accessibilityLabel="Pressure sensitive pen"
                       accessibilityState={{ checked: pressure }}
                       onPress={() => setPressure((value) => !value)}
-                      style={{ padding: 12 }}
+                      style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                     >
                       <Text style={{ color: colors.text }}>Pressure sensitive pen</Text>
                     </Pressable>
@@ -1279,7 +1361,7 @@ export function NativeScreenAnnotations({
                         changeSelected((object) => ({ ...object, style: { ...style } }));
                         setOptionsPanel(null);
                       }}
-                      style={{ padding: 12 }}
+                      style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                     >
                       <Text style={{ color: colors.text }}>Apply to selected</Text>
                     </Pressable>
@@ -1293,11 +1375,25 @@ export function NativeScreenAnnotations({
                     accessibilityLabel="Show annotator names"
                     accessibilityState={{ checked: showNames }}
                     onPress={() => setShowNames((value) => !value)}
-                    style={{ padding: 12 }}
+                    style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                   >
-                    <Text style={{ color: colors.text }}>Show annotator names</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Users size={18} color={colors.text} />
+                      <Text style={{ color: colors.text, fontSize: 14 }}>
+                        Show annotator names
+                      </Text>
+                    </View>
                   </Pressable>
-                  <Text style={{ color: colors.text }}>Toolbar position</Text>
+                  <Text
+                    style={{
+                      color: colors.textMuted,
+                      fontSize: 12,
+                      paddingHorizontal: 12,
+                      marginTop: 12,
+                    }}
+                  >
+                    Toolbar position
+                  </Text>
                   {['top', 'bottom', 'left', 'right', 'floating'].map((value) => (
                     <Pressable
                       key={value}
@@ -1308,9 +1404,17 @@ export function NativeScreenAnnotations({
                         persistPosition(value);
                         setOptionsPanel(null);
                       }}
-                      style={{ padding: 12 }}
+                      style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                     >
-                      <Text style={{ color: colors.text }}>{value}</Text>
+                      <View
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                      >
+                        <PanelTop size={18} color={colors.textMuted} />
+                        <Text style={{ color: colors.text, flex: 1 }}>
+                          {value.charAt(0).toUpperCase() + value.slice(1)}
+                        </Text>
+                        {dock === value && <Check size={18} color={colors.text} />}
+                      </View>
                     </Pressable>
                   ))}
                   {context?.actor.role === 'educator' && (
@@ -1323,7 +1427,7 @@ export function NativeScreenAnnotations({
                           enabled: !context.snapshot.studentsEnabled,
                         })
                       }
-                      style={{ padding: 12 }}
+                      style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                     >
                       <Text style={{ color: colors.text }}>
                         {context.snapshot.studentsEnabled
@@ -1350,9 +1454,12 @@ export function NativeScreenAnnotations({
                         ],
                       )
                     }
-                    style={{ padding: 12 }}
+                    style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                   >
-                    <Text style={{ color: colors.text }}>Clear mine</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Trash2 size={18} color={colors.text} />
+                      <Text style={{ color: colors.text, fontSize: 14 }}>Clear mine</Text>
+                    </View>
                   </Pressable>
                   {context?.actor.role === 'educator' &&
                     (['students', 'all'] as const).map((scope) => (
@@ -1382,7 +1489,7 @@ export function NativeScreenAnnotations({
                             ],
                           )
                         }
-                        style={{ padding: 12 }}
+                        style={{ padding: 12, minHeight: 44, borderRadius: 12 }}
                       >
                         <Text style={{ color: colors.text }}>
                           {scope === 'all' ? 'Clear all' : 'Clear students'}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Text } from 'react-native';
+import { Alert, Modal, Text } from 'react-native';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { DEFAULT_LIVE_SESSION_SETTINGS } from '@iconicedu/shared-types';
 import { NativeClassroom } from './native-classroom';
@@ -238,14 +238,25 @@ describe('native classroom parity with web meeting behaviour', () => {
     expect(f.screen.queryByText('zoom-session-key')).toBeNull();
   });
   it('asks for traditional recording consent and leaves on decline', async () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const f = setup();
     await f.join();
     f.emit({ type: 'recording', status: 'recording' });
     f.emit({ type: 'recording-consent', consent: 'traditional' });
-    expect(f.screen.getByText(/This class is being recorded/)).toBeTruthy();
+    expect(alert).toHaveBeenCalledWith(
+      'This class is being recorded',
+      expect.any(String),
+      expect.any(Array),
+      expect.any(Object),
+    );
+    expect(f.screen.queryByText('Stay and consent')).toBeNull();
     await act(async () => {
-      press(f.screen.getByLabelText('Decline and leave'));
+      alert.mock.calls
+        .at(-1)?.[2]
+        ?.find((item) => item.text === 'Leave class')
+        ?.onPress?.();
     });
+    alert.mockRestore();
     expect(f.adapter.recordingConsent).toHaveBeenCalledWith(false);
     expect(f.adapter.leave).toHaveBeenCalledWith(false);
   });
@@ -429,6 +440,9 @@ describe('native classroom parity with web meeting behaviour', () => {
       await host.join();
       press(host.screen.getByLabelText('Leave or end class'));
       expect(alert.mock.calls.at(-1)?.[0]).toBe('Leave or end the class?');
+      const shown = alert.mock.calls.length;
+      press(host.screen.getByLabelText('Leave or end class'));
+      expect(alert).toHaveBeenCalledTimes(shown);
       const buttons = alert.mock.calls.at(-1)?.[2] as Array<{
         text: string;
         onPress?: () => void;
@@ -710,6 +724,7 @@ it.each([true, false])(
         'Whiteboard',
         expect.any(String),
         expect.any(Array),
+        expect.any(Object),
       ),
     );
     const actions = alert.mock.calls[alert.mock.calls.length - 1][2] as {

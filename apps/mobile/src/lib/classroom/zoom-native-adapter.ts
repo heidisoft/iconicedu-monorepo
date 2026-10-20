@@ -439,6 +439,9 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
           : zoom.audioHelper.muteAudio(id)),
       );
     },
+    async removeParticipant(id) {
+      checked(await zoom.userHelper.removeUser(id));
+    },
     async camera(enabled) {
       checked(
         await (enabled ? zoom.videoHelper.startVideo() : zoom.videoHelper.stopVideo()),

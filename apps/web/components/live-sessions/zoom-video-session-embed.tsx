@@ -2318,6 +2318,32 @@ export function ZoomVideoSessionEmbed({
                   <ZoomParticipantsPanel
                     open={activePanel === 'users'}
                     canMuteOthers={isSelfHost || isSelfCoHost}
+                    onTransferHost={
+                      isSelfHost
+                        ? (userId) => {
+                            void clientRef.current
+                              ?.makeHost(userId)
+                              .catch((error) =>
+                                setMediaError(
+                                  `Could not transfer host: ${describeZoomFailure(error)}`,
+                                ),
+                              );
+                          }
+                        : undefined
+                    }
+                    onRemove={
+                      isSelfHost || isSelfCoHost
+                        ? (userId) => {
+                            void clientRef.current
+                              ?.removeUser(userId)
+                              .catch((error) =>
+                                setMediaError(
+                                  `Could not remove participant: ${describeZoomFailure(error)}`,
+                                ),
+                              );
+                          }
+                        : undefined
+                    }
                     canManageCoHosts={isSelfHost && !!settings.cohosts?.enabled}
                     onCoHost={(userId, enabled) => {
                       const client = clientRef.current;

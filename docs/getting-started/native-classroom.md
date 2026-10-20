@@ -356,3 +356,24 @@ whiteboard gate and defaults off. The join-preview, guardian selection, device s
 and annotation-control corrections above are maintenance fixes to the existing Video SDK
 classroom experience. They use a maintenance exemption rather than introducing another
 web rollout flag; API authorization and admission still validate every selected student.
+
+### Meeting dialogs and participant controls
+
+Native leave and whiteboard confirmations accept one active dialog per surface, so
+repeated taps do not queue duplicate confirmations. Recording requests use a native
+alert instead of a persistent consent banner. The SDK recording response is preserved:
+leaving declines traditional recording; individual recording can be declined without
+leaving the meeting.
+
+On iPad, People and Messages share the same rounded side-panel wrapper. Participant
+actions reflect current SDK permissions: moderators can mute and remove eligible
+participants; hosts can transfer host and manage co-hosts. Co-hosts cannot remove the
+host or another co-host. Native self actions include microphone, camera, and lowering
+a raised hand. Empty participant menus are hidden. Web host transfer and removal use
+styled confirmations. These moderation parity and menu usability corrections are a
+maintenance exemption for the existing Video SDK meeting controls; SDK authorization
+remains authoritative.
+
+Annotation save status is positioned outside the toolbar layout to keep drawing
+controls stationary after each stroke. Expanded whiteboard style controls sit below
+the toolbar and color strip, with scrolling on smaller viewports.

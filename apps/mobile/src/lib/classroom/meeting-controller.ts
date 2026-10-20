@@ -84,6 +84,7 @@ export interface NativeMeetingAdapter {
   share(enabled: boolean): Promise<void>;
   cohost(userId: string, enabled: boolean): Promise<void>;
   host(userId: string): Promise<void>;
+  removeParticipant?(userId: string): Promise<void>;
   claimHost(): Promise<void>;
   command(
     payload:
@@ -487,6 +488,20 @@ export class NativeMeetingController {
   async mute(userId: string) {
     this.requireModerator();
     await this.adapter.microphone(userId, false);
+  }
+  async removeParticipant(userId: string) {
+    this.requireModerator();
+    const user = this.state.participants.find((participant) => participant.id === userId);
+    if (
+      !user ||
+      userId === this.state.selfId ||
+      user.host ||
+      (!this.self?.host && user.cohost)
+    )
+      throw new Error('This participant cannot be removed.');
+    if (!this.adapter.removeParticipant)
+      throw new Error('Update the app to remove participants.');
+    await this.adapter.removeParticipant(userId);
   }
   async cohost(userId: string, enabled: boolean) {
     if (!this.self?.host || !this.settings.cohosts?.enabled)

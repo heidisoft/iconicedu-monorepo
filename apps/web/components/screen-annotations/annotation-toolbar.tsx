@@ -397,7 +397,7 @@ export function AnnotationToolbar({
   const side = dock === 'bottom' ? 'top' : 'bottom';
   const panelInset = inset + (showQuickStyles ? 48 : 0);
   const button =
-    'flex min-h-8 w-full items-center rounded-sm px-2 py-1 text-xs text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
+    'flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
   const close = () => {
     setExpanded(false);
     setPanel(null);
@@ -826,6 +826,7 @@ export function AnnotationToolbar({
                     disabled={!canDraw}
                     onClick={() => clear('mine')}
                   >
+                    <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
                     Clear mine
                   </button>
                   {tutor && (
@@ -835,6 +836,7 @@ export function AnnotationToolbar({
                         className={button}
                         onClick={() => clear('students')}
                       >
+                        <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
                         Clear participants
                       </button>
                       <button
@@ -842,6 +844,7 @@ export function AnnotationToolbar({
                         className={button}
                         onClick={() => clear('all')}
                       >
+                        <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
                         Clear all
                       </button>
                     </>

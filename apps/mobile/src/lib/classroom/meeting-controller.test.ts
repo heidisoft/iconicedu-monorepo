@@ -50,6 +50,7 @@ function fixture() {
     switchCamera: jest.fn().mockResolvedValue(undefined),
     share: jest.fn().mockResolvedValue(undefined),
     cohost: jest.fn().mockResolvedValue(undefined),
+    removeParticipant: jest.fn().mockResolvedValue(undefined),
     claimHost: jest.fn().mockResolvedValue(undefined),
     command: jest.fn().mockResolvedValue(undefined),
     captions: jest.fn().mockResolvedValue(undefined),
@@ -515,4 +516,32 @@ it('requires real authorization before a preview-only controller can join', asyn
   expect(f.adapter.join).not.toHaveBeenCalled();
   expect(controller.snapshot().phase).toBe('preview');
   await controller.dispose();
+});
+
+it('only permits moderators to remove eligible remote participants', async () => {
+  const host = fixture();
+  await host.connected();
+  await host.controller.removeParticipant('2');
+  expect(host.adapter.removeParticipant).toHaveBeenCalledWith('2');
+  await expect(host.controller.removeParticipant('1')).rejects.toThrow(
+    'cannot be removed',
+  );
+  const learner = fixture();
+  await learner.connected('2');
+  await expect(learner.controller.removeParticipant('1')).rejects.toThrow(
+    'access required',
+  );
+  expect(learner.adapter.removeParticipant).not.toHaveBeenCalled();
+  const cohost = fixture();
+  await cohost.connected('2', [
+    teacher,
+    { ...student, cohost: true },
+    { ...student, id: '3', cohost: true },
+  ]);
+  await expect(cohost.controller.removeParticipant('1')).rejects.toThrow(
+    'cannot be removed',
+  );
+  await expect(cohost.controller.removeParticipant('3')).rejects.toThrow(
+    'cannot be removed',
+  );
 });
