@@ -125,7 +125,7 @@ fetch_manifest > /dev/null
 echo "Repeat manifest request took $((SECONDS - STARTED))s"
 # Fail once at startup rather than spending every flow's timeout on a broken dev client.
 maestro --device "$DEVICE_ID" test .maestro/bootstrap.yaml
-maestro --device "$DEVICE_ID" test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-link-entry.yaml .maestro/classroom-deep-links.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml .maestro/classroom-media-controls.yaml .maestro/classroom-whiteboard-write.yaml
+maestro --device "$DEVICE_ID" test .maestro/classroom-ui.yaml .maestro/classroom-join-failure.yaml .maestro/classroom-moderation.yaml .maestro/classroom-student.yaml .maestro/classroom-link-entry.yaml .maestro/classroom-deep-links.yaml .maestro/classroom-presentation-transition.yaml .maestro/classroom-export.yaml .maestro/classroom-annotations.yaml .maestro/classroom-media-controls.yaml .maestro/classroom-whiteboard-write.yaml
 node scripts/verify-classroom-export.mjs "$PLATFORM" "$DEVICE_ID"
 
 if [ "$PLATFORM" = "android" ]; then

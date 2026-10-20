@@ -11,7 +11,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, findNodeHandle, Modal, Pressable, Text, View } from 'react-native';
 import {
-  Maximize,
+  Fullscreen,
+  Scan,
+  ZoomIn,
+  ZoomOut,
   Minimize,
   Download,
   RotateCcw,
@@ -731,10 +734,44 @@ export function NativeWhiteboard({
               zIndex: 2,
               right: 12,
               bottom: 76,
-              flexDirection: 'row-reverse',
+              flexDirection: 'row',
               gap: 8,
             }}
           >
+            {(
+              [
+                ['Fit content', Scan, { type: 'fit' }],
+                ['Zoom in', ZoomIn, { type: 'zoom', delta: 0.1 }],
+                ['Zoom out', ZoomOut, { type: 'zoom', delta: -0.1 }],
+                ['Reset zoom to 100%', RotateCcw, { type: 'reset-zoom' }],
+              ] as const
+            ).map(([label, Icon, command]) => (
+              <Pressable
+                key={label}
+                accessibilityRole="button"
+                accessibilityLabel={label}
+                accessibilityHint={label}
+                disabled={!ready}
+                onPress={() =>
+                  webview.current?.injectJavaScript(
+                    `window.classroomCommand?.(${JSON.stringify(command)}); true;`,
+                  )
+                }
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: colors.card,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  opacity: ready ? 1 : 0.5,
+                }}
+              >
+                <Icon size={20} color={colors.text} />
+              </Pressable>
+            ))}
             {onExpand && (
               <Pressable
                 accessibilityRole="button"
@@ -765,7 +802,7 @@ export function NativeWhiteboard({
                 {expanded ? (
                   <Minimize size={20} color={colors.text} />
                 ) : (
-                  <Maximize size={20} color={colors.text} />
+                  <Fullscreen size={20} color={colors.text} />
                 )}
               </Pressable>
             )}

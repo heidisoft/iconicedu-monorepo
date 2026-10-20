@@ -18,7 +18,7 @@ name: Remote whiteboard stop followed by a peer screen share
     end: '45%,50%'
     duration: 700
 - extendedWaitUntil:
-    visible: 'Changes are waiting to save.*'
+    visible: '.*Changes are waiting to save.*'
     timeout: 10000
 - tapOn: 'Fixture remote whiteboard stop'
 - extendedWaitUntil:

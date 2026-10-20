@@ -12,6 +12,7 @@
 @property(nonatomic, copy) RCTPromiseRejectBlock pendingReject;
 @property(nonatomic) BOOL listening;
 @property(nonatomic) NSUInteger enterGeneration;
+@property(nonatomic) BOOL startRequested;
 @end
 @implementation ClassroomPictureInPicture
 RCT_EXPORT_MODULE(ClassroomPictureInPicture)
@@ -22,6 +23,7 @@ RCT_EXPORT_MODULE(ClassroomPictureInPicture)
 - (void)notify:(BOOL)active { if (self.listening) [self sendEventWithName:@"ClassroomPiPChanged" body:@{@"active": @(active)}]; }
 - (void)clear {
   self.enterGeneration++;
+  self.startRequested = NO;
   if (self.pendingReject) self.pendingReject(@"pip_cancelled", @"Floating call was cancelled", nil);
   self.pendingResolve = nil; self.pendingReject = nil;
   [self.controller stopPictureInPicture]; self.controller.delegate = nil; self.controller = nil;
@@ -76,22 +78,37 @@ RCT_EXPORT_METHOD(configure:(NSString *)userId sharing:(BOOL)sharing automatic:(
 }
 RCT_EXPORT_METHOD(enter:(RCTPromiseResolveBlock)resolve reject:(RCTPromiseRejectBlock)reject) {
   dispatch_async(dispatch_get_main_queue(), ^{
-    if (!self.controller.isPictureInPicturePossible || self.pendingResolve) { reject(@"pip_not_ready", @"Floating call is not ready. Please try again.", nil); return; }
+    if (!self.controller || self.pendingResolve) { reject(@"pip_not_ready", @"Floating call is not ready. Please try again.", nil); return; }
     NSUInteger generation = ++self.enterGeneration;
     self.pendingResolve = resolve; self.pendingReject = reject;
-    [self.controller startPictureInPicture];
+    self.startRequested = NO;
+    [self startWhenPossible:generation];
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 8 * NSEC_PER_SEC), dispatch_get_main_queue(), ^{
       if (generation == self.enterGeneration && self.pendingReject) { self.pendingReject(@"pip_timeout", @"Unable to open floating call. Please try again.", nil); self.pendingResolve = nil; self.pendingReject = nil; [self.controller stopPictureInPicture]; }
     });
   });
 }
+// AVKit readiness can lag canvas subscription and dismissal of the More sheet.
+// Keep this request bounded by enter's timeout, and cancel it on session cleanup.
+- (void)startWhenPossible:(NSUInteger)generation {
+  if (generation != self.enterGeneration || !self.pendingResolve || self.startRequested) return;
+  if (self.controller.isPictureInPicturePossible) {
+    self.startRequested = YES;
+    [self.controller startPictureInPicture];
+    return;
+  }
+  __weak ClassroomPictureInPicture *weakSelf = self;
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC / 10), dispatch_get_main_queue(), ^{
+    [weakSelf startWhenPossible:generation];
+  });
+}
 - (void)pictureInPictureControllerDidStartPictureInPicture:(AVPictureInPictureController *)controller {
   if (self.pendingResolve) self.pendingResolve(@YES);
-  self.pendingResolve = nil; self.pendingReject = nil; [self notify:YES];
+  self.pendingResolve = nil; self.pendingReject = nil; self.startRequested = NO; [self notify:YES];
 }
 - (void)pictureInPictureController:(AVPictureInPictureController *)controller failedToStartPictureInPictureWithError:(NSError *)error {
   if (self.pendingReject) self.pendingReject(@"pip_failed", @"Unable to open floating call", error);
-  self.pendingResolve = nil; self.pendingReject = nil; [self notify:NO];
+  self.pendingResolve = nil; self.pendingReject = nil; self.startRequested = NO; [self notify:NO];
 }
 - (void)pictureInPictureControllerDidStopPictureInPicture:(AVPictureInPictureController *)controller { [self notify:NO]; }
 - (void)pictureInPictureController:(AVPictureInPictureController *)controller restoreUserInterfaceForPictureInPictureStopWithCompletionHandler:(void (^)(BOOL))completionHandler { completionHandler(YES); }

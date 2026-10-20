@@ -1,6 +1,13 @@
 import { NativeControlPop } from './native-meeting-motion';
 import React, { Children, isValidElement, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+  useWindowDimensions,
+} from 'react-native';
 import {
   Ellipsis,
   Mic,
@@ -62,9 +69,13 @@ const menuItem = (label: string) => {
     return { Icon: Users, title: label.replace('Participants', 'People') };
   if (label === 'Invite') return { Icon: Share, title: 'Invite' };
   if (label.includes('captions'))
-    return { Icon: Captions, title: 'Captions', active: label.endsWith('off') };
+    return {
+      Icon: Captions,
+      title: label.endsWith('off') ? 'Turn off captions' : 'Turn on captions',
+      active: label.endsWith('off'),
+    };
   if (label === 'Open floating call')
-    return { Icon: PictureInPicture2, title: 'Floating call' };
+    return { Icon: PictureInPicture2, title: 'Picture-in-picture' };
   if (label.endsWith('participant annotations'))
     return { Icon: ShieldCheck, title: label, host: true };
   if (label.includes('annotat'))
@@ -106,6 +117,7 @@ export function NativeMeetingToolbar({
   more?: React.ReactNode;
 }) {
   const { colors } = useTheme();
+  const grid = useWindowDimensions().width < 700;
   const [expanded, setExpanded] = useState(false);
   const pendingAction = useRef<(() => void) | null>(null);
   const completeDismissal = () => {
@@ -241,62 +253,69 @@ export function NativeMeetingToolbar({
           contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20, gap: 12 }}
         >
           {more}
-          {secondary.map((action) => {
-            const item = menuItem(action.props.accessibilityLabel);
-            return (
-              <Pressable
-                key={action.key}
-                accessibilityRole="button"
-                accessibilityLabel={action.props.accessibilityLabel}
-                accessibilityState={{
-                  disabled: !!action.props.disabled,
-                  selected: !!item.active,
-                }}
-                disabled={action.props.disabled}
-                onPress={() => {
-                  pendingAction.current = action.props.onPress;
-                  setExpanded(false);
-                  if (Platform.OS !== 'ios') completeDismissal();
-                }}
-                style={{
-                  width: '100%',
-                  minHeight: 48,
-                  padding: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  gap: 8,
-                  opacity: action.props.disabled ? 0.45 : 1,
-                }}
-              >
-                <View
+          <View
+            style={{
+              flexDirection: grid ? 'row' : 'column',
+              flexWrap: grid ? 'wrap' : 'nowrap',
+              gap: 4,
+            }}
+          >
+            {secondary.map((action) => {
+              const item = menuItem(action.props.accessibilityLabel);
+              return (
+                <Pressable
+                  key={action.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.props.accessibilityLabel}
+                  accessibilityState={{
+                    disabled: !!action.props.disabled,
+                    selected: !!item.active,
+                  }}
+                  disabled={action.props.disabled}
+                  onPress={() => {
+                    pendingAction.current = action.props.onPress;
+                    setExpanded(false);
+                    if (Platform.OS !== 'ios') completeDismissal();
+                  }}
                   style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 14,
-                    backgroundColor: item.active ? colors.action : colors.actionSubtle,
+                    width: grid ? '32%' : '100%',
+                    minHeight: grid ? 88 : 48,
+                    padding: 8,
+                    borderRadius: 12,
+                    backgroundColor: item.active ? colors.actionSubtle : 'transparent',
+                    flexDirection: grid ? 'column' : 'row',
                     alignItems: 'center',
-                    justifyContent: 'center',
+                    justifyContent: grid ? 'center' : 'flex-start',
+                    gap: 8,
+                    opacity: action.props.disabled ? 0.45 : 1,
                   }}
                 >
-                  <item.Icon
-                    size={20}
-                    color={item.active ? colors.actionForeground : colors.text}
-                  />
-                </View>
-                <Text
-                  style={{
-                    color: colors.text,
-                    fontSize: 16,
-                    textAlign: 'left',
-                    flex: 1,
-                  }}
-                >
-                  {item.title}
-                </Text>
-              </Pressable>
-            );
-          })}
+                  <View
+                    style={{
+                      width: grid ? 44 : 24,
+                      height: grid ? 44 : 24,
+                      borderRadius: grid ? 16 : 0,
+                      backgroundColor: grid ? colors.actionSubtle : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <item.Icon size={20} color={colors.text} />
+                  </View>
+                  <Text
+                    style={{
+                      color: colors.text,
+                      fontSize: grid ? 12 : 16,
+                      textAlign: grid ? 'center' : 'left',
+                      flex: grid ? undefined : 1,
+                    }}
+                  >
+                    {item.title}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
         </ScrollView>
       </NativeMeetingSheet>
     </View>

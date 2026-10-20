@@ -102,3 +102,68 @@ it('reports denied native entry without leaving the app stuck in compact mode', 
   expect(result.current.active).toBe(false);
   unmount();
 });
+
+it('retries a transient SDK participant setup failure instead of leaving floating call disabled', async () => {
+  const pip = adapter();
+  pip.configure.mockRejectedValueOnce(new Error('participant not ready'));
+  const { result, unmount } = renderHook(() => useNativePictureInPicture(pip, meeting));
+  await waitFor(() => expect(pip.configure).toHaveBeenCalledTimes(2));
+  expect(result.current.ready).toBe(true);
+  expect(result.current.error).toBeNull();
+  unmount();
+});
+
+it('allows a manual retry while initial preparation has not yet succeeded', async () => {
+  const pip = adapter();
+  pip.configure.mockRejectedValueOnce(new Error('SDK not ready'));
+  const { result, unmount } = renderHook(() => useNativePictureInPicture(pip, meeting));
+  await waitFor(() => expect(pip.configure).toHaveBeenCalledTimes(1));
+  expect(result.current.canEnter).toBe(true);
+  await act(async () => {
+    await result.current.enter();
+  });
+  expect(pip.enter).toHaveBeenCalledTimes(1);
+  unmount();
+});
+
+it('cancels pending preparation retries when leaving the classroom', async () => {
+  jest.useFakeTimers();
+  try {
+    const pip = adapter();
+    pip.configure.mockRejectedValue(new Error('SDK not ready'));
+    const { unmount } = renderHook(() => useNativePictureInPicture(pip, meeting));
+    await act(async () => {});
+    expect(pip.configure).toHaveBeenCalledWith('2', false, false);
+    unmount();
+    await act(async () => {
+      jest.runOnlyPendingTimers();
+    });
+    expect(pip.configure.mock.calls.filter(([id]) => id === '2')).toHaveLength(1);
+    expect(pip.configure).toHaveBeenLastCalledWith('', false, false);
+  } finally {
+    jest.useRealTimers();
+  }
+});
+
+it('keeps the camera protected from background pausing during the native entry handoff', async () => {
+  let finish: () => void = () => {};
+  const pip = adapter();
+  pip.enter.mockImplementation(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  const { result, unmount } = renderHook(() => useNativePictureInPicture(pip, meeting));
+  await waitFor(() => expect(result.current.ready).toBe(true));
+  let entry: Promise<void>;
+  act(() => {
+    entry = result.current.enter();
+  });
+  expect(result.current.active).toBe(true);
+  await act(async () => {
+    finish();
+    await entry!;
+  });
+  unmount();
+});

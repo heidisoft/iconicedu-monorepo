@@ -1,12 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Keyboard,
-  Pressable,
-  Text,
-  TextInput,
-  View,
-  useWindowDimensions,
-} from 'react-native';
+import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
 import {
   Check,
   Pencil,
@@ -34,7 +27,7 @@ type Props = {
   studentChoices?: React.ReactNode;
   joinDisabled?: boolean;
 };
-/** Web preview hierarchy adapted to tablet columns and native touch targets. */
+/** Compact join preview shared by single-person and shared-device entry. */
 export function NativeDevicePreview(props: Props) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState(false);
@@ -49,7 +42,6 @@ export function NativeDevicePreview(props: Props) {
     setEditing(false);
     Keyboard.dismiss();
   };
-  const wide = useWindowDimensions().width >= 900;
   const iconButton = (
     label: string,
     Icon: typeof Mic,
@@ -76,8 +68,15 @@ export function NativeDevicePreview(props: Props) {
     </Pressable>
   );
   return (
-    <View style={{ flexDirection: wide ? 'row' : 'column', gap: 24 }}>
-      <View style={{ flex: wide ? 1 : undefined, gap: 12 }}>
+    <View
+      style={{
+        width: '100%',
+        maxWidth: 480,
+        alignSelf: 'center',
+        gap: 24,
+      }}
+    >
+      <View style={{ gap: 12 }}>
         {props.children}
         <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 12 }}>
           {iconButton(
@@ -93,7 +92,7 @@ export function NativeDevicePreview(props: Props) {
           {props.onSettings && iconButton('Settings', Settings, props.onSettings)}
         </View>
       </View>
-      <View style={{ width: wide ? 320 : undefined, justifyContent: 'center', gap: 16 }}>
+      <View style={{ gap: 16 }}>
         <Text style={{ color: colors.text, fontSize: 22, fontWeight: '600' }}>
           {props.sessionName}
         </Text>

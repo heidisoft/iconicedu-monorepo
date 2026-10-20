@@ -15,7 +15,9 @@ export function NativeShareStage({
   composited,
   publishAnnotations = true,
   onContext,
+  controls,
 }: {
+  controls?: React.ReactNode;
   sessionId: string;
   userId: string;
   token?: string;
@@ -99,6 +101,7 @@ export function NativeShareStage({
           />
         </View>
       )}
+      {controls}
     </View>
   );
 }

@@ -72,3 +72,29 @@ it('accounts for an inset iOS sheet when keeping the composer above the keyboard
     64,
   );
 });
+
+it('uses a dismissible side panel for tablet chat and explains disabled messaging', () => {
+  const dimensions = jest
+    .spyOn(require('react-native'), 'useWindowDimensions')
+    .mockReturnValue({ width: 1024, height: 768, scale: 1, fontScale: 1 });
+  try {
+    const close = jest.fn();
+    const screen = render(
+      <NativeChatSheet
+        open
+        messages={[]}
+        canSend={false}
+        onSend={jest.fn()}
+        onClose={close}
+      />,
+    );
+    expect(screen.UNSAFE_getByType(Modal).props.presentationStyle).toBe('overFullScreen');
+    expect(
+      screen.getByText('Sending messages is disabled for this meeting.'),
+    ).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Dismiss In-call Messages'));
+    expect(close).toHaveBeenCalledTimes(1);
+  } finally {
+    dimensions.mockRestore();
+  }
+});

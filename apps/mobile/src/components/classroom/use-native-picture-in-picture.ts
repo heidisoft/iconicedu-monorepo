@@ -82,27 +82,47 @@ export function useNativePictureInPicture(
     let mounted = true;
     setReady(false);
     if (!adapter || !supported) return;
-    void configure(enabled ? userId : '', sharing, enabled && automatic)
-      .then(() => {
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const prepare = async (attempt = 0): Promise<void> => {
+      try {
+        await configure(enabled ? userId : '', sharing, enabled && automatic);
         if (mounted) {
           setReady(enabled && !!userId);
           setError(null);
         }
-      })
-      .catch(() => {
-        if (mounted)
+      } catch {
+        if (!mounted) return;
+        // SDK participant/media objects may arrive just after the joined event.
+        if (enabled && attempt < 3) {
+          retry = setTimeout(
+            () => {
+              void prepare(attempt + 1);
+            },
+            250 * 2 ** attempt,
+          );
+        } else {
           setError('Floating call is unavailable. Keep the classroom open or retry.');
-      });
+        }
+      }
+    };
+    void prepare();
     return () => {
       mounted = false;
+      if (retry) clearTimeout(retry);
     };
   }, [adapter, supported, enabled, userId, sharing, automatic, configure]);
   const enter = useCallback(async () => {
-    if (!adapter || !ready)
+    if (!adapter || !enabled || !supported || !userId)
       throw new Error('Wait for the meeting before opening a floating call.');
+    // A manual retry must remain possible after initial SDK preparation failed.
+    if (!ready) {
+      await configure(userId, sharing, automatic);
+      setReady(true);
+    }
     setError(null);
+    // Keep the camera alive during AVKit's startup handoff as well as Android's.
+    setActive(true);
     if (Platform.OS === 'android') {
-      setActive(true);
       await new Promise<void>((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
       );
@@ -113,10 +133,20 @@ export function useNativePictureInPicture(
       setActive(false);
       throw cause;
     }
-  }, [adapter, ready]);
+  }, [adapter, ready, enabled, supported, userId, sharing, automatic, configure]);
   const changeAutomatic = useCallback(async (value: boolean) => {
     await AsyncStorage.setItem(preference, String(value));
     setAutomatic(value);
   }, []);
-  return { supported, automatic, active, ready, target, error, enter, changeAutomatic };
+  return {
+    supported,
+    automatic,
+    active,
+    ready,
+    canEnter: enabled && supported && !!userId,
+    target,
+    error,
+    enter,
+    changeAutomatic,
+  };
 }

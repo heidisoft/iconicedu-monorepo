@@ -1,3 +1,4 @@
+import { NativePresentationControls } from './native-presentation-controls';
 import { NativeBackgroundPicker } from './native-background-picker';
 import { NativeSettingDeviceSelect } from './native-setting-device-select';
 import { NativePreviewAvatar } from './native-preview-avatar';
@@ -198,11 +199,20 @@ export function NativeClassroom({
   const [boardActive, setBoardActive] = useState(false);
   const [boardExpanded, setBoardExpanded] = useState(false);
   const [focused, setFocused] = useState<{ id: string; sharing: boolean } | null>(null);
+  useEffect(() => {
+    if (
+      focused &&
+      ((state.phase !== 'meeting' && state.phase !== 'reconnecting') ||
+        (focused.sharing && !state.sharingUserIds.includes(focused.id)))
+    )
+      setFocused(null);
+  }, [focused, state.phase, state.sharingUserIds]);
   const pip = useNativePictureInPicture(
     adapter.pictureInPicture,
     state,
     focused?.id,
-    boardPending || boardVisible || panel === 'whiteboard',
+    boardPending ||
+      (Platform.OS === 'android' && (boardVisible || panel === 'whiteboard')),
   );
   const [zoomBoardActive, setZoomBoardActive] = useState(false);
   useEffect(() => {
@@ -265,8 +275,13 @@ export function NativeClassroom({
     }
   }, [state.sharingUserIds]);
   useEffect(() => {
-    if (focused?.sharing && !state.sharingUserIds.includes(focused.id)) setFocused(null);
-  }, [focused, state.sharingUserIds]);
+    if (
+      focused &&
+      ((state.phase !== 'meeting' && state.phase !== 'reconnecting') ||
+        (focused.sharing && !state.sharingUserIds.includes(focused.id)))
+    )
+      setFocused(null);
+  }, [focused, state.phase, state.sharingUserIds]);
   const [annotating, setAnnotating] = useState(false);
   const [captions, setCaptions] = useState(false);
   const [displayName, setDisplayName] = useState(credentials.displayName);
@@ -570,22 +585,37 @@ export function NativeClassroom({
   ]);
   useEffect(() => {
     if (!inClass) return;
-    const subscription = AppState.addEventListener('change', (next) => {
-      const current = controller.snapshot();
-      if (next === 'background' && current.camera && !pip.active) {
-        cameraPausedInBackground.current = true;
-        void controller.camera(false).catch(() => {
-          cameraPausedInBackground.current = false;
-        });
+    let pauseTimer: ReturnType<typeof setTimeout> | undefined;
+    let background = AppState.currentState === 'background';
+    const pauseCamera = () => {
+      if (!background || !controller.snapshot().camera) return;
+      cameraPausedInBackground.current = true;
+      void controller.camera(false).catch(() => {
+        cameraPausedInBackground.current = false;
+      });
+    };
+    const change = (next: string) => {
+      if (pauseTimer) clearTimeout(pauseTimer);
+      background = next === 'background';
+      if (background && controller.snapshot().camera && !pip.active) {
+        // AVKit's automatic-entry event may arrive after the app backgrounds.
+        // If it never starts, retain the normal background camera protection.
+        if (pip.automatic && pip.ready) pauseTimer = setTimeout(pauseCamera, 1500);
+        else pauseCamera();
       } else if (next === 'active' && cameraPausedInBackground.current) {
         cameraPausedInBackground.current = false;
         void controller
           .camera(true)
           .catch(() => setError('Your camera could not restart. Turn it on again.'));
       }
-    });
-    return () => subscription.remove();
-  }, [inClass, controller, pip.active]);
+    };
+    const subscription = AppState.addEventListener('change', change);
+    if (background) change('background');
+    return () => {
+      subscription.remove();
+      if (pauseTimer) clearTimeout(pauseTimer);
+    };
+  }, [inClass, controller, pip.active, pip.automatic, pip.ready]);
   useEffect(() => {
     const blocked = state.permissionBlocked;
     if (!blocked) return;
@@ -1341,6 +1371,37 @@ export function NativeClassroom({
       </NativeMeetingSheet>
     </>
   );
+  const toggleParticipantAnnotations = () => {
+    if (!moderator || !shareContext || !state.sharingUserId) return;
+    void run(async () => {
+      const api = nativeAnnotationApi(
+        sessionId,
+        state.sharingUserId!,
+        credentials.annotationToken,
+      );
+      await api.save(shareContext.snapshot.roomId, {
+        eventId: generateClientMessageId(),
+        kind: 'permissions',
+        enabled: !shareContext.snapshot.studentsEnabled,
+      });
+      setShareContext(await api.load());
+    });
+  };
+  const presentationControls = (expanded = false) => (
+    <NativePresentationControls
+      onFullscreen={
+        otherSharing
+          ? () =>
+              setFocused(expanded ? null : { id: state.sharingUserId!, sharing: true })
+          : undefined
+      }
+      expanded={expanded}
+      annotationsEnabled={shareContext?.snapshot.studentsEnabled}
+      onToggleAnnotations={
+        moderator && shareContext ? toggleParticipantAnnotations : undefined
+      }
+    />
+  );
   const focusedVideo = (
     <NativeFocusedVideo
       user={state.participants.find((user) => user.id === focused?.id)}
@@ -1357,6 +1418,7 @@ export function NativeClassroom({
                 onToggleAnnotation={() => setAnnotating((value) => !value)}
                 composited={state.composited.includes(focused.id)}
                 publishAnnotations={false}
+                controls={presentationControls(true)}
                 onContext={rememberAnnotations}
               />
             )
@@ -1556,30 +1618,7 @@ export function NativeClassroom({
                           </Text>
                         </View>
                       ) : null}
-                      {otherSharing && (
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel="Expand shared screen to full screen"
-                          onPress={() =>
-                            setFocused({ id: state.sharingUserId!, sharing: true })
-                          }
-                          style={{
-                            position: 'absolute',
-                            top: 8,
-                            right: 8,
-                            width: 44,
-                            height: 44,
-                            borderRadius: 22,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: colors.card,
-                            borderWidth: 1,
-                            borderColor: colors.border,
-                          }}
-                        >
-                          <Maximize2 size={20} color={colors.text} />
-                        </Pressable>
-                      )}
+                      {presentationControls()}
                     </View>
                   ) : (
                     <NativeParticipantGallery
@@ -1681,29 +1720,7 @@ export function NativeClassroom({
                   () => {
                     void run(() => pip.enter());
                   },
-                  !pip.ready,
-                )}
-              {moderator &&
-                shareContext &&
-                button(
-                  shareContext.snapshot.studentsEnabled
-                    ? 'Disable participant annotations'
-                    : 'Allow participant annotations',
-                  () => {
-                    void run(async () => {
-                      const api = nativeAnnotationApi(
-                        sessionId,
-                        state.sharingUserId!,
-                        credentials.annotationToken,
-                      );
-                      await api.save(shareContext.snapshot.roomId, {
-                        eventId: generateClientMessageId(),
-                        kind: 'permissions',
-                        enabled: !shareContext.snapshot.studentsEnabled,
-                      });
-                      setShareContext(await api.load());
-                    });
-                  },
+                  !pip.canEnter,
                 )}
               {button(
                 selfSharing && !boardPublishing.current
@@ -1803,7 +1820,6 @@ export function NativeClassroom({
                   },
                   state.sharingUserIds.length > 0 && !boardActive && !zoomBoardActive,
                 )}
-              {boardVisible && button('Expand whiteboard', () => setBoardExpanded(true))}
               {controller.settings.participants.visible &&
                 button(
                   `Participants${waiting.length ? ` (${waiting.length} waiting)` : ''}`,
@@ -1853,11 +1869,6 @@ export function NativeClassroom({
                     void changeRecording(() => controller.pauseRecording(), false);
                   },
                   recordingPending,
-                )}
-              {!boardVisible &&
-                otherSharing &&
-                button('Expand shared screen', () =>
-                  setFocused({ id: state.sharingUserId!, sharing: true }),
                 )}
               {button(leaveLabel, confirmLeave)}
             </NativeMeetingToolbar>
@@ -2003,7 +2014,7 @@ export function NativeClassroom({
               >
                 <View
                   style={{
-                    height: width >= 700 ? 350 : 240,
+                    height: width >= 700 ? 270 : 240,
                     borderRadius: 16,
                     overflow: 'hidden',
                     backgroundColor: colors.card,

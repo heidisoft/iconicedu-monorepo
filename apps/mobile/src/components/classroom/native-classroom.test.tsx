@@ -89,6 +89,7 @@ jest.mock('@/providers/theme-provider', () => ({
     colors: { bg: 'white', text: 'black', card: 'white', actionSubtle: 'grey' },
   }),
 }));
+const mockPipAvailability = { automatic: false, ready: false, active: false };
 jest.mock('./use-native-picture-in-picture', () => ({
   useNativePictureInPicture: () => ({
     supported: false,
@@ -99,6 +100,7 @@ jest.mock('./use-native-picture-in-picture', () => ({
     error: null,
     enter: async () => {},
     changeAutomatic: async () => {},
+    ...mockPipAvailability,
   }),
 }));
 jest.mock('./use-native-media-devices', () => ({
@@ -116,7 +118,7 @@ jest.mock('./native-share-stage', () => ({
     return <Text testID="share-stage">{userId}</Text>;
   },
 }));
-jest.mock('./native-focused-video', () => ({ NativeFocusedVideo: () => null }));
+jest.mock('./native-focused-video', () => ({ NativeFocusedVideo: jest.fn(() => null) }));
 let mockBoardPresentation: ((active: boolean) => void) | undefined;
 jest.mock('./native-whiteboard', () => ({
   NativeWhiteboard: ({
@@ -559,7 +561,6 @@ it('initializes annotations for the mobile host’s own screen and exposes permi
   await f.join();
   f.emit({ type: 'share', userId: '1', active: true });
   await waitFor(() => expect(mockAnnotationLoad).toHaveBeenCalled());
-  press(f.screen.getByLabelText('More controls'));
   await waitFor(() =>
     expect(f.screen.getByLabelText('Disable participant annotations')).toBeTruthy(),
   );
@@ -826,5 +827,84 @@ it.each(['1', '2'])(
     await f.join();
     f.emit({ type: 'share', userId: 'peer', active: true });
     expect(f.screen.getByLabelText('Whiteboard')).toBeDisabled();
+  },
+);
+
+it('gives automatic floating-call entry time to start before pausing the background camera', async () => {
+  const { AppState } = require('react-native');
+  const original = AppState.addEventListener;
+  const listeners: Array<(state: string) => void> = [];
+  AppState.addEventListener = (_type: string, listener: (state: string) => void) => {
+    listeners.push(listener);
+    return { remove: () => listeners.splice(listeners.indexOf(listener), 1) };
+  };
+  mockPipAvailability.automatic = true;
+  mockPipAvailability.ready = true;
+  try {
+    const f = setup();
+    await f.join();
+    jest.useFakeTimers();
+    await act(async () => listeners.forEach((listener) => listener('background')));
+    expect(f.adapter.camera).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(1499);
+    });
+    expect(f.adapter.camera).not.toHaveBeenCalled();
+    await act(async () => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(f.adapter.camera).toHaveBeenLastCalledWith(false);
+    await act(async () => listeners.forEach((listener) => listener('active')));
+    f.adapter.camera.mockClear();
+    await act(async () => listeners.forEach((listener) => listener('background')));
+    mockPipAvailability.active = true;
+    f.emit({ type: 'audio-interrupted', active: true });
+    await act(async () => {
+      jest.advanceTimersByTime(1500);
+    });
+    expect(f.adapter.camera).not.toHaveBeenCalled();
+    jest.useRealTimers();
+    f.screen.unmount();
+  } finally {
+    jest.useRealTimers();
+    mockPipAvailability.automatic = false;
+    mockPipAvailability.ready = false;
+    mockPipAvailability.active = false;
+    AppState.addEventListener = original;
+  }
+});
+
+it('allows iPad floating calls while a saved whiteboard remains mounted', async () => {
+  const pipHook = jest.spyOn(
+    require('./use-native-picture-in-picture'),
+    'useNativePictureInPicture',
+  );
+  try {
+    const repository = {
+      load: jest.fn().mockResolvedValue({ presentationActive: false, document: {} }),
+      save: jest.fn().mockResolvedValue({}),
+    };
+    const f = setup('1', repository);
+    await f.join();
+    press(f.screen.getByLabelText('Whiteboard'));
+    await waitFor(() => expect(f.screen.getByText('Class whiteboard')).toBeTruthy());
+    expect(pipHook.mock.calls.at(-1)?.[3]).toBe(false);
+  } finally {
+    pipHook.mockRestore();
+  }
+});
+
+it.each(['share', 'meeting'])(
+  'closes the expanded shared screen when the %s ends',
+  async (ending) => {
+    const focused = require('./native-focused-video').NativeFocusedVideo;
+    const f = setup('1');
+    await f.join();
+    f.emit({ type: 'share', userId: '2', active: true });
+    press(f.screen.getByLabelText('Expand shared screen to full screen'));
+    expect(focused.mock.calls.at(-1)[0].user.id).toBe('2');
+    if (ending === 'share') f.emit({ type: 'share', userId: '2', active: false });
+    else f.emit({ type: 'left', reason: 'ended-by-host' });
+    await waitFor(() => expect(focused.mock.calls.at(-1)[0].user).toBeUndefined());
   },
 );

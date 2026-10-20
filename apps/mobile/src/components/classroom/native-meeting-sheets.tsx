@@ -9,6 +9,7 @@ import {
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { Send, X } from 'lucide-react-native';
 import {
@@ -39,6 +40,7 @@ export function NativeMeetingSheet({
   footer,
   onDismiss,
   compact = false,
+  sidePanel = false,
 }: {
   open: boolean;
   title: string;
@@ -47,9 +49,12 @@ export function NativeMeetingSheet({
   footer?: React.ReactNode;
   onDismiss?: () => void;
   compact?: boolean;
+  sidePanel?: boolean;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const widePanel = sidePanel && width >= 700;
   const reducedMotion = useReducedMotion();
   const content = useRef<View>(null);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
@@ -60,8 +65,8 @@ export function NativeMeetingSheet({
     <Modal
       visible={open}
       animationType={reducedMotion ? 'none' : 'slide'}
-      transparent={compact}
-      presentationStyle={compact ? 'overFullScreen' : 'pageSheet'}
+      transparent={compact || widePanel}
+      presentationStyle={compact || widePanel ? 'overFullScreen' : 'pageSheet'}
       onRequestClose={onClose}
       onDismiss={onDismiss}
       onShow={measureContent}
@@ -71,10 +76,10 @@ export function NativeMeetingSheet({
           style={{
             flex: 1,
             justifyContent: compact ? 'flex-end' : undefined,
-            backgroundColor: compact ? 'rgba(0,0,0,0.4)' : colors.bg,
+            backgroundColor: compact || widePanel ? 'rgba(0,0,0,0.15)' : colors.bg,
           }}
         >
-          {compact && (
+          {(compact || widePanel) && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Dismiss ${title}`}
@@ -94,14 +99,25 @@ export function NativeMeetingSheet({
                   ? {
                       maxHeight: '75%',
                       width: '100%',
-                      maxWidth: 560,
+                      maxWidth: width >= 700 ? 320 : 560,
                       alignSelf: 'center',
                       backgroundColor: colors.card,
                       borderTopLeftRadius: 24,
                       borderTopRightRadius: 24,
                       overflow: 'hidden',
                     }
-                  : { flex: 1 }
+                  : widePanel
+                    ? {
+                        flex: 1,
+                        width: '100%',
+                        maxWidth: 512,
+                        alignSelf: 'flex-end',
+                        margin: 16,
+                        borderRadius: 32,
+                        backgroundColor: colors.bg,
+                        overflow: 'hidden',
+                      }
+                    : { flex: 1 }
               }
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
               keyboardVerticalOffset={
@@ -113,13 +129,20 @@ export function NativeMeetingSheet({
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  paddingHorizontal: 20,
-                  paddingVertical: 12,
+                  paddingHorizontal: sidePanel ? 28 : 20,
+                  paddingVertical: sidePanel ? 24 : 12,
                 }}
               >
                 <Text
                   accessibilityRole="header"
-                  style={{ color: colors.text, fontSize: 18, fontWeight: '600' }}
+                  style={{
+                    color: colors.text,
+                    fontSize: sidePanel ? 30 : 18,
+                    fontWeight: sidePanel ? '500' : '600',
+                    flex: 1,
+                    flexShrink: 1,
+                    marginRight: 8,
+                  }}
                 >
                   {title}
                 </Text>
@@ -170,6 +193,10 @@ export function NativeChatSheet({
   const [sendError, setSendError] = useState<string | null>(null);
   const sendingRef = useRef(false);
   const scroll = useRef<ScrollView>(null);
+  const atLatest = useRef(true);
+  useEffect(() => {
+    if (open) atLatest.current = true;
+  }, [open]);
   // Re-render each minute so relative times stay current while the sheet is open.
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
@@ -199,6 +226,7 @@ export function NativeChatSheet({
     <NativeMeetingSheet
       open={open}
       title="In-call Messages"
+      sidePanel
       onClose={onClose}
       footer={
         canSend ? (
@@ -207,7 +235,7 @@ export function NativeChatSheet({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              margin: 20,
+              margin: 28,
               padding: 6,
               borderRadius: 999,
               backgroundColor: colors.inputBg,
@@ -241,16 +269,18 @@ export function NativeChatSheet({
                 borderRadius: 22,
                 alignItems: 'center',
                 justifyContent: 'center',
-                backgroundColor: colors.action,
+                backgroundColor: 'transparent',
                 opacity: draft.trim() && !sending ? 1 : 0.5,
               }}
             >
-              <Send size={18} color={colors.actionForeground} />
+              <Send size={18} color={colors.text} />
             </Pressable>
           </View>
-        ) : blockedReason ? (
-          <Text style={{ color: colors.textMuted, margin: 20 }}>{blockedReason}</Text>
-        ) : null
+        ) : (
+          <Text style={{ color: colors.textMuted, margin: 28 }}>
+            {blockedReason ?? 'Sending messages is disabled for this meeting.'}
+          </Text>
+        )
       }
     >
       {sendError && (
@@ -264,8 +294,17 @@ export function NativeChatSheet({
       )}
       <ScrollView
         ref={scroll}
-        onContentSizeChange={() => scroll.current?.scrollToEnd({ animated: false })}
-        contentContainerStyle={{ paddingHorizontal: 20, gap: 20 }}
+        onContentSizeChange={() => {
+          if (atLatest.current) scroll.current?.scrollToEnd({ animated: false });
+        }}
+        scrollEventThrottle={16}
+        onScroll={({
+          nativeEvent: { contentOffset, layoutMeasurement, contentSize },
+        }) => {
+          atLatest.current =
+            contentOffset.y + layoutMeasurement.height >= contentSize.height - 48;
+        }}
+        contentContainerStyle={{ paddingHorizontal: 28, paddingVertical: 12, gap: 20 }}
         keyboardShouldPersistTaps="handled"
       >
         {messages.length === 0 ? (
@@ -274,14 +313,17 @@ export function NativeChatSheet({
           messages.map((message) => (
             <View key={message.id} style={{ gap: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8 }}>
-                <Text style={{ color: colors.text, fontWeight: '600' }}>
+                <Text style={{ color: colors.text, fontWeight: '500', fontSize: 14 }}>
                   {message.self ? 'You' : message.sender}
                 </Text>
                 <Text style={{ color: colors.textMuted, fontSize: 12 }}>
                   {formatRelativeTime(message.sentAt, now)}
                 </Text>
               </View>
-              <Text selectable style={{ color: colors.textMuted, lineHeight: 20 }}>
+              <Text
+                selectable
+                style={{ color: colors.textMuted, fontSize: 14, lineHeight: 21 }}
+              >
                 {message.text}
               </Text>
             </View>

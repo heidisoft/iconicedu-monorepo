@@ -541,3 +541,27 @@ it('offers expand and collapse using the fullscreen control without an on-canvas
   expect(onExpand).toHaveBeenCalledTimes(2);
   expect(screen.queryByLabelText('Return to video')).toBeNull();
 });
+
+it('offers canvas zoom actions without opening the drawing toolbar menus', async () => {
+  jest.mocked(capabilityGet).mockResolvedValue(snapshot);
+  const screen = render(<NativeWhiteboard token="synthetic" />);
+  await waitFor(() => expect(screen.getByTestId('drawing-canvas')).toBeTruthy());
+  fireEvent.press(screen.getByLabelText('Zoom in'));
+  expect(mockInjectJavaScript).not.toHaveBeenCalledWith(
+    'window.classroomCommand?.({"type":"zoom","delta":0.1}); true;',
+  );
+  fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
+    nativeEvent: { data: JSON.stringify({ type: 'ready' }) },
+  });
+  for (const [label, command] of [
+    ['Fit content', { type: 'fit' }],
+    ['Zoom in', { type: 'zoom', delta: 0.1 }],
+    ['Zoom out', { type: 'zoom', delta: -0.1 }],
+    ['Reset zoom to 100%', { type: 'reset-zoom' }],
+  ] as const) {
+    fireEvent.press(screen.getByLabelText(label));
+    expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
+      `window.classroomCommand?.(${JSON.stringify(command)}); true;`,
+    );
+  }
+});

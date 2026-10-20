@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Maximize, Minimize } from 'lucide-react';
+import { Fullscreen, Minimize } from 'lucide-react';
 import { NotificationCard } from '@iconicedu/ui-web/ui/notification-card';
 import { Button } from '@iconicedu/ui-web/ui/button';
 
@@ -63,7 +63,7 @@ export function FocusedFullscreenButton({
         type="button"
         variant="secondary"
         size="icon-sm"
-        className="focused-fullscreen-control absolute right-3 bottom-3 z-40 shadow-sm"
+        className="focused-fullscreen-control absolute right-3 bottom-3 z-40 size-11 shadow-sm"
         aria-label={fullscreen.active ? 'Exit fullscreen' : `View ${label} fullscreen`}
         aria-pressed={fullscreen.active}
         title={
@@ -79,7 +79,7 @@ export function FocusedFullscreenButton({
         {fullscreen.active ? (
           <Minimize className="size-4" />
         ) : (
-          <Maximize className="size-4" />
+          <Fullscreen className="size-4" />
         )}
       </Button>
       {fullscreen.error && (

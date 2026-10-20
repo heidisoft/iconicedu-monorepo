@@ -5,7 +5,15 @@ import { participantColor } from '@iconicedu/utils';
 import { ErrorBoundary } from '@iconicedu/ui-web/components/error-boundary';
 import { DropdownMenuItem } from '@iconicedu/ui-web/ui/dropdown-menu';
 import { Button } from '@iconicedu/ui-web/ui/button';
-import { Binoculars, RotateCcw, Download, Trash2 } from 'lucide-react';
+import {
+  Binoculars,
+  RotateCcw,
+  Download,
+  Trash2,
+  Scan,
+  ZoomIn,
+  ZoomOut,
+} from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -192,7 +200,7 @@ export function ClassroomWhiteboard({
           />
         </aside>
       </div>
-      <div className="absolute inset-x-3 bottom-12 z-20 flex flex-col gap-2">
+      <div className="absolute inset-x-3 bottom-20 z-20 flex flex-col gap-2">
         {(board.error || exportError) && (
           <div
             role="alert"
@@ -251,9 +259,37 @@ export function ClassroomWhiteboard({
             }}
           />
         )}
+        <div
+          role="group"
+          aria-label="Whiteboard zoom controls"
+          className="absolute right-14 bottom-3 z-30 flex h-11 items-center gap-1 rounded-full border border-border bg-card shadow-sm"
+        >
+          {(
+            [
+              ['Fit content', Scan, () => engine?.zoomToFit()],
+              ['Zoom in', ZoomIn, () => engine?.zoomBy(0.1)],
+              ['Zoom out', ZoomOut, () => engine?.zoomBy(-0.1)],
+              ['Reset zoom to 100%', RotateCcw, () => engine?.resetZoom()],
+            ] as const
+          ).map(([label, Icon, onClick]) => (
+            <Button
+              key={label}
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-11 rounded-full"
+              aria-label={label}
+              title={label}
+              disabled={!engine}
+              onClick={onClick}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+            </Button>
+          ))}
+        </div>
         <p
           data-whiteboard-hint
-          className="pointer-events-none absolute bottom-3 left-3 hidden rounded-xl border border-border/50 bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground sm:block"
+          className="pointer-events-none absolute bottom-3 left-3 hidden rounded-xl border border-border/50 bg-card/90 px-3 py-1.5 text-[11px] text-muted-foreground @[760px]:block"
         >
           Scroll to pan · Space + drag · Ctrl/⌘ + scroll to zoom
         </p>
