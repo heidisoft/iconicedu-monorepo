@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { WhiteboardSnapshotVM, WhiteboardViewportVM } from '@iconicedu/shared-types';
+import type {
+  WhiteboardSnapshotVM,
+  WhiteboardViewportVM,
+  WhiteboardViewportPresenceVM,
+} from '@iconicedu/shared-types';
 import {
   createWhiteboardRepository,
   type WhiteboardRepository,
@@ -17,6 +21,7 @@ export function useWhiteboardFollow(
     () => repository ?? createWhiteboardRepository(token),
     [repository, token],
   );
+  const [writers, setWriters] = useState<WhiteboardViewportPresenceVM[]>([]);
   const [following, setFollowing] = useState('tutor');
   const [focusRequest, setFocusRequest] = useState(0);
   const focusTutor = useCallback(() => {
@@ -58,11 +63,20 @@ export function useWhiteboardFollow(
       focused = false;
     setStatus('waiting');
     const read = async () => {
-      if (reading || focused || following === 'free') return;
+      if (reading) return;
       reading = true;
       try {
         const peers = await repo.viewports!();
         const candidates = peers.filter((person) => person.expiresAt > Date.now());
+        if (active)
+          setWriters(
+            candidates.filter(
+              (person) =>
+                person.actorId !== snapshotRef.current?.actorId &&
+                !!person.viewport.writing,
+            ),
+          );
+        if (focused || following === 'free') return;
         // A tutor may have rejoined with a new capability; choose a currently publishing tutor.
         const peer =
           following === 'tutor'
@@ -119,5 +133,5 @@ export function useWhiteboardFollow(
       clearInterval(timer);
     };
   }, [token, repository, repo, enabled, target, following, receive, focusRequest]);
-  return { following, setFollowing, focusTutor, publish, status };
+  return { writers, following, setFollowing, focusTutor, publish, status };
 }

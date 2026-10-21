@@ -5,7 +5,12 @@ import { CaptureUpdateAction, Excalidraw, restoreElements } from '@excalidraw/ex
 import '@excalidraw/excalidraw/index.css';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
-import type { WhiteboardViewportVM, WhiteboardElementVM } from '@iconicedu/shared-types';
+import type {
+  WhiteboardViewportVM,
+  WhiteboardElementVM,
+  WhiteboardViewportPresenceVM,
+  WhiteboardSnapshotVM,
+} from '@iconicedu/shared-types';
 import { ExcalidrawWhiteboardEngine, wrapCanvasElements } from './excalidraw-engine';
 import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
 import './whiteboard-canvas.css';
@@ -26,7 +31,11 @@ export function ExcalidrawCanvas({
   onViewport,
   viewport,
   followSource,
+  writers = [],
+  presence = [],
 }: {
+  writers?: WhiteboardViewportPresenceVM[];
+  presence?: WhiteboardSnapshotVM['presence'];
   token?: string;
   onViewport?: (viewport: WhiteboardViewportVM) => void;
   viewport?: WhiteboardViewportVM;
@@ -101,7 +110,7 @@ export function ExcalidrawCanvas({
       },
     );
   }, [api, viewport, followSource]);
-  const onPointerUpdate = useWhiteboardLaser(api, token);
+  const onPointerUpdate = useWhiteboardLaser(api, token, presence);
   const engineRef = useRef<ExcalidrawWhiteboardEngine | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -264,6 +273,31 @@ export function ExcalidrawCanvas({
         }
       }}
     >
+      <div className="pointer-events-none absolute inset-0 z-[2] overflow-hidden">
+        {api &&
+          writers
+            .filter((person) => person.expiresAt > Date.now())
+            .map((person) => {
+              const point = person.viewport.writing;
+              const name = presence.find((peer) => peer.id === person.actorId)?.name;
+              const view = api.getAppState();
+              return (
+                point &&
+                name && (
+                  <span
+                    key={person.actorId}
+                    className="absolute rounded-lg bg-background px-2 py-1 text-xs text-foreground shadow-sm"
+                    style={{
+                      left: (point.x + view.scrollX) * view.zoom.value + 8,
+                      top: (point.y + view.scrollY) * view.zoom.value - 24,
+                    }}
+                  >
+                    {name}
+                  </span>
+                )
+              );
+            })}
+      </div>
       <Excalidraw
         onPointerUpdate={(event) => {
           onPointerUpdate(event);

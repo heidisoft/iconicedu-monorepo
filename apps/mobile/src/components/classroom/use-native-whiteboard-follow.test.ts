@@ -135,3 +135,39 @@ it('follows the currently publishing tutor after a capability changes on rejoin'
   expect(receive).toHaveBeenCalledWith(viewport, expect.any(String));
   unmount();
 });
+
+it('keeps writing presence updated after focusing without following continuously', async () => {
+  jest.useFakeTimers();
+  const repository = {
+    load: jest.fn(),
+    save: jest.fn(),
+    publishViewport: jest.fn().mockResolvedValue({}),
+    viewports: jest.fn().mockResolvedValue([
+      {
+        actorId: 'tutor',
+        viewport: { centerX: 0, centerY: 0, zoom: 1, writing: { x: 10, y: 20 } },
+        expiresAt: Date.now() + 10000,
+      },
+    ]),
+  };
+  const receive = jest.fn();
+  const { result, unmount } = renderHook(() =>
+    useNativeWhiteboardFollow('token', repository, snapshot, true, receive),
+  );
+  await act(async () => {});
+  expect(result.current.writers[0].viewport.writing).toEqual({ x: 10, y: 20 });
+  repository.viewports.mockResolvedValue([
+    {
+      actorId: 'tutor',
+      viewport: { centerX: 0, centerY: 0, zoom: 1, writing: { x: 30, y: 40 } },
+      expiresAt: Date.now() + 10000,
+    },
+  ]);
+  await act(async () => {
+    jest.advanceTimersByTime(500);
+  });
+  expect(result.current.writers[0].viewport.writing).toEqual({ x: 30, y: 40 });
+  expect(receive).toHaveBeenCalledTimes(1);
+  unmount();
+  jest.useRealTimers();
+});

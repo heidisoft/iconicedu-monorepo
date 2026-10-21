@@ -923,3 +923,13 @@ it.each(['share', 'meeting'])(
     await waitFor(() => expect(focused.mock.calls.at(-1)[0].user).toBeUndefined());
   },
 );
+
+it('offers Claim host only inside People', async () => {
+  const f = setup('2', undefined, { hostEligible: true });
+  await f.join();
+  expect(f.screen.queryByLabelText('Claim host')).toBeNull();
+  press(f.screen.getByLabelText('More controls'));
+  expect(f.screen.queryByLabelText('Claim host')).toBeNull();
+  press(f.screen.getByLabelText('Participants'));
+  expect(f.screen.getByLabelText('Claim host')).toBeTruthy();
+});

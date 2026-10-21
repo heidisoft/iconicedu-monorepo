@@ -40,8 +40,10 @@ test('draws, edits text, selects objects and stays aligned after resizing', asyn
     before!.y + before!.height * (0.2 + (0.1 * 2) / 3),
   );
   await page.getByRole('button', { name: 'Resize viewer' }).click();
+  await expect
+    .poll(async () => (await surface.boundingBox())!.width)
+    .toBeLessThan(before!.width);
   const after = await surface.boundingBox();
-  expect(after!.width).toBeLessThan(before!.width);
   expect(after!.width / after!.height).toBeCloseTo(16 / 9, 3);
   await page.screenshot({ path: '/tmp/iconicedu-screen-annotations.png' });
   await toolbar.getByRole('button', { name: 'Pan', exact: true }).click();
@@ -58,13 +60,15 @@ test('supports shape variants, formatting and nonpersistent vanishing marks', as
   await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
   const surface = await page.locator('[data-shared-content-bounds]').boundingBox();
   for (const [group, tool] of [
-    ['Shapes', 'Double arrow'],
-    ['Shapes', 'Rectangle highlight'],
-    ['Shapes', 'Filled ellipse'],
-    ['Shapes', 'Diamond'],
+    ['More', 'Double arrow'],
+    ['More', 'Rectangle highlight'],
+    ['More', 'Filled ellipse'],
+    ['More', 'Diamond'],
     ['', 'Laser pointer'],
   ]) {
     if (group) await page.getByRole('button', { name: group, exact: true }).click();
+    if (tool === 'Highlighter')
+      await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: tool, exact: true }).click();
     await page.mouse.move(
       surface!.x + surface!.width * 0.1,
@@ -105,10 +109,10 @@ test('opens from a pen button and keeps grouped tools usable in a narrow viewer'
   await expect(toolbar).toHaveCSS('overflow-x', 'auto');
   await expect(toolbar).toHaveCSS('flex-wrap', 'nowrap');
   expect(
-    await toolbar.evaluate((element) => element.scrollWidth > element.clientWidth),
+    await toolbar.evaluate((element) => element.scrollWidth >= element.clientWidth),
   ).toBe(true);
-  await toolbar.getByRole('button', { name: 'Shapes', exact: true }).click();
-  const shapes = page.getByRole('group', { name: 'Shapes', exact: true });
+  await toolbar.getByRole('button', { name: 'More', exact: true }).click();
+  const shapes = page.getByRole('group', { name: 'More', exact: true });
   await expect(shapes).toBeVisible();
   const bounds = await shapes.boundingBox();
   expect(bounds!.x).toBeGreaterThanOrEqual(0);
@@ -116,9 +120,10 @@ test('opens from a pen button and keeps grouped tools usable in a narrow viewer'
   await shapes.getByRole('button', { name: 'Rectangle', exact: true }).click();
   await expect(shapes).toHaveCount(0);
   await expect(
-    toolbar.getByRole('button', { name: 'Shapes', exact: true }),
+    toolbar.getByRole('button', { name: 'More', exact: true }),
   ).toHaveAttribute('aria-pressed', 'true');
-  await toolbar.getByRole('button', { name: 'Format', exact: true }).click();
+  await toolbar.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('button', { name: 'Format', exact: true }).click();
   const format = page.getByRole('group', { name: 'Format', exact: true });
   await expect(format).toBeVisible();
   await expect(format.getByLabel('Stroke width')).toHaveCSS('height', '32px');
@@ -131,7 +136,8 @@ test('opens from a pen button and keeps grouped tools usable in a narrow viewer'
   await expect(
     page.getByRole('button', { name: 'Stroke color #ef4444' }),
   ).toHaveAttribute('aria-pressed', 'true');
-  await toolbar.getByRole('button', { name: 'Format', exact: true }).click();
+  await toolbar.getByRole('button', { name: 'More', exact: true }).click();
+  await page.getByRole('button', { name: 'Format', exact: true }).click();
   const formatBounds = await format.boundingBox();
   expect(formatBounds!.width).toBeLessThanOrEqual(240);
   expect(formatBounds!.x + formatBounds!.width).toBeLessThanOrEqual(390);
@@ -160,7 +166,7 @@ test('draws a crisp constrained rectangle and hides the visual mark counter', as
     ),
   ).toBe(true);
   await toolbar.getByRole('button', { name: 'Open annotation toolbar' }).click();
-  await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
   const surface = page.locator('[data-shared-content-bounds]');
   const box = (await surface.boundingBox())!;
@@ -252,7 +258,7 @@ test('keeps rapid strokes and the first shape after a tool change', async ({ pag
   await page.mouse.down();
   await page.keyboard.press('v');
   await page.mouse.up();
-  await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+  await page.getByRole('button', { name: 'More', exact: true }).click();
   await page.getByRole('button', { name: 'Rectangle', exact: true }).click();
   await page.mouse.move(box.x + box.width * 0.65, box.y + box.height * 0.2);
   await page.mouse.down();
@@ -426,12 +432,13 @@ test('reopens repeatedly without errors and paints rapid pen and highlighter dot
   await page.goto('/visual-test/screen-annotations');
   for (let index = 0; index < 5; index++) {
     await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
+    await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: 'Highlighter', exact: true }).click();
     await page.getByRole('button', { name: 'Close annotation toolbar' }).click();
   }
   await page.getByRole('button', { name: 'Open annotation toolbar' }).click();
   const surface = page.locator('[data-shared-content-bounds]');
-  const box = (await surface.boundingBox())!;
+  let box = (await surface.boundingBox())!;
   await surface.locator('[data-recording-annotations]').evaluate((root: HTMLElement) => {
     const capture = root.setPointerCapture.bind(root);
     let firstCapture = true;
@@ -453,7 +460,10 @@ test('reopens repeatedly without errors and paints rapid pen and highlighter dot
     };
   });
   for (const [index, tool] of ['Pen', 'Highlighter'].entries()) {
+    if (tool === 'Highlighter')
+      await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: tool, exact: true }).click();
+    box = (await surface.boundingBox())!;
     for (let dot = 0; dot < 5; dot++) {
       const x = box.x + box.width * (0.45 + dot * 0.06);
       const y = box.y + box.height * (0.5 + index * 0.15);

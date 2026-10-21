@@ -244,6 +244,7 @@ it('routes native library and export options to the canvas without sharing capab
     nativeEvent: { data: '{"type":"ready"}' },
   });
   await act(async () => {});
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   fireEvent.press(screen.getByLabelText('Library'));
   expect(mockInjectJavaScript).toHaveBeenLastCalledWith(
     'window.classroomCommand?.({"type":"library"}); true;',
@@ -372,6 +373,7 @@ it('offers tutor following by default and participant or free navigation choices
     ),
   );
   expect(screen.queryByLabelText('Follow viewport')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   fireEvent.press(screen.getByLabelText('Focus tutor'));
   await act(async () => {});
   expect(repository.viewports).toHaveBeenCalledTimes(2);
@@ -446,7 +448,7 @@ it('exports queued edits and discards them only after confirmation and successfu
   expect(AsyncStorage.removeItem).toHaveBeenCalledWith('classroom-drawing:board:teacher');
   alert.mockRestore();
 });
-it('toggles tutor following directly from the toolbar without opening More', async () => {
+it('focuses the tutor once from More and closes the menu', async () => {
   jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
   jest.mocked(capabilityGet).mockResolvedValue(snapshot);
   const screen = render(<NativeWhiteboard token="fixture" />);
@@ -454,18 +456,11 @@ it('toggles tutor following directly from the toolbar without opening More', asy
   fireEvent(screen.getByTestId('drawing-canvas'), 'message', {
     nativeEvent: { data: '{"type":"ready"}' },
   });
-  expect(
-    screen.getByLabelText('Focus tutor').props.accessibilityState.selected,
-  ).toBeUndefined();
+  expect(screen.queryByLabelText('Focus tutor')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
+  expect(screen.getByLabelText('Focus tutor')).toBeTruthy();
   fireEvent.press(screen.getByLabelText('Focus tutor'));
-  expect(
-    screen.getByLabelText('Focus tutor').props.accessibilityState.selected,
-  ).toBeUndefined();
   expect(screen.queryByLabelText('Close More whiteboard actions')).toBeNull();
-  fireEvent.press(screen.getByLabelText('Focus tutor'));
-  expect(
-    screen.getByLabelText('Focus tutor').props.accessibilityState.selected,
-  ).toBeUndefined();
 });
 
 it('does not offer tutors a stop action for another participant board', async () => {

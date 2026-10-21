@@ -188,13 +188,13 @@ export function ClassroomWhiteboard({
             followControl={
               <Button
                 variant="toolbar"
-                size="icon"
                 aria-label="Focus tutor"
                 title="Focus tutor’s current view"
                 onClick={follow.focusTutor}
-                className="size-8 shrink-0 rounded-full"
+                className="min-h-11 w-full justify-start gap-2 rounded-lg"
               >
                 <Binoculars className="size-4" aria-hidden="true" />
+                Focus tutor
               </Button>
             }
           />
@@ -226,6 +226,8 @@ export function ClassroomWhiteboard({
         >
           <Canvas
             token={token}
+            writers={follow.writers}
+            presence={snapshot?.presence}
             viewport={follow.following === 'free' ? undefined : viewport}
             followSource={followSource}
             onViewport={follow.publish}

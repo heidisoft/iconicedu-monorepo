@@ -801,19 +801,38 @@ export function NativeScreenAnnotations({
                 />
               );
             })()}
-          {showNames && selectedObject && (
-            <SvgText
-              x={nativeAnnotationBounds(selectedObject, width, height).x}
-              y={Math.max(
-                12,
-                nativeAnnotationBounds(selectedObject, width, height).y - 8,
-              )}
-              fill={selectedObject.style.color}
-              fontSize={12}
-            >
-              {selectedObject.creatorName}
-            </SvgText>
-          )}
+          {showNames &&
+            [
+              ...new Map(
+                [
+                  ...(context?.snapshot.objects ?? []).filter(
+                    (object) => !object.deleted,
+                  ),
+                  ...(context?.lasers ?? []).flatMap((peer) =>
+                    peer.strokes
+                      .filter((stroke) => stroke.expiresAt > now)
+                      .map((stroke) => stroke.object),
+                  ),
+                  ...(draft ? [draft] : []),
+                ].map((object) => [object.creatorId, object]),
+              ).values(),
+            ].map((object) => {
+              const point = object.points.at(-1);
+              return (
+                point && (
+                  <SvgText
+                    key={`name-${object.creatorId}`}
+                    accessibilityLabel={`Annotation by ${object.creatorName}`}
+                    x={Math.min(width - 80, Math.max(8, point.x * width + 8))}
+                    y={Math.max(14, Math.min(height - 8, point.y * height - 8))}
+                    fill={object.style.color}
+                    fontSize={12}
+                  >
+                    {object.creatorName}
+                  </SvgText>
+                )
+              );
+            })}
           {draft && <Shape object={draft} width={width} height={height} />}
           {context?.pointers
             ?.filter((pointer) => pointer.expiresAt > now)

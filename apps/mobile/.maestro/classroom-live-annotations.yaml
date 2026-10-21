@@ -36,7 +36,9 @@ name: Native live annotation receiver - a peer must present a fresh synthetic sl
 - tapOn: 'Undo annotation'
 - assertVisible:
     id: 'annotation-saved-elements-0'
+- tapOn: 'More annotation actions'
 - tapOn: 'Redo annotation'
+- tapOn: 'Close More annotation actions'
 - assertVisible:
     id: 'annotation-saved-elements-1'
 - tapOn: 'Undo annotation'

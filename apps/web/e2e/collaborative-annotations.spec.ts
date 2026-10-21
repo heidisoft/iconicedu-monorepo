@@ -234,7 +234,7 @@ test('shared-link guest sees presenter marks and draws without an account sessio
     await enableNames(teacher.page);
     await hoverAnnotation(guest.page);
     await expect.poll(() => pointerLabels(teacher.page)).toContain('Guest');
-    await teacher.page.getByRole('button', { name: 'Attention', exact: true }).click();
+    await teacher.page.getByRole('button', { name: 'More', exact: true }).click();
     await teacher.page.getByRole('button', { name: 'Spotlight', exact: true }).click();
     const edge = (await teacher.page
       .locator('[data-shared-content-bounds]')
@@ -401,6 +401,7 @@ test('keeps real API dots and fast highlights after closing and reopening tools'
         bounds.y + bounds.height * 0.55,
       );
     }
+    await teacher.page.getByRole('button', { name: 'More', exact: true }).click();
     await teacher.page.getByRole('button', { name: 'Highlighter', exact: true }).click();
     for (let index = 0; index < 5; index++) {
       await teacher.page.mouse.move(

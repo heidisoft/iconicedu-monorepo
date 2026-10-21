@@ -41,8 +41,11 @@ function setup(overrides: Partial<ComponentProps<typeof AnnotationToolbar>> = {}
   render(<AnnotationToolbar {...props} />);
   return props;
 }
-const click = (name: string) =>
+const click = (name: string) => {
+  if (name === 'Format' && !screen.queryByRole('button', { name, exact: true }))
+    click('More');
   fireEvent.click(screen.getByRole('button', { name, exact: true }));
+};
 beforeEach(() => localStorage.clear());
 describe('screen annotation toolbar', () => {
   it.each([false, true])(
@@ -137,13 +140,8 @@ describe('screen annotation toolbar', () => {
     expect(buttons[1]).toHaveAccessibleName('Laser pointer');
     expect(buttons[2]).toHaveAccessibleName('Select');
     expect(buttons[buttons.indexOf(pen) + 1]).toHaveAccessibleName('Text');
-    expect(screen.getByRole('button', { name: 'Shapes', exact: true })).toHaveClass(
-      'h-8',
-      'w-11',
-      'rounded-full',
-    );
-
-    click('Shapes');
+    expect(screen.queryByRole('button', { name: 'Shapes', exact: true })).toBeNull();
+    click('More');
     const shape = screen.getByRole('button', { name: 'Rectangle', exact: true });
     expect(shape).toHaveClass('min-h-11');
     expect(shape.querySelector('span')).not.toHaveClass('sr-only');
@@ -151,20 +149,14 @@ describe('screen annotation toolbar', () => {
   it('groups every advanced tool, closes a group after selection, and shows its active state', () => {
     const props = setup({ tool: 'ellipseFilled' });
     click('Open annotation toolbar');
-    expect(screen.getByRole('button', { name: 'Shapes', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    click('Shapes');
-    expect(screen.getByRole('group', { name: 'Shapes', exact: true })).toBeVisible();
-    click('Stamps');
+    click('More');
     expect(
-      screen.queryByRole('group', { name: 'Shapes', exact: true }),
-    ).not.toBeInTheDocument();
+      screen.getByRole('button', { name: 'Filled ellipse', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
     click('Star');
     expect(props.setTool).toHaveBeenLastCalledWith('stampStar');
     expect(
-      screen.queryByRole('group', { name: 'Stamps', exact: true }),
+      screen.queryByRole('group', { name: 'More', exact: true }),
     ).not.toBeInTheDocument();
     click('Laser pointer');
     expect(props.setTool).toHaveBeenLastCalledWith('vanishingPen');
@@ -180,16 +172,10 @@ describe('screen annotation toolbar', () => {
       'aria-pressed',
       'true',
     );
-    click('Shapes');
-    for (const name of [
-      'Lines and arrows',
-      'Outline shapes',
-      'Filled shapes',
-      'Highlights',
-    ]) {
+    if (!screen.queryByRole('group', { name: 'More', exact: true })) click('More');
+    for (const name of ['Shapes', 'Highlight and stamps', 'Attention']) {
       expect(screen.getByRole('group', { name, exact: true })).toBeVisible();
     }
-    click('More');
     for (const name of ['Selection', 'Board', 'Sharing and view']) {
       expect(screen.getByRole('group', { name, exact: true })).toBeVisible();
     }
@@ -199,6 +185,7 @@ describe('screen annotation toolbar', () => {
     click('Open annotation toolbar');
     expect(props.setTool).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Pan', exact: true })).toBeEnabled();
+    click('More');
     for (const name of [
       'Select',
       'Pen',
@@ -211,9 +198,9 @@ describe('screen annotation toolbar', () => {
     ]) {
       expect(screen.getByRole('button', { name, exact: true })).toBeDisabled();
     }
-    click('Shapes');
+    if (!screen.queryByRole('group', { name: 'More', exact: true })) click('More');
     expect(screen.getByRole('button', { name: 'Rectangle', exact: true })).toBeDisabled();
-    click('More');
+    if (!screen.queryByRole('group', { name: 'More', exact: true })) click('More');
     expect(
       screen.queryByRole('checkbox', { name: 'Allow participants to annotate' }),
     ).not.toBeInTheDocument();

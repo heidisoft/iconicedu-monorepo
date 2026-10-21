@@ -27,6 +27,7 @@ export type NativeRecordingConsent = 'traditional' | 'individual';
 export type NativeMeetingEvent =
   | { type: 'joined'; selfId: string; participants: NativeParticipant[] }
   | { type: 'participants'; participants: NativeParticipant[] }
+  | { type: 'participant-audio'; userId: string; muted: boolean }
   | { type: 'left'; reason: NativeLeaveReason }
   | { type: 'error'; message: string }
   | { type: 'share'; userId: string; active: boolean }
@@ -251,6 +252,17 @@ export class NativeMeetingController {
         });
         this.chime();
         this.enforceChatPolicy();
+        break;
+      case 'participant-audio':
+        this.update({
+          participants: this.state.participants.map((user) =>
+            user.id === event.userId ? { ...user, muted: event.muted } : user,
+          ),
+          ...(event.userId === this.state.selfId ? { microphone: !event.muted } : {}),
+          speaking: event.muted
+            ? this.state.speaking.filter((id) => id !== event.userId)
+            : this.state.speaking,
+        });
         break;
       case 'participants': {
         const wasHost = !!this.self?.host;
@@ -488,6 +500,12 @@ export class NativeMeetingController {
   async mute(userId: string) {
     this.requireModerator();
     await this.adapter.microphone(userId, false);
+    this.event({
+      type: 'participants',
+      participants: this.state.participants.map((user) =>
+        user.id === userId ? { ...user, muted: true } : user,
+      ),
+    });
   }
   async removeParticipant(userId: string) {
     this.requireModerator();

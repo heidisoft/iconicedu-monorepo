@@ -169,6 +169,7 @@ describe('native screen annotation delivery', () => {
     fireEvent.press(screen.getByLabelText('Undo annotation'));
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
+    fireEvent.press(screen.getByLabelText('More annotation actions'));
     fireEvent.press(screen.getByLabelText('Redo annotation'));
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(3));
     expect(api.save.mock.calls.map((call) => call[1].kind)).toEqual([
@@ -199,6 +200,7 @@ describe('native screen annotation delivery', () => {
     });
     fireEvent(surface, 'responderRelease');
     fireEvent.press(screen.getByLabelText('More annotation actions'));
+    fireEvent.press(screen.getByLabelText('Sharing and export'));
     fireEvent.press(screen.getByLabelText('Rotate selected annotation'));
     await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
     expect(api.save.mock.calls[1][1]).toMatchObject({
@@ -244,6 +246,7 @@ it('sends educator clear-all through the shared API after confirmation', async (
     actor: { ...context.actor, role: 'educator' },
   });
   fireEvent.press(screen.getByLabelText('More annotation actions'));
+  fireEvent.press(screen.getByLabelText('Sharing and export'));
   await waitFor(() =>
     expect(screen.getByLabelText('Clear all annotations')).toBeTruthy(),
   );
@@ -274,10 +277,12 @@ it('removes annotation totals and keeps Format separate from More actions', asyn
   stroke(screen);
   await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
   expect(screen.queryByText(/^\d+ annotations?$/)).toBeNull();
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
   fireEvent.press(screen.getByLabelText('Annotation styles'));
   expect(screen.getByLabelText('Annotation opacity')).toBeTruthy();
   expect(screen.queryByLabelText('Export annotations image')).toBeNull();
   fireEvent.press(screen.getByLabelText('More annotation actions'));
+  fireEvent.press(screen.getByLabelText('Sharing and export'));
   expect(screen.getByLabelText('Export annotations image')).toBeTruthy();
   expect(screen.queryByLabelText('Annotation opacity')).toBeNull();
   fireEvent.press(screen.getByLabelText('Close annotation options'));
@@ -345,6 +350,7 @@ it('applies staged formatting to a selection and persists the toolbar dock', asy
     nativeEvent: { locationX: 75, locationY: 60 },
   });
   fireEvent(screen.getByTestId('annotation-drawing-surface'), 'responderRelease');
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
   fireEvent.press(screen.getByLabelText('Annotation styles'));
   fireEvent.changeText(screen.getByLabelText('Annotation opacity'), '50');
   expect(api.save).toHaveBeenCalledTimes(1);
@@ -357,6 +363,7 @@ it('applies staged formatting to a selection and persists the toolbar dock', asy
   });
   await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
   fireEvent.press(screen.getByLabelText('More annotation actions'));
+  fireEvent.press(screen.getByLabelText('Sharing and export'));
   fireEvent.press(screen.getByLabelText('Toolbar position bottom'));
   expect(AsyncStorage.setItem).toHaveBeenCalledWith(
     'annotation-toolbar',
@@ -407,4 +414,17 @@ it('keeps save status outside toolbar flow while a stroke is being saved', async
     release();
   });
   await waitFor(() => expect(screen.queryByText('Saving annotations…')).toBeNull());
+});
+
+it('shows the author of a saved annotation without requiring selection', async () => {
+  const { api, screen } = setup();
+  await waitFor(() =>
+    expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+      'auto',
+    ),
+  );
+  fireEvent.press(screen.getByLabelText('Pen'));
+  stroke(screen);
+  await waitFor(() => expect(api.save).toHaveBeenCalled());
+  expect(screen.getByLabelText(`Annotation by ${context.actor.name}`)).toBeTruthy();
 });

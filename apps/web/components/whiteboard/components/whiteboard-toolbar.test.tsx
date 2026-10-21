@@ -25,10 +25,10 @@ describe('native whiteboard controls', () => {
     expect(screen.getByRole('button', { name: 'Pan', exact: true })).toBeEnabled();
     await user.click(screen.getByRole('button', { name: 'Pan', exact: true }));
     expect(engine.setTool).toHaveBeenCalledWith('hand');
-    await user.click(screen.getByRole('button', { name: 'View controls' }));
+    await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Zoom in', exact: true }));
     expect(engine.zoomBy).toHaveBeenCalledWith(0.1);
-    await user.click(screen.getByRole('button', { name: 'View controls' }));
+    await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
     await user.click(screen.getByRole('menuitem', { name: 'Reset zoom to 100%' }));
     expect(engine.resetZoom).toHaveBeenCalledOnce();
   });
@@ -52,22 +52,18 @@ describe('native whiteboard controls', () => {
       'size-8',
       'rounded-full',
     );
-    for (const name of ['Shapes', 'View controls'])
-      expect(screen.getByRole('button', { name })).toHaveClass(
-        'h-8',
-        'w-11',
-        'rounded-full',
-      );
+    expect(screen.queryByRole('button', { name: 'Shapes' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'View controls' })).toBeNull();
 
     expect(
       screen.queryByRole('menuitem', { name: 'Clear board' }),
     ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Shapes' }));
+    await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
     await user.click(screen.getByRole('menuitemradio', { name: 'Rectangle' }));
     expect(engine.setTool).toHaveBeenCalledWith('rectangle');
     expect(onTool).toHaveBeenCalledWith('rectangle');
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Shapes' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'More whiteboard actions' })).toHaveFocus();
   });
   it('keeps teacher actions hidden from students and preserves redo access', async () => {
     const user = userEvent.setup();

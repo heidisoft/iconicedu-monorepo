@@ -27,21 +27,18 @@ it('matches the web annotation order and groups shapes, stamps and attention too
     'Pen',
     'Text',
     'Eraser',
-    'Shapes',
-    'Highlighter',
-    'Stamps',
-    'Attention',
     'Undo annotation',
-    'Redo annotation',
-    'Annotation styles',
     'More annotation actions',
   ]);
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
   fireEvent.press(screen.getByLabelText('Shapes'));
   fireEvent.press(screen.getByLabelText('Double arrow'));
   expect(onTool).toHaveBeenLastCalledWith('doubleArrow');
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
   fireEvent.press(screen.getByLabelText('Stamps'));
   fireEvent.press(screen.getByLabelText('Star'));
   expect(onTool).toHaveBeenLastCalledWith('stampStar');
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
   fireEvent.press(screen.getByLabelText('Attention'));
   fireEvent.press(screen.getByLabelText('Named pointer'));
   expect(onTool).toHaveBeenLastCalledWith('pointerArrow');

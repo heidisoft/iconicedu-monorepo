@@ -156,3 +156,26 @@ it('hides empty participant menus and confirms removal before calling the SDK ac
   fireEvent.click(screen.getByRole('button', { name: 'Remove', exact: true }));
   expect(onRemove).toHaveBeenCalledExactlyOnceWith(2);
 });
+
+it('offers Claim host in People and disables it while claiming', async () => {
+  const { fireEvent } = await import('@testing-library/react');
+  const claim = vi.fn();
+  const panel = (claimingHost: boolean) => (
+    <TooltipProvider>
+      <ZoomParticipantsPanel
+        open
+        participants={[]}
+        canMuteOthers={false}
+        onMute={vi.fn()}
+        onOpenChange={vi.fn()}
+        onClaimHost={claim}
+        claimingHost={claimingHost}
+      />
+    </TooltipProvider>
+  );
+  const view = render(panel(false));
+  fireEvent.click(screen.getByRole('button', { name: 'Claim host' }));
+  expect(claim).toHaveBeenCalledOnce();
+  view.rerender(panel(true));
+  expect(screen.getByRole('button', { name: 'Claiming host…' })).toBeDisabled();
+});

@@ -25,15 +25,14 @@ it('matches web tool order and sends the selected canvas commands', () => {
     'Pen',
     'Text',
     'Eraser',
-    'Shapes',
-    'Library',
     'Undo',
-    'View controls',
     'More whiteboard actions',
   ]);
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   fireEvent.press(screen.getByLabelText('Shapes'));
   fireEvent.press(screen.getByLabelText('Diamond'));
   expect(onCommand).toHaveBeenLastCalledWith({ type: 'tool', tool: 'diamond' });
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   fireEvent.press(screen.getByLabelText('View controls'));
   fireEvent.press(screen.getByLabelText('Fit content'));
   expect(onCommand).toHaveBeenLastCalledWith({ type: 'fit' });
@@ -103,6 +102,7 @@ it('keeps Follow tutor and More in the toolbar while their options stay in menus
   );
   expect(screen.queryByText('Saved')).toBeNull();
   expect(screen.queryByText('Follow tutor')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
   fireEvent.press(screen.getByLabelText('Focus tutor'));
   expect(follow).toHaveBeenCalledTimes(1);
   fireEvent.press(screen.getByLabelText('More whiteboard actions'));

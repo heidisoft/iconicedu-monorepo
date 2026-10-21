@@ -35,7 +35,9 @@ test('live shared screen receives pen marks and supports undo/redo @live-classro
     await expect(count).toHaveText('1');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(count).toHaveText('0');
+    await page.getByRole('button', { name: 'More', exact: true }).click();
     await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await page.getByRole('button', { name: 'Close More', exact: true }).click();
     await expect(count).toHaveText('1');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(count).toHaveText('0');

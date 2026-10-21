@@ -31,7 +31,7 @@ for (const width of [320, 390, 768]) {
       const overlayBox = (await overlay.boundingBox())!;
       expect(overlayBox.x + overlayBox.width).toBeLessThanOrEqual(board.x + board.width);
       if (width < 600) expect(overlayBox.y - board.y).toBeLessThan(20);
-      const view = overlay.getByRole('button', { name: 'View controls' });
+      const view = overlay.getByRole('button', { name: 'More whiteboard actions' });
       await view.scrollIntoViewIfNeeded();
       await view.click();
       await expect(page.getByRole('menuitem', { name: 'Fit content' })).toBeVisible();

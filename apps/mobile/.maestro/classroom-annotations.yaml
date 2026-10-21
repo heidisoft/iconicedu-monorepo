@@ -24,7 +24,9 @@ name: Native annotation drawing and versioned history
 - tapOn: 'Undo annotation'
 - assertVisible:
     id: 'annotation-saved-elements-0'
+- tapOn: 'More annotation actions'
 - tapOn: 'Redo annotation'
+- tapOn: 'Close More annotation actions'
 - assertVisible:
     id: 'annotation-saved-elements-1'
 - swipe:
@@ -33,6 +35,7 @@ name: Native annotation drawing and versioned history
     direction: LEFT
     duration: 600
 - tapOn: 'More annotation actions'
+- tapOn: 'Sharing and export'
 - tapOn: 'Export annotations image'
 - runFlow: assert-classroom-export.yaml
 - takeScreenshot: native-annotation-export

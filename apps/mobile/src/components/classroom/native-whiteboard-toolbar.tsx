@@ -72,7 +72,6 @@ export function NativeWhiteboardToolbar({
   onMenuChange?: (menu: string | null) => void;
 }) {
   const { colors } = useTheme();
-  const [focusHint, setFocusHint] = useState(false);
   const { height } = useWindowDimensions();
   const [chosenTool, setTool] = useState<Tool>('laser');
   const [localMenu, setLocalMenu] = useState<string | null>(null);
@@ -186,60 +185,8 @@ export function NativeWhiteboardToolbar({
               tool === value,
             ),
           )}
-          {button(
-            'Shapes',
-            shapes.find(([value]) => value === tool)?.[2] ?? Shapes,
-            () => toggle('Shapes'),
-            !ready || !editable,
-            shapes.some(([value]) => value === tool),
-            true,
-          )}
-          {button('Library', Library, () => onCommand({ type: 'library' }), !ready)}
-          <View
-            style={{
-              width: 1,
-              height: 24,
-              backgroundColor: colors.border,
-              marginHorizontal: 4,
-            }}
-          />
           {button('Undo', Undo2, () => onCommand({ type: 'undo' }), !ready || !editable)}
-          {button(
-            'View controls',
-            Scan,
-            () => toggle('View controls'),
-            !ready,
-            false,
-            true,
-          )}
         </ScrollView>
-        {onFollow && (
-          <>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Focus tutor"
-              accessibilityHint="Center on the tutor’s current view once"
-              onLongPress={() => setFocusHint((value) => !value)}
-              accessibilityState={{ disabled: !ready }}
-              disabled={!ready}
-              onPress={() => {
-                setFocusHint(false);
-                onFollow?.();
-              }}
-              style={{
-                minHeight: 44,
-                minWidth: 44,
-                justifyContent: 'center',
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-                borderRadius: 22,
-              }}
-            >
-              <Binoculars size={16} color={colors.text} />
-            </Pressable>
-          </>
-        )}
         {button(
           'More whiteboard actions',
           Ellipsis,
@@ -249,22 +196,6 @@ export function NativeWhiteboardToolbar({
           true,
         )}
       </View>
-      {focusHint && (
-        <Text
-          style={{
-            color: colors.text,
-            padding: 8,
-            backgroundColor: colors.card,
-            borderRadius: 12,
-            position: 'absolute',
-            top: 54,
-            right: 12,
-            zIndex: 20,
-          }}
-        >
-          Focus tutor’s current view
-        </Text>
-      )}
       {editable && !['hand', 'laser', 'eraser', 'selection'].includes(styleTool) && (
         <DrawingStyleStrip
           open={stylesVisible}
@@ -371,6 +302,27 @@ export function NativeWhiteboardToolbar({
             )}
             {menu === 'More whiteboard actions' && (
               <>
+                {item('Shapes', Shapes, () => toggle('Shapes'), !ready || !editable)}
+                {item(
+                  'Library',
+                  Library,
+                  () => {
+                    setMenu(null);
+                    onCommand({ type: 'library' });
+                  },
+                  !ready,
+                )}
+                {item('View controls', Scan, () => toggle('View controls'), !ready)}
+                {onFollow &&
+                  item(
+                    'Focus tutor',
+                    Binoculars,
+                    () => {
+                      setMenu(null);
+                      onFollow();
+                    },
+                    !ready,
+                  )}
                 {moreContent}
                 {item(
                   'Redo',

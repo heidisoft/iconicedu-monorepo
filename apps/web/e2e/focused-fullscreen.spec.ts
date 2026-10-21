@@ -86,7 +86,8 @@ for (const mode of ['remote', 'local', 'whiteboard'] as const) {
       const toolbar = surface.getByRole('toolbar', { name: 'Screen annotations' });
       await expect(toolbar).toBeVisible();
       await toolbar.getByRole('button', { name: 'Pen', exact: true }).click();
-      await toolbar.getByRole('button', { name: 'Format', exact: true }).click();
+      await toolbar.getByRole('button', { name: 'More', exact: true }).click();
+      await surface.getByRole('button', { name: 'Format', exact: true }).click();
       await expect(surface.locator('[data-annotation-panel]')).toBeVisible();
       await surface.getByRole('button', { name: 'Close Format', exact: true }).click();
     }

@@ -14,7 +14,6 @@ import {
   Heart,
   Highlighter,
   Hand,
-  Shapes,
   LocateFixed,
   Minus,
   MousePointer2,
@@ -23,7 +22,6 @@ import {
   Redo2,
   Square,
   Star,
-  Stamp,
   Type,
   Undo2,
   X,
@@ -152,7 +150,9 @@ function ToolMenu({
   active = false,
   surface,
   inset,
+  hideTrigger = false,
 }: {
+  hideTrigger?: boolean;
   label: string;
   icon: ReactNode;
   open: boolean;
@@ -167,14 +167,19 @@ function ToolMenu({
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const opener = trigger.current;
+    const opener = hideTrigger
+      ? trigger.current
+          ?.closest('[role="toolbar"]')
+          ?.querySelector<HTMLButtonElement>('[aria-label="More"]')
+      : trigger.current;
     content.current?.focus();
     return () => opener?.focus();
-  }, [open]);
+  }, [open, hideTrigger]);
   return (
     <div>
       <button
         ref={trigger}
+        hidden={hideTrigger}
         type="button"
         aria-label={label}
         aria-expanded={open}
@@ -578,55 +583,6 @@ export function AnnotationToolbar({
             <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
             <div
               role="group"
-              aria-label="More drawing tools"
-              className="flex shrink-0 items-center gap-1"
-            >
-              <ToolMenu
-                {...menuProps('Shapes')}
-                icon={<Shapes size={16} aria-hidden="true" />}
-                active={shapes.includes(tool)}
-              >
-                <div className="space-y-3">
-                  <PanelSection label="Lines and arrows">
-                    {grid(shapes.slice(0, 3))}
-                  </PanelSection>
-                  <PanelSection label="Outline shapes">
-                    {grid(shapes.slice(3, 6))}
-                  </PanelSection>
-                  <PanelSection label="Filled shapes">
-                    {grid(shapes.slice(6, 8))}
-                  </PanelSection>
-                  <PanelSection label="Highlights">{grid(shapes.slice(8))}</PanelSection>
-                </div>
-              </ToolMenu>
-              <ToolButton
-                compact
-                tool="highlighter"
-                active={tool === 'highlighter'}
-                disabled={!canDraw}
-                choose={() => choose('highlighter')}
-              />
-              <ToolMenu
-                {...menuProps('Stamps')}
-                icon={<Stamp size={16} aria-hidden="true" />}
-                active={stamps.includes(tool)}
-              >
-                {grid(stamps)}
-              </ToolMenu>
-              <ToolMenu
-                {...menuProps('Attention')}
-                icon={<LocateFixed size={16} aria-hidden="true" />}
-                active={attention.includes(tool)}
-              >
-                {grid(attention)}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Temporary marks to guide your class.
-                </p>
-              </ToolMenu>
-            </div>
-            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
-            <div
-              role="group"
               aria-label="Annotation history"
               className="flex shrink-0 items-center gap-1"
             >
@@ -641,20 +597,10 @@ export function AnnotationToolbar({
                 <Undo2 size={16} aria-hidden="true" />
                 <span className="sr-only">Undo</span>
               </button>
-              <button
-                type="button"
-                aria-label="Redo"
-                title="Redo (⌘/Ctrl+Shift+Z)"
-                className={iconButton}
-                disabled={!canDraw || !redoCount}
-                onClick={redo}
-              >
-                <Redo2 size={16} aria-hidden="true" />
-                <span className="sr-only">Redo</span>
-              </button>
             </div>
             <ToolMenu
               {...menuProps('Format')}
+              hideTrigger
               icon={
                 <span className="relative">
                   <Palette size={16} aria-hidden="true" />
@@ -796,9 +742,34 @@ export function AnnotationToolbar({
             </ToolMenu>
             <ToolMenu
               {...menuProps('More')}
+              active={[...shapes, ...stamps, ...attention, 'highlighter'].includes(tool)}
               icon={<Ellipsis size={16} aria-hidden="true" />}
             >
               <div className="space-y-3">
+                <PanelSection label="Shapes">{grid(shapes)}</PanelSection>
+                <PanelSection label="Highlight and stamps">
+                  {grid(['highlighter', ...stamps])}
+                </PanelSection>
+                <PanelSection label="Attention">{grid(attention)}</PanelSection>
+                <PanelSection label="History and style">
+                  <button
+                    type="button"
+                    className={button}
+                    disabled={!canDraw || !redoCount}
+                    onClick={redo}
+                  >
+                    <Redo2 size={16} className="mr-2" />
+                    Redo
+                  </button>
+                  <button
+                    type="button"
+                    className={button}
+                    onClick={() => setPanel('Format')}
+                  >
+                    <Palette size={16} className="mr-2" />
+                    Format
+                  </button>
+                </PanelSection>
                 <PanelSection label="Selection">
                   <button
                     type="button"

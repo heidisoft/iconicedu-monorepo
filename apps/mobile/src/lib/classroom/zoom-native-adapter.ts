@@ -268,7 +268,6 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
           EventType.onUserLeave,
           EventType.onUserHostChanged,
           EventType.onUserManagerChanged,
-          EventType.onUserAudioStatusChanged,
           EventType.onUserVideoStatusChanged,
           EventType.onUserNameChanged,
         ].map((event) =>
@@ -276,6 +275,24 @@ export function createZoomNativeAdapter(zoom: Zoom): NativeMeetingAdapter {
             void refresh();
           }),
         ),
+        zoom.addListener(EventType.onUserAudioStatusChanged, (value: unknown) => {
+          const users = object(value).changedUsers;
+          if (!Array.isArray(users)) {
+            void refresh();
+            return;
+          }
+          for (const value of users) {
+            const user = new ZoomVideoSdkUser(value);
+            void user.audioStatus
+              .isMuted()
+              .then((muted) =>
+                send({ type: 'participant-audio', userId: user.userId, muted }),
+              )
+              .catch(() => {
+                void refresh();
+              });
+          }
+        }),
         zoom.addListener(EventType.onError, (value: unknown) => {
           const errorType = String(object(value).errorType ?? '');
           // Failover is reported through onUserFailoverStatusChanged.

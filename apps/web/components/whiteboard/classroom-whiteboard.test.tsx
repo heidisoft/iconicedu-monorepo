@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, it, vi } from 'vitest';
 import { ClassroomWhiteboard } from './classroom-whiteboard';
@@ -33,10 +33,13 @@ it('offers an icon-only one-time tutor focus with a tooltip', async () => {
       repository={{ load: vi.fn(), save: vi.fn() }}
     />,
   );
-  const focus = screen.getByRole('button', { name: 'Focus tutor' });
+  fireEvent.keyDown(screen.getByRole('button', { name: 'More whiteboard actions' }), {
+    key: 'ArrowDown',
+  });
+  const focus = screen.getByRole('menuitem', { name: 'Focus tutor' });
   expect(focus).toHaveAttribute('title', 'Focus tutor’s current view');
   expect(focus).not.toHaveAttribute('aria-pressed');
-  expect(focus).not.toHaveTextContent('Focus tutor');
+  expect(focus).toHaveTextContent('Focus tutor');
   await userEvent.click(focus);
   expect(screen.queryByRole('button', { name: 'Follow viewport' })).toBeNull();
 });
@@ -50,9 +53,11 @@ it('keeps Saved and board options inside toolbar More and exposes a direct tutor
   );
   expect(screen.queryByText('Saved')).toBeNull();
   expect(screen.queryByRole('button', { name: 'Board options' })).toBeNull();
-  const follow = screen.getByRole('button', { name: 'Focus tutor', exact: true });
+  await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
+  const follow = screen.getByRole('menuitem', { name: 'Focus tutor', exact: true });
   await user.click(follow);
-  await user.click(follow);
+  await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
+  await user.click(screen.getByRole('menuitem', { name: 'Focus tutor', exact: true }));
   await user.click(screen.getByRole('button', { name: 'More whiteboard actions' }));
   expect(screen.getByRole('status')).toHaveTextContent('Saved');
   expect(screen.getByRole('menuitem', { name: 'Export PNG' })).toBeTruthy();

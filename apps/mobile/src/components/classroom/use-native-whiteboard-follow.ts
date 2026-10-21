@@ -15,6 +15,7 @@ export function useNativeWhiteboardFollow(
   enabled: boolean,
   receive: (viewport: WhiteboardViewportVM, sourceKey?: string) => void,
 ) {
+  const [writers, setWriters] = useState<WhiteboardViewportPresenceVM[]>([]);
   const [following, setFollowing] = useState('tutor');
   const [focusRequest, setFocusRequest] = useState(0);
   const focusTutor = useCallback(() => {
@@ -56,7 +57,7 @@ export function useNativeWhiteboardFollow(
       focused = false;
     setStatus('waiting');
     const read = async () => {
-      if (reading || focused || following === 'free') return;
+      if (reading) return;
       reading = true;
       try {
         const peers = repository
@@ -66,6 +67,15 @@ export function useNativeWhiteboardFollow(
               token,
             );
         const candidates = peers.filter((person) => person.expiresAt > Date.now());
+        if (active)
+          setWriters(
+            candidates.filter(
+              (person) =>
+                person.actorId !== snapshotRef.current?.actorId &&
+                !!person.viewport.writing,
+            ),
+          );
+        if (focused || following === 'free') return;
         // A tutor may have rejoined with a new capability; choose a currently publishing tutor.
         const peer =
           following === 'tutor'
@@ -123,5 +133,5 @@ export function useNativeWhiteboardFollow(
       clearInterval(timer);
     };
   }, [token, repository, enabled, target, following, receive, focusRequest]);
-  return { following, setFollowing, focusTutor, publish, status };
+  return { writers, following, setFollowing, focusTutor, publish, status };
 }

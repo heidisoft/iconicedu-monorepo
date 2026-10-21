@@ -652,3 +652,19 @@ it('uses the communication route when independent microphone selection is unavai
   await f.adapter.selectMicrophone!('speaker');
   expect(NativeModules.ClassroomDevices.selectAudioRoute).toHaveBeenCalledWith('speaker');
 });
+
+it('publishes authoritative audio changes for the affected user', async () => {
+  const f = fixture();
+  const receive = jest.fn();
+  const dispose = f.adapter.subscribe(receive);
+  f.listeners.get('onUserAudioStatusChanged')?.({
+    changedUsers: [{ userId: '2', userName: 'Learner' }],
+  });
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  expect(receive).toHaveBeenCalledWith({
+    type: 'participant-audio',
+    userId: '2',
+    muted: true,
+  });
+  dispose();
+});

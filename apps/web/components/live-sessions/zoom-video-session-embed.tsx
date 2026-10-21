@@ -54,7 +54,6 @@ import { ClassroomWhiteboard } from '../whiteboard/classroom-whiteboard';
 import type { WhiteboardAccessVM } from '@iconicedu/shared-types';
 import { useZoomMessagesFeature } from './zoom-video/use-zoom-messages-feature';
 import { useZoomRecordingFeature } from './zoom-video/use-zoom-recording-feature';
-import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -883,6 +882,8 @@ export function ZoomVideoSessionEmbed({
     ) => {
       const updates = new Map(payload.map((user) => [user.userId, user]));
       const selfUpdate = updates.get(selfUserIdRef.current ?? -1);
+      if (typeof selfUpdate?.muted === 'boolean') setIsMuted(selfUpdate.muted);
+      if (typeof selfUpdate?.bVideoOn === 'boolean') setIsVideoOn(selfUpdate.bVideoOn);
       if (typeof selfUpdate?.isHost === 'boolean') setIsSelfHost(selfUpdate.isHost);
       setIsSelfCoHost(client.isManager());
       setCoHosts(
@@ -1170,6 +1171,11 @@ export function ZoomVideoSessionEmbed({
       captionClearTimerRef.current = setTimeout(() => setCaptionText(''), 6000);
     };
 
+    const handleCurrentAudioChange = (payload: { action: string }) => {
+      if (payload.action === 'muted' || payload.action === 'unmuted')
+        setIsMuted(payload.action === 'muted');
+    };
+    client.on('current-audio-change', handleCurrentAudioChange);
     client.on('user-added', handleUserAdded);
     client.on('user-removed', handleUserRemoved);
     client.on('user-updated', handleUserUpdated);
@@ -1341,6 +1347,7 @@ export function ZoomVideoSessionEmbed({
     return () => {
       stopDeviceRecovery();
       cancelled = true;
+      client.off('current-audio-change', handleCurrentAudioChange);
       client.off('user-added', handleUserAdded);
       client.off('user-removed', handleUserRemoved);
       client.off('user-updated', handleUserUpdated);
@@ -1381,18 +1388,24 @@ export function ZoomVideoSessionEmbed({
     leaveMeeting,
   ]);
 
+  const mutePending = useRef(false);
   const toggleMute = useCallback(async () => {
     const client = clientRef.current;
-    if (!client) {
-      return;
+    if (!client || mutePending.current) return;
+    mutePending.current = true;
+    const muted = !isMuted;
+    try {
+      await executeZoomCollaborationCommand(() =>
+        muted
+          ? client.getMediaStream().muteAudio()
+          : client.getMediaStream().unmuteAudio(),
+      );
+      setIsMuted(muted);
+    } catch (error) {
+      setMediaError(`Could not update microphone: ${describeZoomFailure(error)}`);
+    } finally {
+      mutePending.current = false;
     }
-    const stream = client.getMediaStream();
-    if (isMuted) {
-      await stream.unmuteAudio().catch(() => null);
-    } else {
-      await stream.muteAudio().catch(() => null);
-    }
-    setIsMuted((previous) => !previous);
   }, [isMuted]);
 
   const toggleVideo = useCallback(async () => {
@@ -1584,9 +1597,19 @@ export function ZoomVideoSessionEmbed({
       }
       void executeZoomCollaborationCommand(() =>
         client.getMediaStream().muteAudio(userId),
-      ).catch((error) =>
-        setMediaError(`Could not mute participant: ${describeZoomFailure(error)}`),
-      );
+      )
+        .then(() => {
+          updateRemoteParticipants((previous) =>
+            previous.map((participant) =>
+              participant.userId === userId
+                ? { ...participant, muted: true }
+                : participant,
+            ),
+          );
+        })
+        .catch((error) =>
+          setMediaError(`Could not mute participant: ${describeZoomFailure(error)}`),
+        );
       void logLiveSessionAuditEvent(
         liveSessionId,
         {
@@ -1598,7 +1621,14 @@ export function ZoomVideoSessionEmbed({
         accessToken,
       );
     },
-    [isSelfHost, isSelfCoHost, liveSessionId, accessToken, meetingLinkToken],
+    [
+      isSelfHost,
+      isSelfCoHost,
+      liveSessionId,
+      accessToken,
+      meetingLinkToken,
+      updateRemoteParticipants,
+    ],
   );
 
   // Host-only "End session for everyone" — distinct from the regular Leave
@@ -2043,16 +2073,6 @@ export function ZoomVideoSessionEmbed({
                   linkToken={meetingLinkToken}
                 />
               ) : null}
-              {!isSelfHost && clientRef.current?.isOriginalHost() ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={claimingHost}
-                  onClick={() => void claimHost()}
-                >
-                  {claimingHost ? 'Claiming host…' : 'Claim host'}
-                </Button>
-              ) : null}
 
               <MeetingControlButton
                 tooltip={isMuted ? 'Unmute' : 'Mute'}
@@ -2317,6 +2337,12 @@ export function ZoomVideoSessionEmbed({
                 {settings.participants.visible ? (
                   <ZoomParticipantsPanel
                     open={activePanel === 'users'}
+                    onClaimHost={
+                      !isSelfHost && clientRef.current?.isOriginalHost()
+                        ? () => void claimHost()
+                        : undefined
+                    }
+                    claimingHost={claimingHost}
                     canMuteOthers={isSelfHost || isSelfCoHost}
                     onTransferHost={
                       isSelfHost

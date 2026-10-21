@@ -11,7 +11,9 @@ import type {
 import { participantColor } from '@iconicedu/utils';
 declare global {
   interface Window {
-    classroomLasers?: (presence: WhiteboardLaserPresenceVM[]) => void;
+    classroomLasers?: (
+      presence: (WhiteboardLaserPresenceVM & { name?: string })[],
+    ) => void;
   }
 }
 /** Excalidraw owns scene-coordinate laser trails, using the same presence contract as web. */
@@ -20,7 +22,12 @@ export function useClassroomLasers(api: ExcalidrawImperativeAPI | null) {
     if (!api) return;
     const peers = new Map<
       string,
-      { seen: Set<string>; queue: WhiteboardLaserSampleVM[]; expiresAt: number }
+      {
+        seen: Set<string>;
+        queue: WhiteboardLaserSampleVM[];
+        expiresAt: number;
+        name?: string;
+      }
     >();
     const collaborators = new Map<SocketId, Collaborator>();
     window.classroomLasers = (presence) => {
@@ -31,6 +38,7 @@ export function useClassroomLasers(api: ExcalidrawImperativeAPI | null) {
           expiresAt: value.expiresAt,
         };
         peer.expiresAt = value.expiresAt;
+        peer.name = value.name;
         for (const sample of value.samples)
           if (!peer.seen.has(sample.id)) {
             peer.seen.add(sample.id);
@@ -62,11 +70,12 @@ export function useClassroomLasers(api: ExcalidrawImperativeAPI | null) {
           const sample = peer.queue.shift();
           if (sample) {
             collaborators.set(socket, {
+              username: peer.name,
               pointer: {
                 x: sample.x,
                 y: sample.y,
                 tool: 'laser',
-                renderCursor: false,
+                renderCursor: true,
                 laserColor: participantColor(actor),
               },
               button: sample.button,

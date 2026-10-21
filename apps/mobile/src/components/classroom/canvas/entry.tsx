@@ -11,7 +11,12 @@ import {
 } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
-import type { WhiteboardViewportVM, WhiteboardElementVM } from '@iconicedu/shared-types';
+import type {
+  WhiteboardViewportVM,
+  WhiteboardElementVM,
+  WhiteboardViewportPresenceVM,
+  WhiteboardSnapshotVM,
+} from '@iconicedu/shared-types';
 import {
   SceneHistory,
   sceneFingerprint,
@@ -32,6 +37,10 @@ declare global {
       delta?: number;
       style?: { strokeColor?: string; strokeWidth?: number; backgroundColor?: string };
     }) => void;
+    classroomWriters?: (
+      writers: WhiteboardViewportPresenceVM[],
+      presence: WhiteboardSnapshotVM['presence'],
+    ) => void;
     classroomViewport?: (
       viewport: WhiteboardViewportVM,
       sourceKey?: string | null,
@@ -48,6 +57,17 @@ declare global {
 const send = (value: unknown) =>
   window.ReactNativeWebView.postMessage(JSON.stringify(value));
 function Canvas() {
+  const [writers, setWriters] = useState<WhiteboardViewportPresenceVM[]>([]);
+  const [people, setPeople] = useState<WhiteboardSnapshotVM['presence']>([]);
+  useEffect(() => {
+    window.classroomWriters = (value, presence) => {
+      setWriters(value);
+      setPeople(presence);
+    };
+    return () => {
+      delete window.classroomWriters;
+    };
+  }, []);
   const [styleOptions, setStyleOptions] = useState(false);
   const [library, setLibrary] = useState(false);
   const [search, setSearch] = useState('');
@@ -336,6 +356,45 @@ function Canvas() {
         .native-classroom-canvas[data-grid="dots"] { background-image:radial-gradient(circle,#8884 1px, transparent 1px);background-size:24px 24px; }
         .native-classroom-canvas[data-grid="lines"] { background-image:linear-gradient(to right,#8882 1px,transparent 1px),linear-gradient(to bottom,#8882 1px,transparent 1px);background-size:24px 24px; }
       `}</style>
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          zIndex: 2,
+          overflow: 'hidden',
+        }}
+      >
+        {api &&
+          writers
+            .filter((person) => person.expiresAt > Date.now())
+            .map((person) => {
+              const point = person.viewport.writing;
+              const name = people.find((peer) => peer.id === person.actorId)?.name;
+              const view = api.getAppState();
+              return (
+                point &&
+                name && (
+                  <span
+                    key={person.actorId}
+                    style={{
+                      position: 'absolute',
+                      left: (point.x + view.scrollX) * view.zoom.value + 8,
+                      top: (point.y + view.scrollY) * view.zoom.value - 24,
+                      background: dark ? '#232329' : '#fff',
+                      color: dark ? '#eee' : '#333',
+                      padding: '3px 8px',
+                      borderRadius: 8,
+                      font: '12px system-ui',
+                      boxShadow: '0 1px 4px #0002',
+                    }}
+                  >
+                    {name}
+                  </span>
+                )
+              );
+            })}
+      </div>
       <Excalidraw
         excalidrawAPI={setApi}
         onPointerUpdate={(event) => {

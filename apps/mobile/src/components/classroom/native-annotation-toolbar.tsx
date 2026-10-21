@@ -152,56 +152,13 @@ export function NativeAnnotationToolbar({
             tool === value,
           ),
         )}
-        {button(
-          'Shapes',
-          Shapes,
-          () => toggle('Shapes'),
-          !editable,
-          shapes.some(([value]) => value === tool),
-          true,
-        )}
-        {button(
-          'Highlighter',
-          Highlighter,
-          () => choose('highlighter'),
-          !editable,
-          tool === 'highlighter',
-        )}
-        {button(
-          'Stamps',
-          Stamp,
-          () => toggle('Stamps'),
-          !editable,
-          stamps.some(([value]) => value === tool),
-          true,
-        )}
-        {button(
-          'Attention',
-          LocateFixed,
-          () => toggle('Attention'),
-          !editable,
-          attention.some(([value]) => value === tool),
-          true,
-        )}
         {button('Undo annotation', Undo2, onUndo, !editable || !canUndo)}
-        {button('Redo annotation', Redo2, onRedo, !editable || !canRedo)}
-        {button(
-          'Annotation styles',
-          Palette,
-          () => {
-            setMenu(null);
-            onOptions('format');
-          },
-          false,
-          false,
-          true,
-        )}
         {button(
           'More annotation actions',
           Ellipsis,
           () => {
             setMenu(null);
-            onOptions('more');
+            toggle('More annotation actions');
           },
           false,
           false,
@@ -235,34 +192,88 @@ export function NativeAnnotationToolbar({
               <X size={16} color={colors.text} />
             </Pressable>
           </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            {group.map(([value, label, Icon]) => (
-              <Pressable
-                key={value}
-                accessibilityRole="button"
-                accessibilityLabel={label}
-                accessibilityState={{ disabled: !editable, selected: tool === value }}
-                disabled={!editable}
-                onPress={() => choose(value)}
-                style={{
-                  width: '33.333%',
-                  minHeight: 64,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 4,
-                }}
-              >
-                <Icon
-                  size={20}
-                  color={colors.text}
-                  fill={label.startsWith('Filled') ? colors.text : 'none'}
-                />
-                <Text style={{ color: colors.text, fontSize: 11, textAlign: 'center' }}>
-                  {label}
-                </Text>
-              </Pressable>
-            ))}
-          </View>
+          {menu === 'More annotation actions' ? (
+            <ScrollView style={{ maxHeight: 320 }}>
+              {(
+                [
+                  ['Shapes', Shapes, () => toggle('Shapes')],
+                  ['Highlighter', Highlighter, () => choose('highlighter')],
+                  ['Stamps', Stamp, () => toggle('Stamps')],
+                  ['Attention', LocateFixed, () => toggle('Attention')],
+                  ['Redo annotation', Redo2, onRedo],
+                  [
+                    'Annotation styles',
+                    Palette,
+                    () => {
+                      setMenu(null);
+                      onOptions('format');
+                    },
+                  ],
+                  [
+                    'Sharing and export',
+                    Ellipsis,
+                    () => {
+                      setMenu(null);
+                      onOptions('more');
+                    },
+                  ],
+                ] as const
+              ).map(([label, Icon, action]) => (
+                <Pressable
+                  key={label as string}
+                  accessibilityRole="button"
+                  accessibilityLabel={label as string}
+                  onPress={action as () => void}
+                  disabled={
+                    label === 'Redo annotation'
+                      ? !editable || !canRedo
+                      : ['Shapes', 'Highlighter', 'Stamps', 'Attention'].includes(label)
+                        ? !editable
+                        : false
+                  }
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 12,
+                    minHeight: 44,
+                    padding: 12,
+                  }}
+                >
+                  <Icon size={18} color={colors.text} />
+                  <Text style={{ color: colors.text }}>{label as string}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+          ) : (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {group.map(([value, label, Icon]) => (
+                <Pressable
+                  key={value}
+                  accessibilityRole="button"
+                  accessibilityLabel={label}
+                  accessibilityState={{ disabled: !editable, selected: tool === value }}
+                  disabled={!editable}
+                  onPress={() => choose(value)}
+                  style={{
+                    width: '33.333%',
+                    minHeight: 64,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 4,
+                  }}
+                >
+                  <Icon
+                    size={20}
+                    color={colors.text}
+                    fill={label.startsWith('Filled') ? colors.text : 'none'}
+                  />
+                  <Text style={{ color: colors.text, fontSize: 11, textAlign: 'center' }}>
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
         </View>
       )}
     </View>

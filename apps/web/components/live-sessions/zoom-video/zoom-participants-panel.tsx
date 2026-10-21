@@ -57,6 +57,8 @@ export function ZoomParticipantsPanel({
   canManageCoHosts = false,
   onCoHost,
   onTransferHost,
+  onClaimHost,
+  claimingHost = false,
   onRemove,
 }: {
   open: boolean;
@@ -64,6 +66,8 @@ export function ZoomParticipantsPanel({
   canMuteOthers: boolean;
   canManageCoHosts?: boolean;
   onCoHost?: (userId: number, enabled: boolean) => void;
+  onClaimHost?: () => void;
+  claimingHost?: boolean;
   onTransferHost?: (userId: number) => void;
   onRemove?: (userId: number) => void;
   className?: string;
@@ -134,6 +138,17 @@ export function ZoomParticipantsPanel({
               People
             </SheetTitle>
           </SheetHeader>
+          {onClaimHost && (
+            <button
+              type="button"
+              className="mx-8 mb-4 flex min-h-11 items-center gap-2 rounded-xl bg-muted px-4 text-sm font-medium disabled:opacity-50"
+              disabled={claimingHost}
+              onClick={onClaimHost}
+            >
+              <ShieldCheck className="size-4" />
+              {claimingHost ? 'Claiming host…' : 'Claim host'}
+            </button>
+          )}
           <div className="mx-8 mb-5 flex h-14 items-center rounded-full bg-muted p-1">
             <div className="flex h-full flex-1 items-center justify-center gap-3 rounded-full bg-foreground px-5 text-sm font-medium text-background">
               <span>In meeting</span>

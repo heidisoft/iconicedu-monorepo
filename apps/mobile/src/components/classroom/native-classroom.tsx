@@ -1295,6 +1295,23 @@ export function NativeClassroom({
                 {state.participants.length}
               </Text>
             </View>
+            {hostEligible &&
+              !controller.self?.host &&
+              button('Claim host', () =>
+                showAlert(
+                  'Claim host access?',
+                  'The current host will become a participant.',
+                  [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Claim host',
+                      onPress: () => {
+                        void run(() => controller.claimHost());
+                      },
+                    },
+                  ],
+                ),
+              )}
             {waiting.map((user) => (
               <View key={user.id}>
                 <Text style={{ color: colors.text }}>{user.displayName} is waiting</Text>
@@ -1741,23 +1758,6 @@ export function NativeClassroom({
               {button(state.camera ? 'Stop video' : 'Start video', () => {
                 void run(() => controller.camera(!state.camera));
               })}
-              {hostEligible &&
-                !controller.self?.host &&
-                button('Claim host', () =>
-                  showAlert(
-                    'Claim host access?',
-                    'The current host will become a participant.',
-                    [
-                      { text: 'Cancel', style: 'cancel' },
-                      {
-                        text: 'Claim host',
-                        onPress: () => {
-                          void run(() => controller.claimHost());
-                        },
-                      },
-                    ],
-                  ),
-                )}
               {button(captions ? 'Turn captions off' : 'Turn captions on', () => {
                 void run(async () => {
                   await adapter.captions(!captions);

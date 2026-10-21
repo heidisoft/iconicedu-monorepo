@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Layer, Rect, Stage, Transformer } from 'react-konva';
+import { Layer, Rect, Stage, Transformer, Text as CanvasText } from 'react-konva';
 import { AnnotationPointer } from './annotation-pointer';
 import { shapeEndpoint } from './annotation-drawing';
 import type Konva from 'konva';
@@ -94,7 +94,7 @@ export function AnnotationOverlay({
   const active = useRef<AnnotationObject | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [hoverName, setHoverName] = useState<string | null>(null);
-  const [showNames, setShowNames] = useState(false);
+  const [showNames, setShowNames] = useState(true);
   const [textEditor, setTextEditor] = useState<{
     object: AnnotationObject;
     value: string;
@@ -729,6 +729,35 @@ export function AnnotationOverlay({
               height={height}
             />
           ))}
+        </Layer>
+        <Layer listening={false}>
+          {showNames &&
+            [
+              ...new Map(
+                [
+                  ...engine.objects.filter((object) => !object.deleted),
+                  ...engine.remoteDrafts,
+                  ...engine.vanishing
+                    .filter((stroke) => stroke.expiresAt > Date.now())
+                    .map((stroke) => stroke.object),
+                  ...(draft ? [draft] : []),
+                ].map((object) => [object.creatorId, object]),
+              ).values(),
+            ].map((object) => {
+              const point = object.points[object.points.length - 1];
+              return (
+                point && (
+                  <CanvasText
+                    key={`name-${object.creatorId}`}
+                    x={Math.max(8, Math.min(width - 100, point.x * width + 8))}
+                    y={Math.max(8, Math.min(height - 20, point.y * height - 20))}
+                    text={object.creatorName}
+                    fill={object.style.color}
+                    fontSize={12}
+                  />
+                )
+              );
+            })}
         </Layer>
         <Layer listening={false}>
           {Object.entries(engine.pointers)

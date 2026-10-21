@@ -377,3 +377,21 @@ remains authoritative.
 Annotation save status is positioned outside the toolbar layout to keep drawing
 controls stationary after each stroke. Expanded whiteboard style controls sit below
 the toolbar and color strip, with scrolling on smaller viewports.
+
+### Consistent drawing tools and names
+
+Whiteboard and screen-annotation toolbars share the same primary order: Pan, Laser,
+Select, Pen, Text, Eraser, Undo, More. Shapes, stamps, advanced formatting, redo,
+whiteboard library and view options, tutor focus, and sharing actions live in More
+where applicable. Quick color and stroke controls remain contextual to the selected
+tool. Claim host is available in People instead of the meeting toolbar.
+
+SDK audio-change events update both the local microphone control and participant
+media indicators, including host-issued mutes. Annotation author names are enabled
+by default and appear near each person's latest mark or active pointer. Whiteboard
+writing and laser presence show the participant's name using the existing public
+presence roster; drawing names do not move the viewer's viewport. Presence polling
+continues after the initial tutor focus, independently of following.
+
+These are maintenance corrections to the existing classroom controls and presence
+experience, covered by the Video SDK feature-flag maintenance exemption above.

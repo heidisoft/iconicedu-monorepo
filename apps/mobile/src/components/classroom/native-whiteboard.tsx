@@ -132,13 +132,25 @@ export function NativeWhiteboard({
     receiveViewport,
   );
   useEffect(() => {
+    if (ready)
+      webview.current?.injectJavaScript(
+        `window.classroomWriters?.(${JSON.stringify(follow.writers ?? [])}, ${JSON.stringify(snapshot?.presence ?? []).replaceAll('<', '\\u003c')}); true;`,
+      );
+  }, [ready, follow.writers, snapshot?.presence]);
+  useEffect(() => {
     if (follow.following === 'free')
       webview.current?.injectJavaScript('window.classroomCancelFollow?.(); true;');
   }, [follow.following]);
   const actorId = snapshot?.actorId;
   const receiveLasers = useCallback(
     (presence: WhiteboardLaserPresenceVM[]) => {
-      const peers = presence.filter((peer) => peer.actorId !== actorId);
+      const peers = presence
+        .filter((peer) => peer.actorId !== actorId)
+        .map((peer) => ({
+          ...peer,
+          name: current.current?.presence.find((person) => person.id === peer.actorId)
+            ?.name,
+        }));
       webview.current?.injectJavaScript(
         `window.classroomLasers && window.classroomLasers(${JSON.stringify(peers).replaceAll('<', '\\u003c')}); true;`,
       );

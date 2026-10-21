@@ -545,3 +545,20 @@ it('only permits moderators to remove eligible remote participants', async () =>
     'cannot be removed',
   );
 });
+
+it('updates local and remote microphone indicators from host-issued audio events', async () => {
+  const f = fixture();
+  await f.connected('2');
+  f.emit({ type: 'participant-audio', userId: '2', muted: true });
+  expect(f.controller.snapshot().microphone).toBe(false);
+  expect(
+    f.controller.snapshot().participants.find((user) => user.id === '2')?.muted,
+  ).toBe(true);
+  f.emit({ type: 'participant-audio', userId: '1', muted: false });
+  expect(
+    f.controller.snapshot().participants.find((user) => user.id === '1')?.muted,
+  ).toBe(false);
+  expect(f.controller.snapshot().microphone).toBe(false);
+  f.emit({ type: 'participant-audio', userId: '2', muted: false });
+  expect(f.controller.snapshot().microphone).toBe(true);
+});
