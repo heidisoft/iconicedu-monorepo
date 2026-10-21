@@ -60,6 +60,7 @@ export function useScreenAnnotations(
   const history = useRef<HistoryEntry[]>([]);
   const redo = useRef<HistoryEntry[]>([]);
   const queue = useRef<Promise<unknown>>(Promise.resolve());
+  const failed = useRef(new Map<string, AnnotationOperation>());
   const generation = useRef(0);
   const clientId = useRef(crypto.randomUUID());
   const publishContext = useCallback((value: AnnotationContext) => {
@@ -173,6 +174,7 @@ export function useScreenAnnotations(
   useEffect(() => {
     let alive = true;
     const effectGeneration = ++generation.current;
+    failed.current.clear();
     const lasers = outgoingLasers.current;
     const realtimePointers = recentRealtimePointers.current;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -654,6 +656,7 @@ export function useScreenAnnotations(
         if (currentGeneration !== generation.current)
           throw new Error('Screen share changed');
         const before = contextRef.current?.snapshot.objects ?? [];
+        let retainInk = false;
         try {
           let commit: AnnotationCommit | undefined;
           for (let attempt = 0; attempt < 8; attempt++) {
@@ -680,6 +683,7 @@ export function useScreenAnnotations(
           }
           if (!commit) throw new Error('Unable to save annotation');
           if (currentGeneration !== generation.current) return commit;
+          failed.current.delete(operation.eventId);
           receiveCommit(commit);
           setError(null);
           if (
@@ -701,6 +705,13 @@ export function useScreenAnnotations(
           }
           return commit;
         } catch (error) {
+          retainInk = !(
+            error instanceof ApiHttpError &&
+            error.status >= 400 &&
+            error.status < 500
+          );
+          if (retainInk && currentGeneration === generation.current)
+            failed.current.set(operation.eventId, operation);
           if (currentGeneration === generation.current) {
             setError(
               error instanceof Error ? error.message : 'Unable to save annotation',
@@ -709,8 +720,13 @@ export function useScreenAnnotations(
           }
           throw error;
         } finally {
-          if (currentGeneration === generation.current && operation.kind === 'put')
+          if (
+            !retainInk &&
+            currentGeneration === generation.current &&
+            operation.kind === 'put'
+          )
             setOptimistic((previous) => {
+              if (previous[operation.object.id] !== operation.object) return previous;
               const next = { ...previous };
               delete next[operation.object.id];
               return next;
@@ -808,6 +824,16 @@ export function useScreenAnnotations(
     historyCount,
     broadcast,
     execute,
+    retry: () =>
+      Promise.all(
+        [...failed.current.values()]
+          .filter(
+            (operation) =>
+              operation.kind !== 'put' ||
+              operation.object.roomId === contextRef.current?.snapshot.roomId,
+          )
+          .map((operation) => execute(operation)),
+      ),
     changeHistory,
     clientId: clientId.current,
   };

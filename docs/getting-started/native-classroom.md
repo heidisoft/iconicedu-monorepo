@@ -383,7 +383,8 @@ the toolbar and color strip, with scrolling on smaller viewports.
 Whiteboard and screen-annotation toolbars share the same primary order: Pan, Laser,
 Select, Pen, Text, Eraser, Undo, More. Shapes, stamps, advanced formatting, redo,
 whiteboard library and view options, tutor focus, and sharing actions live in More
-where applicable. Quick color and stroke controls remain contextual to the selected
+where applicable. Larger drawing surfaces expose additional shortcuts without
+wrapping the toolbar; compact surfaces retain the same core tools. Quick color and stroke controls remain contextual to the selected
 tool. Claim host is available in People instead of the meeting toolbar.
 
 SDK audio-change events update both the local microphone control and participant
@@ -395,3 +396,22 @@ continues after the initial tutor focus, independently of following.
 
 These are maintenance corrections to the existing classroom controls and presence
 experience, covered by the Video SDK feature-flag maintenance exemption above.
+
+Whiteboard bottom-right controls group one-time **Focus active participant**, fit,
+zoom, reset, and fullscreen actions. Focus prefers an active writer, then the latest
+participant viewport; it does not continuously move the viewer. Hover pointers
+remain in ephemeral presence between strokes. Whiteboard and screen annotations
+use pastel participant labels and dark pointer arrows so identities remain legible
+without competing with lesson content.
+
+Native annotation strokes remain visible while queued for saving, including a
+retry after a connection failure. Web retries retain unsaved ink until acknowledged
+or explicitly rejected by the API. Delayed commit deltas merge by object version
+without reverting newer room permissions or resurrecting deleted objects.
+
+While a whiteboard presentation is active, the SDK host locks competing screen
+sharing and restores the previous sharing permission when it stops. A competing
+SDK event does not automatically hide an active native whiteboard. Sharing mode
+changes require stopping the board first. This coordinates existing presentation
+controls under the same maintenance exemption; presenter ownership and server
+access checks remain authoritative.

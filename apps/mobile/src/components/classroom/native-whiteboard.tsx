@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { findNodeHandle, Modal, Pressable, Text, View } from 'react-native';
 import {
   Fullscreen,
+  Binoculars,
   Scan,
   ZoomIn,
   ZoomOut,
@@ -95,6 +96,7 @@ export function NativeWhiteboard({
   const [error, setError] = useState<string | null>(null);
   const [toolbarMenu, setToolbarMenu] = useState<string | null>(null);
   const [boardWidth, setBoardWidth] = useState(0);
+  const [boardHeight, setBoardHeight] = useState(0);
   const [ready, setReady] = useState(false);
   const [styleState, setStyleState] = useState<{
     tool: Tool;
@@ -378,7 +380,10 @@ export function NativeWhiteboard({
           style={{ flex: 1, backgroundColor: colors.card }}
           testID={`whiteboard-saved-elements-${snapshot?.document.pages[0]?.elements.filter((element) => !element.deleted).length ?? 0}`}
           accessibilityLabel="Class whiteboard"
-          onLayout={(event) => setBoardWidth(event.nativeEvent.layout.width)}
+          onLayout={(event) => {
+            setBoardWidth(event.nativeEvent.layout.width);
+            setBoardHeight(event.nativeEvent.layout.height);
+          }}
         >
           {error && <NativeClassroomError message={error} />}
           <View
@@ -392,6 +397,8 @@ export function NativeWhiteboard({
             }}
           >
             <NativeWhiteboardToolbar
+              availableWidth={boardWidth}
+              availableHeight={boardHeight}
               menu={toolbarMenu}
               onMenuChange={setToolbarMenu}
               moreContent={
@@ -747,11 +754,36 @@ export function NativeWhiteboard({
               position: 'absolute',
               zIndex: 2,
               right: 12,
-              bottom: 76,
+              bottom: 12,
               flexDirection: 'row',
-              gap: 8,
+              gap: 0,
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: colors.border,
+              backgroundColor: colors.card,
             }}
           >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Focus active participant"
+              accessibilityHint="Center once on the participant currently writing."
+              onLongPress={() =>
+                showAlert(
+                  'Focus active participant',
+                  'Center once on the participant currently writing.',
+                )
+              }
+              onPress={follow.focusActive}
+              disabled={!ready}
+              style={{
+                width: 44,
+                height: 44,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Binoculars size={20} color={colors.text} />
+            </Pressable>
             {(
               [
                 ['Fit content', Scan, { type: 'fit' }],
@@ -778,19 +810,20 @@ export function NativeWhiteboard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: colors.card,
-                  borderWidth: 1,
-                  borderColor: colors.border,
+
                   opacity: ready ? 1 : 0.5,
                 }}
               >
                 <Icon size={20} color={colors.text} />
               </Pressable>
             ))}
-            {onExpand && (
+            {(onExpand || (!embedded && onClose)) && (
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={
-                  expanded ? 'Collapse whiteboard' : 'Expand whiteboard to full screen'
+                  expanded || (!onExpand && !embedded)
+                    ? 'Collapse whiteboard'
+                    : 'Expand whiteboard to full screen'
                 }
                 onPress={() => {
                   if (drawing.current) {
@@ -800,7 +833,7 @@ export function NativeWhiteboard({
                     );
                     return;
                   }
-                  onExpand();
+                  (onExpand ?? onClose)?.();
                 }}
                 style={{
                   width: 44,
@@ -809,11 +842,9 @@ export function NativeWhiteboard({
                   alignItems: 'center',
                   justifyContent: 'center',
                   backgroundColor: colors.card,
-                  borderWidth: 1,
-                  borderColor: colors.border,
                 }}
               >
-                {expanded ? (
+                {expanded || (!onExpand && !embedded) ? (
                   <Minimize size={20} color={colors.text} />
                 ) : (
                   <Fullscreen size={20} color={colors.text} />

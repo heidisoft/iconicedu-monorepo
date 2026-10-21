@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
 import {
   Hand,
   MousePointer2,
@@ -64,6 +64,8 @@ const attention = [
   ['pointerArrow', 'Named pointer', MoveUpRight],
 ] as const;
 export function NativeAnnotationToolbar({
+  availableWidth,
+  availableHeight,
   tool,
   editable,
   onTool,
@@ -77,6 +79,8 @@ export function NativeAnnotationToolbar({
   panelOffset = 104,
   panelWidth = 260,
 }: {
+  availableWidth?: number;
+  availableHeight?: number;
   tool: AnnotationTool;
   editable: boolean;
   onTool: (tool: AnnotationTool) => void;
@@ -91,6 +95,9 @@ export function NativeAnnotationToolbar({
   panelWidth?: number;
 }) {
   const { colors } = useTheme();
+  const size = useWindowDimensions();
+  const spacious =
+    (availableWidth ?? size.width) >= 760 && (availableHeight ?? size.height) >= 600;
   const [menu, setMenu] = useState<string | null>(null);
   const button = (
     label: string,
@@ -152,6 +159,17 @@ export function NativeAnnotationToolbar({
             tool === value,
           ),
         )}
+        {spacious &&
+          button('Shapes', Shapes, () => toggle('Shapes'), !editable, false, true)}
+        {spacious &&
+          button(
+            'Highlighter',
+            Highlighter,
+            () => choose('highlighter'),
+            !editable,
+            tool === 'highlighter',
+          )}
+        {spacious && button('Redo annotation', Redo2, onRedo, !editable || !canRedo)}
         {button('Undo annotation', Undo2, onUndo, !editable || !canUndo)}
         {button(
           'More annotation actions',

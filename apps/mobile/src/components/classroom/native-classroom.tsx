@@ -263,18 +263,46 @@ export function NativeClassroom({
     },
     [adapter],
   );
+  const boardShareMode = useRef<'locked' | 'single' | 'multiple' | null>(null);
+  const shareProtectionQueue = useRef<Promise<unknown>>(Promise.resolve());
+  useEffect(() => {
+    if (!controller.self?.host || !adapter.setShareMode || state.phase !== 'meeting')
+      return;
+    const active = boardActive || zoomBoardActive;
+    const update = async () => {
+      if (active) {
+        boardShareMode.current ??= controller.state.shareMode ?? 'single';
+        await controller.setShareMode('locked');
+      } else if (boardShareMode.current !== null) {
+        await controller.setShareMode(boardShareMode.current);
+        boardShareMode.current = null;
+      }
+    };
+    shareProtectionQueue.current = shareProtectionQueue.current
+      .then(update, update)
+      .catch(() => {
+        setError('Unable to update presentation controls. Please retry.');
+      });
+  }, [
+    adapter,
+    controller,
+    boardActive,
+    zoomBoardActive,
+    state.phase,
+    controller.self?.host,
+  ]);
   const previousShares = useRef(new Set<string>());
   useEffect(() => {
     const started = state.sharingUserIds.some((id) => !previousShares.current.has(id));
     previousShares.current = new Set(state.sharingUserIds);
-    if (started && !boardPublishing.current) {
+    if (started && !boardPublishing.current && !boardActive && !zoomBoardActive) {
       // A new SDK share replaces the local board view without stopping the class board.
       setBoardVisible(false);
       setBoardExpanded(false);
       setPanel((previous) => (previous === 'whiteboard' ? 'none' : previous));
       setFocused((previous) => (previous?.sharing ? null : previous));
     }
-  }, [state.sharingUserIds]);
+  }, [state.sharingUserIds, boardActive, zoomBoardActive]);
   useEffect(() => {
     if (
       focused &&
@@ -1214,7 +1242,13 @@ export function NativeClassroom({
                       icon={Users}
                       selected={state.shareMode === mode}
                       onPress={() => {
-                        void run(() => controller.setShareMode(mode));
+                        void run(async () => {
+                          if (boardActive || zoomBoardActive)
+                            throw new Error(
+                              'Stop the whiteboard before changing screen sharing permissions.',
+                            );
+                          await controller.setShareMode(mode);
+                        });
                       }}
                     />
                   ))}

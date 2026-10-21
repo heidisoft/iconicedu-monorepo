@@ -136,3 +136,56 @@ it('follows the currently publishing tutor after a capability changes on rejoin'
   expect(receive).toHaveBeenCalledWith(viewport, expect.any(String));
   unmount();
 });
+
+it('focuses the active student once and retains hover cursors between strokes', async () => {
+  vi.useFakeTimers();
+  const repository = {
+    load: vi.fn(),
+    save: vi.fn(),
+    publishViewport: vi.fn(),
+    viewports: vi.fn().mockResolvedValue([
+      {
+        actorId: 'tutor',
+        viewport: { centerX: 0, centerY: 0, zoom: 1 },
+        expiresAt: Date.now() + 10000,
+      },
+      {
+        actorId: 'peer',
+        viewport: {
+          centerX: 0,
+          centerY: 0,
+          zoom: 1,
+          writing: { x: 400, y: 500 },
+          pointer: { x: 410, y: 510 },
+        },
+        expiresAt: Date.now() + 9000,
+      },
+    ]),
+  };
+  const receive = vi.fn();
+  const { result, unmount } = renderHook(() =>
+    useWhiteboardFollow('token', repository, snapshot, true, receive),
+  );
+  await act(async () => {});
+  receive.mockClear();
+  act(() => result.current.focusActive());
+  await act(async () => {});
+  expect(receive).toHaveBeenCalledWith(
+    expect.objectContaining({ centerX: 400, centerY: 500 }),
+    expect.any(String),
+  );
+  repository.viewports.mockResolvedValue([
+    {
+      actorId: 'peer',
+      viewport: { centerX: 0, centerY: 0, zoom: 1, pointer: { x: 420, y: 520 } },
+      expiresAt: Date.now() + 9000,
+    },
+  ]);
+  await act(async () => {
+    vi.advanceTimersByTime(500);
+  });
+  expect(receive).toHaveBeenCalledTimes(1);
+  expect(result.current.writers).toHaveLength(1);
+  unmount();
+  vi.useRealTimers();
+});

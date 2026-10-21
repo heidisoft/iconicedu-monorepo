@@ -309,6 +309,7 @@ export function AnnotationToolbar({
   useEffect(() => {
     if (autoExpand) setExpanded(true);
   }, [autoExpand]);
+  const [spacious, setSpacious] = useState(false);
   const [panel, setPanel] = useState<string | null>(null);
   const [stylesVisible, setStylesVisible] = useState(true);
   const toolbarRef = useRef<HTMLDivElement>(null);
@@ -371,6 +372,7 @@ export function AnnotationToolbar({
       const toolbar = toolbarRef.current;
       if (!toolbar) return;
       setInset(toolbar.offsetHeight + 16);
+      setSpacious(surface.clientWidth >= 760 && surface.clientHeight >= 600);
       if (surface.clientWidth > 0 && surface.clientHeight > 0) {
         setPosition((previous) => {
           const next = {
@@ -598,6 +600,30 @@ export function AnnotationToolbar({
                 <span className="sr-only">Undo</span>
               </button>
             </div>
+            {spacious && (
+              <div className="flex">
+                <button
+                  type="button"
+                  aria-label="Redo"
+                  title="Redo"
+                  className={iconButton}
+                  disabled={!canDraw || !redoCount}
+                  onClick={redo}
+                >
+                  <Redo2 size={16} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Highlighter"
+                  title="Highlighter"
+                  className={iconButton}
+                  disabled={!canDraw}
+                  onClick={() => setTool('highlighter')}
+                >
+                  <Highlighter size={16} aria-hidden="true" />
+                </button>
+              </div>
+            )}
             <ToolMenu
               {...menuProps('Format')}
               hideTrigger

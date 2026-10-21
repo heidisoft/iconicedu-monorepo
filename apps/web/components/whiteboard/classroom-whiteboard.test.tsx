@@ -71,7 +71,16 @@ it('exposes zoom actions on the canvas while waiting for the engine to load', ()
     />,
   );
   const group = screen.getByRole('group', { name: 'Whiteboard zoom controls' });
-  for (const name of ['Fit content', 'Zoom in', 'Zoom out', 'Reset zoom to 100%']) {
+  expect(group).toContainElement(
+    screen.getByRole('button', { name: 'View whiteboard fullscreen' }),
+  );
+  for (const name of [
+    'Focus active participant',
+    'Fit content',
+    'Zoom in',
+    'Zoom out',
+    'Reset zoom to 100%',
+  ]) {
     const button = screen.getByRole('button', { name });
     expect(group).toContainElement(button);
     expect(button).toBeDisabled();

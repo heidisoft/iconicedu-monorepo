@@ -17,7 +17,12 @@ import './whiteboard-canvas.css';
 import { useWhiteboardLaser } from './use-whiteboard-laser';
 import { DrawingStyleStrip } from '@iconicedu/ui-web/ui/drawing-style-strip';
 import { sceneFingerprint } from './scene-history';
-import { resolveWhiteboardFollow, animateWhiteboardFollow } from '@iconicedu/utils';
+import {
+  participantColor,
+  participantCursorColors,
+  resolveWhiteboardFollow,
+  animateWhiteboardFollow,
+} from '@iconicedu/utils';
 
 export function ExcalidrawCanvas({
   elements,
@@ -65,6 +70,7 @@ export function ExcalidrawCanvas({
   const defaultToolApplied = useRef(false);
   const previousSource = useRef<string | undefined>(undefined);
   const previousViewport = useRef<WhiteboardViewportVM | undefined>(undefined);
+  const pointer = useRef<{ x: number; y: number } | undefined>(undefined);
   const writing = useRef<{ x: number; y: number } | undefined>(undefined);
   const writingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cancelFollow = useRef<() => void>(() => {});
@@ -278,7 +284,13 @@ export function ExcalidrawCanvas({
           writers
             .filter((person) => person.expiresAt > Date.now())
             .map((person) => {
-              const point = person.viewport.writing;
+              const point = person.viewport.pointer ?? person.viewport.writing;
+              const palette = participantCursorColors(
+                participantColor(
+                  person.actorId,
+                  presence.map((peer) => peer.id),
+                ),
+              );
               const name = presence.find((peer) => peer.id === person.actorId)?.name;
               const view = api.getAppState();
               return (
@@ -288,10 +300,26 @@ export function ExcalidrawCanvas({
                     key={person.actorId}
                     className="absolute rounded-lg bg-background px-2 py-1 text-xs text-foreground shadow-sm"
                     style={{
-                      left: (point.x + view.scrollX) * view.zoom.value + 8,
-                      top: (point.y + view.scrollY) * view.zoom.value - 24,
+                      backgroundColor: palette.background,
+                      color: palette.foreground,
+                      left: (point.x + view.scrollX) * view.zoom.value + 16,
+                      top: (point.y + view.scrollY) * view.zoom.value + 8,
                     }}
                   >
+                    <svg
+                      width="18"
+                      height="24"
+                      viewBox="0 0 18 24"
+                      aria-hidden="true"
+                      style={{ position: 'absolute', left: -16, top: -8 }}
+                    >
+                      <path
+                        d="M1 1 L1 18 L6 13 L10 21 L14 19 L10 11 L17 11 Z"
+                        fill={palette.foreground}
+                        stroke="#fff"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
                     {name}
                   </span>
                 )
@@ -301,6 +329,18 @@ export function ExcalidrawCanvas({
       <Excalidraw
         onPointerUpdate={(event) => {
           onPointerUpdate(event);
+          pointer.current = { x: event.pointer.x, y: event.pointer.y };
+          if (api && editable) {
+            const state = api.getAppState();
+            onViewport?.({
+              centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+              centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+              zoom: state.zoom.value,
+              pointer: pointer.current,
+              ...(writing.current ? { writing: writing.current } : {}),
+            });
+          }
+
           if (
             !api ||
             !editable ||
@@ -325,6 +365,7 @@ export function ExcalidrawCanvas({
               centerY: state.height / (2 * state.zoom.value) - state.scrollY,
               zoom: state.zoom.value,
               ...(writing.current ? { writing: writing.current } : {}),
+              ...(pointer.current ? { pointer: pointer.current } : {}),
             });
           };
           publish();
@@ -397,6 +438,7 @@ export function ExcalidrawCanvas({
             centerY: state.height / (2 * state.zoom.value) - state.scrollY,
             zoom: state.zoom.value,
             ...(writing.current ? { writing: writing.current } : {}),
+            ...(pointer.current ? { pointer: pointer.current } : {}),
           });
           const selected = next.find(
             (element) => !element.isDeleted && state.selectedElementIds[element.id],

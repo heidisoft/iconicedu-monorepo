@@ -43,6 +43,8 @@ export type Tool =
   | 'frame';
 type IconType = React.ComponentType<{ size?: number; color?: string }>;
 export function NativeWhiteboardToolbar({
+  availableWidth,
+  availableHeight,
   editable,
   ready,
   canClear,
@@ -54,6 +56,8 @@ export function NativeWhiteboardToolbar({
   menu: controlledMenu,
   onMenuChange,
 }: {
+  availableWidth?: number;
+  availableHeight?: number;
   editable: boolean;
   ready: boolean;
   canClear: boolean;
@@ -72,7 +76,9 @@ export function NativeWhiteboardToolbar({
   onMenuChange?: (menu: string | null) => void;
 }) {
   const { colors } = useTheme();
-  const { height } = useWindowDimensions();
+  const { width: screenWidth, height } = useWindowDimensions();
+  const spacious =
+    (availableWidth ?? screenWidth) >= 760 && (availableHeight ?? height) >= 600;
   const [chosenTool, setTool] = useState<Tool>('laser');
   const [localMenu, setLocalMenu] = useState<string | null>(null);
   const menu = controlledMenu === undefined ? localMenu : controlledMenu;
@@ -185,6 +191,26 @@ export function NativeWhiteboardToolbar({
               tool === value,
             ),
           )}
+          {spacious &&
+            button(
+              'Shapes',
+              Shapes,
+              () => toggle('Shapes'),
+              !ready || !editable,
+              false,
+              true,
+            )}
+          {spacious &&
+            button(
+              'Library',
+              Library,
+              () => toggle('Library'),
+              !ready || !editable,
+              false,
+              true,
+            )}
+          {spacious &&
+            button('Redo', Redo2, () => onCommand({ type: 'redo' }), !ready || !editable)}
           {button('Undo', Undo2, () => onCommand({ type: 'undo' }), !ready || !editable)}
         </ScrollView>
         {button(

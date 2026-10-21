@@ -1,5 +1,5 @@
 'use client';
-import { useState, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { LaserPointerIcon } from '@iconicedu/ui-web/ui/laser-pointer-icon';
 import {
   ArrowUpRight,
@@ -74,6 +74,18 @@ export function WhiteboardToolbar({
   followControl?: ReactNode;
   moreContent?: ReactNode;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  const [spacious, setSpacious] = useState(false);
+  useEffect(() => {
+    const surface = root.current?.closest('section');
+    if (!surface || typeof ResizeObserver === 'undefined') return;
+    const measure = () =>
+      setSpacious(surface.clientWidth >= 760 && surface.clientHeight >= 600);
+    const observer = new ResizeObserver(measure);
+    observer.observe(surface);
+    measure();
+    return () => observer.disconnect();
+  }, []);
   const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
   const [snap, setSnap] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
@@ -89,6 +101,7 @@ export function WhiteboardToolbar({
   });
   return (
     <div
+      ref={root}
       role="toolbar"
       aria-orientation="horizontal"
       aria-label="Whiteboard tools"
@@ -124,6 +137,32 @@ export function WhiteboardToolbar({
         <Undo2 className="size-4" aria-hidden="true" />
       </IconActionButton>
 
+      {spacious && (
+        <div className="flex">
+          <IconActionButton
+            label="Redo"
+            tooltip="Redo"
+            variant="toolbar"
+            className={actionClass}
+            disabled={!editable || !engine}
+            onClick={() => engine?.redo()}
+          >
+            <Redo2 className="size-4" aria-hidden="true" />
+          </IconActionButton>
+          {onLibrary && (
+            <IconActionButton
+              label="Library"
+              tooltip="Educational library"
+              variant="toolbar"
+              className={actionClass}
+              disabled={!editable || !engine}
+              onClick={onLibrary}
+            >
+              <Library className="size-4" aria-hidden="true" />
+            </IconActionButton>
+          )}
+        </div>
+      )}
       <DropdownMenu {...menuProps('more')}>
         <DropdownMenuTrigger asChild>
           <Button

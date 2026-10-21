@@ -85,6 +85,12 @@ export class WhiteboardsService {
       !Number.isFinite(viewport.zoom) ||
       viewport.zoom < 0.1 ||
       viewport.zoom > 30 ||
+      (viewport.pointer !== undefined &&
+        (!viewport.pointer ||
+          !Number.isFinite(viewport.pointer.x) ||
+          !Number.isFinite(viewport.pointer.y) ||
+          Math.abs(viewport.pointer.x) > 10_000_000 ||
+          Math.abs(viewport.pointer.y) > 10_000_000)) ||
       (viewport.writing !== undefined &&
         (!viewport.writing ||
           !Number.isFinite(viewport.writing.x) ||
@@ -101,6 +107,9 @@ export class WhiteboardsService {
           centerX: viewport.centerX,
           centerY: viewport.centerY,
           zoom: viewport.zoom,
+          ...(viewport.pointer
+            ? { pointer: { x: viewport.pointer.x, y: viewport.pointer.y } }
+            : {}),
           ...(viewport.writing
             ? { writing: { x: viewport.writing.x, y: viewport.writing.y } }
             : {}),

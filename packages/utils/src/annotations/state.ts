@@ -9,23 +9,24 @@ export function applyAnnotationCommit(
   snapshot: AnnotationSnapshot,
   event: AnnotationCommit,
 ): AnnotationSnapshot {
-  if (
-    snapshot.ended ||
-    event.roomId !== snapshot.roomId ||
-    event.revision <= snapshot.revision
-  )
-    return snapshot;
+  if (snapshot.ended || event.roomId !== snapshot.roomId) return snapshot;
+  // Commits contain deltas: an older room revision can still carry an unseen stroke.
+  const newer = event.revision > snapshot.revision;
+  let changed = false;
   const objects = new Map(snapshot.objects.map((object) => [object.id, object]));
   for (const object of event.objects) {
-    if (object.version > (objects.get(object.id)?.version ?? 0))
+    if (object.version > (objects.get(object.id)?.version ?? 0)) {
       objects.set(object.id, object);
+      changed = true;
+    }
   }
+  if (!newer && !changed) return snapshot;
   return {
     ...snapshot,
-    revision: event.revision,
-    objects: event.ended ? [] : [...objects.values()],
-    studentsEnabled: event.studentsEnabled,
-    ended: event.ended,
+    revision: Math.max(snapshot.revision, event.revision),
+    objects: newer && event.ended ? [] : [...objects.values()],
+    studentsEnabled: newer ? event.studentsEnabled : snapshot.studentsEnabled,
+    ended: newer ? event.ended : snapshot.ended,
   };
 }
 export class AnnotationStrokeBuffer {
@@ -67,5 +68,32 @@ export function moveAnnotation(
   return {
     ...object,
     points: object.points.map((p) => ({ ...p, x: p.x + x, y: p.y + y })),
+  };
+}
+
+/** Subtle participant labels retain identity without competing with the drawing. */
+export function participantCursorColors(color: string) {
+  const hex = /^#[0-9a-f]{6}$/i.test(color) ? color.slice(1) : '475569';
+  const channels = [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
+  const blend = (amount: number) =>
+    '#' +
+    channels
+      .map((value) =>
+        Math.round(value * (1 - amount) + 255 * amount)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('');
+  return {
+    background: blend(0.9),
+    foreground:
+      '#' +
+      channels
+        .map((value) =>
+          Math.round(value * 0.45)
+            .toString(16)
+            .padStart(2, '0'),
+        )
+        .join(''),
   };
 }

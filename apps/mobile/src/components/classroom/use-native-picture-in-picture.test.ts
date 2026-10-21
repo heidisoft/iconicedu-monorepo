@@ -107,8 +107,10 @@ it('retries a transient SDK participant setup failure instead of leaving floatin
   const pip = adapter();
   pip.configure.mockRejectedValueOnce(new Error('participant not ready'));
   const { result, unmount } = renderHook(() => useNativePictureInPicture(pip, meeting));
-  await waitFor(() => expect(pip.configure).toHaveBeenCalledTimes(2));
-  expect(result.current.ready).toBe(true);
+  await waitFor(() => {
+    expect(pip.configure).toHaveBeenCalledTimes(2);
+    expect(result.current.ready).toBe(true);
+  });
   expect(result.current.error).toBeNull();
   unmount();
 });

@@ -467,10 +467,9 @@ export function ZoomVideoSessionEmbed({
   const [audioProcessing, setAudioProcessing] = useState<AudioProcessingMode>(
     initialMediaSettings?.audioProcessing ?? 'noiseSuppression',
   );
-  // Matches Zoom's own default (the regular client's Share Screen Settings
-  // defaults to "Multiple participants can share simultaneously").
+  // Use single-presenter controls until the SDK reports the host's sharing setting.
   const [sharePrivilege, setSharePrivilege] = useState<SharePrivilege>(
-    SharePrivilege.MultipleShare,
+    SharePrivilege.Unlocked,
   );
   const [hwAccelEncode, setHwAccelEncode] = useState(
     initialMediaSettings?.hardwareAcceleration.encode ?? true,
@@ -494,6 +493,33 @@ export function ZoomVideoSessionEmbed({
     toggle: toggleWhiteboardContent,
     exportPdf: exportWhiteboardPdf,
   } = whiteboard;
+  const boardShareMode = useRef<SharePrivilege | null>(null);
+  const shareProtectionQueue = useRef<Promise<unknown>>(Promise.resolve());
+  useEffect(() => {
+    if (status !== 'connected' || !isSelfHost) return;
+    const stream = clientRef.current?.getMediaStream();
+    if (!stream) return;
+    const active = whiteboard.active || whiteboardStatus !== WhiteboardStatus.Closed;
+    const update = async () => {
+      if (active) {
+        boardShareMode.current ??= stream.getSharePrivilege();
+        const result = await stream.setSharePrivilege(SharePrivilege.Locked);
+        if (result !== '') throw new Error('Unable to protect whiteboard sharing.');
+        setSharePrivilege(SharePrivilege.Locked);
+      } else if (boardShareMode.current !== null) {
+        const previous = boardShareMode.current;
+        const result = await stream.setSharePrivilege(previous);
+        if (result !== '') throw new Error('Unable to restore screen sharing.');
+        boardShareMode.current = null;
+        setSharePrivilege(previous);
+      }
+    };
+    shareProtectionQueue.current = shareProtectionQueue.current
+      .then(update, update)
+      .catch(() => {
+        setShareError('Unable to update presentation controls. Please retry.');
+      });
+  }, [status, isSelfHost, whiteboard.active, whiteboardStatus]);
   const pauseRecordingForContentFailure = useCallback(() => {
     if (!isSelfHost || recordingStatus !== RecordingStatus.Recording) return;
     const recordingClient = clientRef.current?.getRecordingClient();
@@ -1775,6 +1801,10 @@ export function ZoomVideoSessionEmbed({
   );
 
   const selectSharePrivilege = useCallback(async (privilege: SharePrivilege) => {
+    if (boardShareMode.current !== null) {
+      setShareError('Stop the whiteboard before changing screen sharing permissions.');
+      return;
+    }
     const client = clientRef.current;
     if (!client) {
       return;
@@ -1975,6 +2005,7 @@ export function ZoomVideoSessionEmbed({
             localCanvasRef={localShareCanvasRef}
             localVideoRef={localShareVideoRef}
             whiteboardContainerRef={whiteboardContainerRef}
+            whiteboardControlsFullscreen={!!whiteboard.nativeToken && whiteboard.active}
             whiteboardContent={
               whiteboard.nativeToken && whiteboard.active ? (
                 <ClassroomWhiteboard

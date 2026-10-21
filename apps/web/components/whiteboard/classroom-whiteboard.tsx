@@ -1,6 +1,12 @@
 'use client';
+import {
+  FocusedFullscreenStyles,
+  FocusedFullscreenButton,
+  useFocusedFullscreen,
+  FocusedContentFullscreenContext,
+} from '@iconicedu/ui-web/ui/focused-fullscreen';
 import dynamic from 'next/dynamic';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useContext } from 'react';
 import { participantColor } from '@iconicedu/utils';
 import { ErrorBoundary } from '@iconicedu/ui-web/components/error-boundary';
 import { DropdownMenuItem } from '@iconicedu/ui-web/ui/dropdown-menu';
@@ -50,6 +56,9 @@ export function ClassroomWhiteboard({
   repository?: WhiteboardRepository;
   collaboration?: WhiteboardCollaborationProvider;
 }) {
+  const ownFullscreen = useFocusedFullscreen();
+  const providedFullscreen = useContext(FocusedContentFullscreenContext);
+  const fullscreen = providedFullscreen ?? ownFullscreen;
   const board = useWhiteboard(token, repository, collaboration);
   const [engine, setEngine] = useState<WhiteboardEngine | null>(null);
   const [tool, setTool] = useState<WhiteboardTool>('laser');
@@ -133,6 +142,7 @@ export function ClassroomWhiteboard({
       data-board-id={snapshot.id}
       data-element-count={page.elements.filter((e) => !e.deleted).length}
     >
+      <FocusedFullscreenStyles />
       <div className="pointer-events-none absolute inset-x-3 top-3 z-20 flex items-start">
         <aside
           data-testid="whiteboard-overlay-toolbar"
@@ -215,7 +225,11 @@ export function ClassroomWhiteboard({
           </p>
         )}
       </div>
-      <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-card">
+      <div
+        ref={ownFullscreen.setTarget}
+        data-focused-content="whiteboard"
+        className="relative flex min-h-0 flex-1 overflow-hidden rounded-2xl bg-card"
+      >
         <ErrorBoundary
           key={page.id}
           fallback={
@@ -264,10 +278,11 @@ export function ClassroomWhiteboard({
         <div
           role="group"
           aria-label="Whiteboard zoom controls"
-          className="absolute right-14 bottom-3 z-30 flex h-11 items-center gap-1 rounded-full border border-border bg-card shadow-sm"
+          className="absolute right-3 bottom-3 z-30 flex h-11 max-w-[calc(100%-1.5rem)] items-center gap-0 rounded-full border border-border bg-card shadow-sm @[400px]:gap-1"
         >
           {(
             [
+              ['Focus active participant', Binoculars, follow.focusActive],
               ['Fit content', Scan, () => engine?.zoomToFit()],
               ['Zoom in', ZoomIn, () => engine?.zoomBy(0.1)],
               ['Zoom out', ZoomOut, () => engine?.zoomBy(-0.1)],
@@ -279,7 +294,7 @@ export function ClassroomWhiteboard({
               type="button"
               variant="ghost"
               size="icon"
-              className="size-11 rounded-full"
+              className="size-11 shrink-0 rounded-full"
               aria-label={label}
               title={label}
               disabled={!engine}
@@ -288,6 +303,7 @@ export function ClassroomWhiteboard({
               <Icon className="size-4" aria-hidden="true" />
             </Button>
           ))}
+          <FocusedFullscreenButton fullscreen={fullscreen} label="whiteboard" inline />
         </div>
         <p
           data-whiteboard-hint

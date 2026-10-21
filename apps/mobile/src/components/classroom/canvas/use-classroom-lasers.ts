@@ -75,7 +75,7 @@ export function useClassroomLasers(api: ExcalidrawImperativeAPI | null) {
                 x: sample.x,
                 y: sample.y,
                 tool: 'laser',
-                renderCursor: true,
+                renderCursor: false,
                 laserColor: participantColor(actor),
               },
               button: sample.button,

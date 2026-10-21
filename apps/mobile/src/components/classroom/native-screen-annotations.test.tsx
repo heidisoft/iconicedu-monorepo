@@ -108,6 +108,37 @@ describe('native screen annotation delivery', () => {
     jest.clearAllMocks();
     jest.mocked(AsyncStorage.getItem).mockResolvedValue(null);
   });
+  it('keeps rapid pen strokes visible and queues them while saving', async () => {
+    const { api, screen } = setup();
+    await waitFor(() =>
+      expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+        'auto',
+      ),
+    );
+    fireEvent.press(screen.getByLabelText('Pen'));
+    const save = api.save.getMockImplementation()!;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    api.save.mockImplementationOnce(async (room, operation) => {
+      await gate;
+      return save(room, operation);
+    });
+    stroke(screen);
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(1));
+    stroke(screen);
+    expect(screen.getByTestId('annotation-drawing-surface').props.pointerEvents).toBe(
+      'auto',
+    );
+    expect(screen.getAllByLabelText('Annotation by Test student')).toHaveLength(1);
+    await act(async () => release());
+    await waitFor(() => expect(api.save).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.getByTestId('annotation-saved-elements-2')).toBeTruthy(),
+    );
+    screen.unmount();
+  });
   it('sends vanishing strokes as ephemeral presence without persisting a drawing', async () => {
     const { api, screen } = setup();
     await waitFor(() =>

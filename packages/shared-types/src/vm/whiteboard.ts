@@ -74,6 +74,8 @@ export interface WhiteboardViewportVM {
   zoom: number;
   /** Active scene-space writing position; ephemeral, never saved in the drawing. */
   writing?: { x: number; y: number };
+  /** Last scene-space pointer, including hovering between strokes. */
+  pointer?: { x: number; y: number };
 }
 export interface WhiteboardViewportPresenceVM {
   actorId: string;

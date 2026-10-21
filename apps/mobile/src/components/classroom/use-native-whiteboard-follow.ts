@@ -22,6 +22,10 @@ export function useNativeWhiteboardFollow(
     setFollowing('tutor');
     setFocusRequest((value) => value + 1);
   }, []);
+  const focusActive = useCallback(() => {
+    setFollowing('active');
+    setFocusRequest((value) => value + 1);
+  }, []);
   const [status, setStatus] = useState<'waiting' | 'following' | 'reconnecting'>(
     'waiting',
   );
@@ -72,33 +76,40 @@ export function useNativeWhiteboardFollow(
             candidates.filter(
               (person) =>
                 person.actorId !== snapshotRef.current?.actorId &&
-                !!person.viewport.writing,
+                !!(person.viewport.writing || person.viewport.pointer),
             ),
           );
         if (focused || following === 'free') return;
         // A tutor may have rejoined with a new capability; choose a currently publishing tutor.
         const peer =
-          following === 'tutor'
-            ? candidates
-                .filter((person) =>
-                  snapshotRef.current?.presence.some(
-                    (actor) =>
-                      actor.id === person.actorId &&
-                      actor.role === 'teacher' &&
-                      actor.id !== snapshotRef.current?.actorId,
-                  ),
-                )
-                .sort((a, b) => b.expiresAt - a.expiresAt)[0]
-            : candidates.find((person) => person.actorId === target);
+          following === 'active'
+            ? [...candidates].sort(
+                (a, b) =>
+                  Number(!!b.viewport.writing) - Number(!!a.viewport.writing) ||
+                  b.expiresAt - a.expiresAt,
+              )[0]
+            : following === 'tutor'
+              ? candidates
+                  .filter((person) =>
+                    snapshotRef.current?.presence.some(
+                      (actor) =>
+                        actor.id === person.actorId &&
+                        actor.role === 'teacher' &&
+                        actor.id !== snapshotRef.current?.actorId,
+                    ),
+                  )
+                  .sort((a, b) => b.expiresAt - a.expiresAt)[0]
+              : candidates.find((person) => person.actorId === target);
         if (active) {
           setStatus(peer ? 'following' : 'waiting');
           if (peer) {
             focused = true;
-            const viewport = peer.viewport.writing
+            const point = peer.viewport.writing ?? peer.viewport.pointer;
+            const viewport = point
               ? {
                   ...peer.viewport,
-                  centerX: peer.viewport.writing.x,
-                  centerY: peer.viewport.writing.y,
+                  centerX: point.x,
+                  centerY: point.y,
                 }
               : peer.viewport;
             receive(viewport, `${peer.actorId}:${epoch}`);
@@ -133,5 +144,5 @@ export function useNativeWhiteboardFollow(
       clearInterval(timer);
     };
   }, [token, repository, enabled, target, following, receive, focusRequest]);
-  return { writers, following, setFollowing, focusTutor, publish, status };
+  return { writers, following, setFollowing, focusTutor, focusActive, publish, status };
 }

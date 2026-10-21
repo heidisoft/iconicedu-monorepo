@@ -171,3 +171,56 @@ it('keeps writing presence updated after focusing without following continuously
   unmount();
   jest.useRealTimers();
 });
+
+it('focuses the active student once and retains hover cursors between strokes', async () => {
+  jest.useFakeTimers();
+  const repository = {
+    load: jest.fn(),
+    save: jest.fn(),
+    publishViewport: jest.fn(),
+    viewports: jest.fn().mockResolvedValue([
+      {
+        actorId: 'tutor',
+        viewport: { centerX: 0, centerY: 0, zoom: 1 },
+        expiresAt: Date.now() + 10000,
+      },
+      {
+        actorId: 'peer',
+        viewport: {
+          centerX: 0,
+          centerY: 0,
+          zoom: 1,
+          writing: { x: 400, y: 500 },
+          pointer: { x: 410, y: 510 },
+        },
+        expiresAt: Date.now() + 9000,
+      },
+    ]),
+  };
+  const receive = jest.fn();
+  const { result, unmount } = renderHook(() =>
+    useNativeWhiteboardFollow('token', repository, snapshot, true, receive),
+  );
+  await act(async () => {});
+  receive.mockClear();
+  act(() => result.current.focusActive());
+  await act(async () => {});
+  expect(receive).toHaveBeenCalledWith(
+    expect.objectContaining({ centerX: 400, centerY: 500 }),
+    expect.any(String),
+  );
+  repository.viewports.mockResolvedValue([
+    {
+      actorId: 'peer',
+      viewport: { centerX: 0, centerY: 0, zoom: 1, pointer: { x: 420, y: 520 } },
+      expiresAt: Date.now() + 9000,
+    },
+  ]);
+  await act(async () => {
+    jest.advanceTimersByTime(500);
+  });
+  expect(receive).toHaveBeenCalledTimes(1);
+  expect(result.current.writers).toHaveLength(1);
+  unmount();
+  jest.useRealTimers();
+});

@@ -138,3 +138,25 @@ it('toggles the picker from the selected tool and preserves closure across style
   fireEvent.press(screen.getByLabelText('Text'));
   expect(screen.getByLabelText('Close drawing styles')).toBeTruthy();
 });
+
+it('exposes extra shortcuts only when the drawing surface has enough room', () => {
+  const props = {
+    ready: true,
+    editable: true,
+    canClear: true,
+    onCommand: jest.fn(),
+    onClear: jest.fn(),
+  };
+  const screen = render(
+    <NativeWhiteboardToolbar {...props} availableWidth={1024} availableHeight={768} />,
+  );
+  expect(screen.getByLabelText('Shapes')).toBeTruthy();
+  expect(screen.getByLabelText('Library')).toBeTruthy();
+  expect(screen.getByLabelText('Redo')).toBeTruthy();
+  screen.rerender(
+    <NativeWhiteboardToolbar {...props} availableWidth={390} availableHeight={844} />,
+  );
+  expect(screen.queryByLabelText('Shapes')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More whiteboard actions'));
+  expect(screen.getByLabelText('Shapes')).toBeTruthy();
+});

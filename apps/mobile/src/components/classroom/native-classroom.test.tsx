@@ -623,13 +623,22 @@ it('removes a stopped board and displays the next screen share without leaving t
   expect(f.screen.getByTestId('share-stage')).toHaveTextContent('1');
   expect(f.screen.getByLabelText('Expand shared screen to full screen')).toBeTruthy();
 });
-it('lets a new screen share replace a still visible board before its next poll', async () => {
+it('locks competing SDK shares while the host presents a whiteboard and restores permissions', async () => {
+  const f = setup('1', { load: jest.fn(), save: jest.fn() });
+  await f.join();
+  act(() => mockBoardPresentation?.(true));
+  await waitFor(() => expect(f.adapter.setShareMode).toHaveBeenCalledWith('locked'));
+  f.adapter.setShareMode!.mockClear();
+  act(() => mockBoardPresentation?.(false));
+  await waitFor(() => expect(f.adapter.setShareMode).toHaveBeenCalledWith('single'));
+});
+it('keeps an active whiteboard visible when an unexpected screen share starts', async () => {
   const f = setup('2', { load: jest.fn(), save: jest.fn() });
   await f.join();
   act(() => mockBoardPresentation?.(true));
   f.emit({ type: 'share', userId: '1', active: true });
-  expect(f.screen.queryByText('Class whiteboard')).toBeNull();
-  expect(f.screen.getByTestId('share-stage')).toHaveTextContent('1');
+  expect(f.screen.getByText('Class whiteboard')).toBeTruthy();
+  expect(f.screen.queryByTestId('share-stage')).toBeNull();
   act(() => mockBoardPresentation?.(false));
   expect(f.screen.getByTestId('share-stage')).toHaveTextContent('1');
 });

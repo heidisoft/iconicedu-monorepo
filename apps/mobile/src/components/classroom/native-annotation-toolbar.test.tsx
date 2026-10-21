@@ -43,3 +43,27 @@ it('matches the web annotation order and groups shapes, stamps and attention too
   fireEvent.press(screen.getByLabelText('Named pointer'));
   expect(onTool).toHaveBeenLastCalledWith('pointerArrow');
 });
+
+it('uses the drawing surface size to expose shortcuts without changing compact tools', () => {
+  const props = {
+    tool: 'pen' as const,
+    editable: true,
+    onTool: jest.fn(),
+    onUndo: jest.fn(),
+    onRedo: jest.fn(),
+    canUndo: true,
+    canRedo: true,
+    onOptions: jest.fn(),
+  };
+  const screen = render(
+    <NativeAnnotationToolbar {...props} availableWidth={1024} availableHeight={768} />,
+  );
+  fireEvent.press(screen.getByLabelText('Highlighter'));
+  expect(props.onTool).toHaveBeenCalledWith('highlighter');
+  screen.rerender(
+    <NativeAnnotationToolbar {...props} availableWidth={390} availableHeight={844} />,
+  );
+  expect(screen.queryByLabelText('Highlighter')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More annotation actions'));
+  expect(screen.getByLabelText('Highlighter')).toBeTruthy();
+});

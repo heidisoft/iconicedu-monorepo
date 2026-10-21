@@ -18,6 +18,8 @@ import type {
   WhiteboardSnapshotVM,
 } from '@iconicedu/shared-types';
 import {
+  participantColor,
+  participantCursorColors,
   SceneHistory,
   sceneFingerprint,
   educationalAssets,
@@ -81,6 +83,7 @@ function Canvas() {
   const interacting = useRef(false);
   const previousSource = useRef<string | null | undefined>(undefined);
   const previousViewport = useRef<WhiteboardViewportVM | undefined>(undefined);
+  const pointer = useRef<{ x: number; y: number } | undefined>(undefined);
   const writing = useRef<{ x: number; y: number } | undefined>(undefined);
   const writingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const cancelFollow = useRef<() => void>(() => {});
@@ -369,7 +372,13 @@ function Canvas() {
           writers
             .filter((person) => person.expiresAt > Date.now())
             .map((person) => {
-              const point = person.viewport.writing;
+              const point = person.viewport.pointer ?? person.viewport.writing;
+              const palette = participantCursorColors(
+                participantColor(
+                  person.actorId,
+                  people.map((peer) => peer.id),
+                ),
+              );
               const name = people.find((peer) => peer.id === person.actorId)?.name;
               const view = api.getAppState();
               return (
@@ -379,16 +388,31 @@ function Canvas() {
                     key={person.actorId}
                     style={{
                       position: 'absolute',
-                      left: (point.x + view.scrollX) * view.zoom.value + 8,
-                      top: (point.y + view.scrollY) * view.zoom.value - 24,
-                      background: dark ? '#232329' : '#fff',
-                      color: dark ? '#eee' : '#333',
+                      backgroundColor: palette.background,
+                      color: palette.foreground,
+                      left: (point.x + view.scrollX) * view.zoom.value + 16,
+                      top: (point.y + view.scrollY) * view.zoom.value + 8,
+
                       padding: '3px 8px',
                       borderRadius: 8,
                       font: '12px system-ui',
                       boxShadow: '0 1px 4px #0002',
                     }}
                   >
+                    <svg
+                      width="18"
+                      height="24"
+                      viewBox="0 0 18 24"
+                      aria-hidden="true"
+                      style={{ position: 'absolute', left: -16, top: -8 }}
+                    >
+                      <path
+                        d="M1 1 L1 18 L6 13 L10 21 L14 19 L10 11 L17 11 Z"
+                        fill={palette.foreground}
+                        stroke="#fff"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
                     {name}
                   </span>
                 )
@@ -398,6 +422,20 @@ function Canvas() {
       <Excalidraw
         excalidrawAPI={setApi}
         onPointerUpdate={(event) => {
+          pointer.current = { x: event.pointer.x, y: event.pointer.y };
+          if (api && editable) {
+            const state = api.getAppState();
+            send({
+              type: 'viewport',
+              viewport: {
+                centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+                centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+                zoom: state.zoom.value,
+                pointer: pointer.current,
+                ...(writing.current ? { writing: writing.current } : {}),
+              },
+            });
+          }
           if (
             api &&
             editable &&
@@ -423,6 +461,7 @@ function Canvas() {
                   centerY: state.height / (2 * state.zoom.value) - state.scrollY,
                   zoom: state.zoom.value,
                   ...(writing.current ? { writing: writing.current } : {}),
+                  ...(pointer.current ? { pointer: pointer.current } : {}),
                 },
               });
             };
@@ -472,6 +511,7 @@ function Canvas() {
             centerY: state.height / (2 * state.zoom.value) - state.scrollY,
             zoom: state.zoom.value,
             ...(writing.current ? { writing: writing.current } : {}),
+            ...(pointer.current ? { pointer: pointer.current } : {}),
           };
           const key = JSON.stringify(viewport);
           if (key !== lastViewport.current) {

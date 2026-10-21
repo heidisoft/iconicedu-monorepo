@@ -47,6 +47,7 @@ import type {
 import {
   applyAnnotationCommit,
   participantColor,
+  participantCursorColors,
   moveAnnotation,
 } from '@iconicedu/utils';
 import { nativeAnnotationApi } from '@/lib/classroom/annotation-api';
@@ -62,6 +63,56 @@ import {
 } from '@/lib/classroom/annotation-geometry';
 import { exportClassroomImage } from '@/lib/classroom/export-image';
 import { useTheme } from '@/providers/theme-provider';
+
+function ParticipantCursor({
+  point,
+  name,
+  color,
+  width,
+  height,
+  showName = true,
+  spotlight = false,
+}: {
+  showName?: boolean;
+  spotlight?: boolean;
+  point: AnnotationPoint;
+  name: string;
+  color: string;
+  width: number;
+  height: number;
+}) {
+  const palette = participantCursorColors(color);
+  const labelWidth = Math.min(width - 24, 180, name.length * 7 + 16);
+  const x = Math.max(0, Math.min(width - 20, point.x * width));
+  const y = Math.max(0, Math.min(height - 24, point.y * height));
+  const labelX = Math.max(-x + 4, Math.min(16, width - x - labelWidth - 4));
+  return (
+    <G x={x} y={y} accessibilityLabel={showName ? `Annotation by ${name}` : undefined}>
+      {spotlight && <Circle r={18} fill={color} opacity={0.4} />}
+      <Path
+        d="M0 0 L0 18 L5 13 L9 21 L13 19 L9 11 L16 11 Z"
+        fill={palette.foreground}
+        stroke="#ffffff"
+        strokeWidth={1.5}
+      />
+      {showName && (
+        <>
+          <Rect
+            x={labelX}
+            y={8}
+            width={labelWidth}
+            height={24}
+            rx={4}
+            fill={palette.background}
+          />
+          <SvgText x={labelX + 8} y={24} fill={palette.foreground} fontSize={12}>
+            {name.length > 23 ? name.slice(0, 22) + '…' : name}
+          </SvgText>
+        </>
+      )}
+    </G>
+  );
+}
 
 const stamps: Record<string, string> = {
   stampCheck: '✓',
@@ -451,7 +502,7 @@ export function NativeScreenAnnotations({
   const save = (
     operation: Omit<AnnotationOperation, 'eventId'> | AnnotationOperation,
   ) => {
-    if (pending || !contextRef.current || contextRef.current.snapshot.ended) return;
+    if (!contextRef.current || contextRef.current.snapshot.ended) return;
     const value = {
       ...operation,
       eventId: generateClientMessageId(),
@@ -541,9 +592,18 @@ export function NativeScreenAnnotations({
   }, [api, flush]);
   const editable =
     !!context &&
-    !pending &&
     !context.snapshot.ended &&
     (context.actor.role === 'educator' || context.snapshot.studentsEnabled);
+  // Keep queued ink on screen until its authoritative commit arrives, including retries.
+  const visibleObjects = new Map(
+    (context?.snapshot.objects ?? []).map((object) => [object.id, object]),
+  );
+  for (const operation of queue.current) {
+    if (operation.kind === 'put')
+      visibleObjects.set(operation.object.id, operation.object);
+    else if (operation.kind === 'delete') visibleObjects.delete(operation.id);
+  }
+  const displayedObjects = [...visibleObjects.values()];
   const selectedObject = context?.snapshot.objects.find(
     (object) => object.id === selected && !object.deleted,
   );
@@ -581,7 +641,14 @@ export function NativeScreenAnnotations({
     if (tool === 'spotlight' || tool === 'pointerArrow') {
       lastPointer.current = Date.now();
       void api
-        .pointer({ point: p, tool, color: participantColor(context.actor.userId) })
+        .pointer({
+          point: p,
+          tool,
+          color: participantColor(
+            context.actor.userId,
+            context.actors.map((actor) => actor.userId),
+          ),
+        })
         .catch(() => setError('Unable to share pointer.'));
       return;
     }
@@ -655,14 +722,21 @@ export function NativeScreenAnnotations({
     if (tool === 'vanishingPen') updateLaser(object, false);
   };
   const move = (p: AnnotationPoint) => {
-    if ((tool === 'spotlight' || tool === 'pointerArrow') && editable && context) {
+    if (editable && context) {
       if (Date.now() - lastPointer.current >= 100) {
         lastPointer.current = Date.now();
         void api
-          .pointer({ point: p, tool, color: participantColor(context.actor.userId) })
+          .pointer({
+            point: p,
+            tool: tool === 'spotlight' ? 'spotlight' : 'pointerArrow',
+            color: participantColor(
+              context.actor.userId,
+              context.actors.map((actor) => actor.userId),
+            ),
+          })
           .catch(() => setError('Unable to share pointer.'));
       }
-      return;
+      if (tool === 'spotlight' || tool === 'pointerArrow') return;
     }
     const value = drawing.current;
     if (!value) return;
@@ -756,7 +830,7 @@ export function NativeScreenAnnotations({
             style={{ position: 'absolute', left: -10000 }}
           >
             <Svg ref={publicationSvg} width={width} height={height}>
-              {context?.snapshot.objects
+              {displayedObjects
                 .filter((object) => !object.deleted)
                 .map((object) => (
                   <Shape key={object.id} object={object} width={width} height={height} />
@@ -766,7 +840,7 @@ export function NativeScreenAnnotations({
         )}
         <Svg ref={svg} width={width} height={height}>
           {!composited &&
-            context?.snapshot.objects
+            displayedObjects
               .filter((object) => !object.deleted)
               .map((object) => (
                 <Shape key={object.id} object={object} width={width} height={height} />
@@ -805,9 +879,7 @@ export function NativeScreenAnnotations({
             [
               ...new Map(
                 [
-                  ...(context?.snapshot.objects ?? []).filter(
-                    (object) => !object.deleted,
-                  ),
+                  ...displayedObjects.filter((object) => !object.deleted),
                   ...(context?.lasers ?? []).flatMap((peer) =>
                     peer.strokes
                       .filter((stroke) => stroke.expiresAt > now)
@@ -816,43 +888,49 @@ export function NativeScreenAnnotations({
                   ...(draft ? [draft] : []),
                 ].map((object) => [object.creatorId, object]),
               ).values(),
-            ].map((object) => {
-              const point = object.points.at(-1);
-              return (
-                point && (
-                  <SvgText
-                    key={`name-${object.creatorId}`}
-                    accessibilityLabel={`Annotation by ${object.creatorName}`}
-                    x={Math.min(width - 80, Math.max(8, point.x * width + 8))}
-                    y={Math.max(14, Math.min(height - 8, point.y * height - 8))}
-                    fill={object.style.color}
-                    fontSize={12}
-                  >
-                    {object.creatorName}
-                  </SvgText>
-                )
-              );
-            })}
+            ]
+              .filter(
+                (object) =>
+                  !context?.pointers?.some(
+                    (pointer) =>
+                      pointer.userId === object.creatorId && pointer.expiresAt > now,
+                  ),
+              )
+              .map((object) => {
+                const point = object.points.at(-1);
+                return (
+                  point && (
+                    <ParticipantCursor
+                      key={`name-${object.creatorId}`}
+                      point={point}
+                      name={object.creatorName}
+                      color={participantColor(
+                        object.creatorId,
+                        context?.actors.map((actor) => actor.userId),
+                      )}
+                      width={width}
+                      height={height}
+                    />
+                  )
+                );
+              })}
           {draft && <Shape object={draft} width={width} height={height} />}
           {context?.pointers
             ?.filter((pointer) => pointer.expiresAt > now)
             .map((pointer) => (
-              <G key={pointer.userId}>
-                <Circle
-                  cx={pointer.point.x * width}
-                  cy={pointer.point.y * height}
-                  r={pointer.tool === 'spotlight' ? 18 : 5}
-                  fill={pointer.color}
-                  opacity={0.6}
-                />
-                <SvgText
-                  x={pointer.point.x * width + 10}
-                  y={pointer.point.y * height}
-                  fill={pointer.color}
-                >
-                  {pointer.name}
-                </SvgText>
-              </G>
+              <ParticipantCursor
+                key={pointer.userId}
+                point={pointer.point}
+                name={pointer.name}
+                showName={showNames}
+                spotlight={pointer.tool === 'spotlight'}
+                color={participantColor(
+                  pointer.userId,
+                  context?.actors.map((actor) => actor.userId),
+                )}
+                width={width}
+                height={height}
+              />
             ))}
         </Svg>
       </View>
@@ -925,6 +1003,8 @@ export function NativeScreenAnnotations({
             dragHandlers={drag.panHandlers}
           >
             <NativeAnnotationToolbar
+              availableWidth={width}
+              availableHeight={height}
               tool={tool}
               editable={editable}
               onTool={(value) => {

@@ -361,6 +361,9 @@ describe('whiteboard viewport presence', () => {
     { centerX: Infinity, centerY: 0, zoom: 1 },
     { centerX: 0, centerY: 0, zoom: 31 },
     { centerX: '0', centerY: 0, zoom: 1 },
+    { centerX: 0, centerY: 0, zoom: 1, pointer: { x: NaN, y: 0 } },
+    { centerX: 0, centerY: 0, zoom: 1, pointer: { x: 0, y: Infinity } },
+    { centerX: 0, centerY: 0, zoom: 1, pointer: null },
   ])('rejects malformed viewport %p', async (value) => {
     await expect(new WhiteboardsService().publishViewport(token, value)).rejects.toThrow(
       'Invalid whiteboard viewport',
@@ -374,9 +377,10 @@ describe('whiteboard viewport presence', () => {
       centerY: -30,
       zoom: 2,
       actorId: 'forged',
+      pointer: { x: 2, y: 3 },
     });
     expect(grant.update).toHaveBeenCalledWith({
-      viewport: { centerX: 12, centerY: -30, zoom: 2 },
+      viewport: { centerX: 12, centerY: -30, zoom: 2, pointer: { x: 2, y: 3 } },
       viewport_updated_at: expect.any(String),
     });
     expect(grant.eq).toHaveBeenCalledWith('token_hash', hashWhiteboardToken(token));

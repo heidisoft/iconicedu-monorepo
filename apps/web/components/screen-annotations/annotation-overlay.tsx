@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Layer, Rect, Stage, Transformer, Text as CanvasText } from 'react-konva';
+import { Layer, Rect, Stage, Transformer } from 'react-konva';
 import { AnnotationPointer } from './annotation-pointer';
 import { shapeEndpoint } from './annotation-drawing';
 import type Konva from 'konva';
@@ -52,7 +52,10 @@ export function AnnotationOverlay({
   shareKey: string;
   width: number;
   height: number;
-  useAnnotations?: typeof useScreenAnnotations;
+  useAnnotations?: (
+    ...args: Parameters<typeof useScreenAnnotations>
+  ) => Omit<ReturnType<typeof useScreenAnnotations>, 'retry'> &
+    Partial<Pick<ReturnType<typeof useScreenAnnotations>, 'retry'>>;
   onContext?: (context: AnnotationContext) => void;
 }) {
   const engine = useAnnotations(sessionId, shareKey, annotationToken);
@@ -342,7 +345,15 @@ export function AnnotationOverlay({
     if (now - lastPointer.current < 40) return;
     lastPointer.current = now;
     preview(
-      { kind: 'pointer', point, tool: pointerTool, color },
+      {
+        kind: 'pointer',
+        point,
+        tool: pointerTool,
+        color: participantColor(
+          actor?.userId ?? 'participant',
+          engine.context?.actors.map((person) => person.userId),
+        ),
+      },
       `pointer:${actor?.userId}`,
       ++pointerSequence.current,
     );
@@ -743,25 +754,36 @@ export function AnnotationOverlay({
                   ...(draft ? [draft] : []),
                 ].map((object) => [object.creatorId, object]),
               ).values(),
-            ].map((object) => {
-              const point = object.points[object.points.length - 1];
-              return (
-                point && (
-                  <CanvasText
-                    key={`name-${object.creatorId}`}
-                    x={Math.max(8, Math.min(width - 100, point.x * width + 8))}
-                    y={Math.max(8, Math.min(height - 20, point.y * height - 20))}
-                    text={object.creatorName}
-                    fill={object.style.color}
-                    fontSize={12}
-                  />
-                )
-              );
-            })}
+            ]
+              .filter(
+                (object) =>
+                  !engine.pointers[object.creatorId] ||
+                  engine.pointers[object.creatorId].expiresAt <= Date.now(),
+              )
+              .map((object) => {
+                const point = object.points[object.points.length - 1];
+                return (
+                  point && (
+                    <AnnotationPointer
+                      key={`name-${object.creatorId}`}
+                      point={point}
+                      width={width}
+                      height={height}
+                      tool="pointerArrow"
+                      name={object.creatorName}
+                      color={participantColor(
+                        object.creatorId,
+                        engine.context?.actors.map((person) => person.userId),
+                      )}
+                      showName
+                    />
+                  )
+                );
+              })}
         </Layer>
         <Layer listening={false}>
           {Object.entries(engine.pointers)
-            .filter(([, pointer]) => showNames && pointer.tool === 'pointerArrow')
+            .filter(([, pointer]) => pointer.tool === 'pointerArrow')
             .map(([id, pointer]) => (
               <AnnotationPointer
                 key={id}
@@ -769,13 +791,10 @@ export function AnnotationOverlay({
                 showName={showNames}
                 width={width}
                 height={height}
-                color={
-                  pointer.color ??
-                  participantColor(
-                    id,
-                    engine.context?.actors.map((person) => person.userId),
-                  )
-                }
+                color={participantColor(
+                  id,
+                  engine.context?.actors.map((person) => person.userId),
+                )}
               />
             ))}
         </Layer>
@@ -810,13 +829,10 @@ export function AnnotationOverlay({
                 showName={showNames}
                 width={width}
                 height={height}
-                color={
-                  pointer.color ??
-                  participantColor(
-                    id,
-                    engine.context?.actors.map((person) => person.userId),
-                  )
-                }
+                color={participantColor(
+                  id,
+                  engine.context?.actors.map((person) => person.userId),
+                )}
               />
             ))}
         </Layer>
@@ -976,9 +992,18 @@ export function AnnotationOverlay({
       {(engine.error || localError || !engine.connected) && (
         <div
           role="status"
-          className="pointer-events-none absolute left-2 top-2 max-w-sm rounded-md bg-background px-3 py-2 text-xs text-muted-foreground"
+          className="absolute left-2 top-2 max-w-sm rounded-md bg-background px-3 py-2 text-xs text-muted-foreground"
         >
           {localError ?? engine.error ?? 'Reconnecting annotations…'}
+          {engine.error && engine.retry && (
+            <button
+              type="button"
+              className="ml-2 underline"
+              onClick={() => void engine.retry?.().catch(() => undefined)}
+            >
+              Retry saving
+            </button>
+          )}
         </div>
       )}
     </div>
