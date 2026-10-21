@@ -23,7 +23,7 @@ export interface WhiteboardDocumentVM {
   studentEditing: boolean;
   presenting?: boolean;
   /** Server-owned identity of the grant and meeting that started presenting. */
-  presentation?: { presenterId: string; sessionId: string };
+  presentation?: { presenterId: string; sessionId: string; presentationId?: string };
   /** Retired page IDs prevent delayed add-page messages from resurrecting deleted pages. */
   deletedPageIds?: string[];
 }
@@ -64,5 +64,21 @@ export interface WhiteboardLaserSampleVM {
 export interface WhiteboardLaserPresenceVM {
   actorId: string;
   samples: WhiteboardLaserSampleVM[];
+  expiresAt: number;
+}
+
+/** Ephemeral scene-space viewport, independent of screen dimensions. */
+export interface WhiteboardViewportVM {
+  centerX: number;
+  centerY: number;
+  zoom: number;
+  /** Active scene-space writing position; ephemeral, never saved in the drawing. */
+  writing?: { x: number; y: number };
+  /** Last scene-space pointer, including hovering between strokes. */
+  pointer?: { x: number; y: number };
+}
+export interface WhiteboardViewportPresenceVM {
+  actorId: string;
+  viewport: WhiteboardViewportVM;
   expiresAt: number;
 }

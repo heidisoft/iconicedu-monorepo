@@ -1,12 +1,7 @@
 'use client';
-import { useState } from 'react';
-import { Download, PanelsTopLeft, Users } from 'lucide-react';
+import { Download, Users } from 'lucide-react';
 import type { WhiteboardSnapshotVM } from '@iconicedu/shared-types';
-import { Button } from '@iconicedu/ui-web/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
@@ -33,54 +28,9 @@ export function WhiteboardBoardDetails({
   onExport: (format: 'svg' | 'png') => void;
   onStudentEditing: (enabled: boolean) => void;
 }) {
-  const [boardMenu, setBoardMenu] = useState(false);
   return (
-    <header
-      data-testid="whiteboard-board-details"
-      className="pointer-events-auto relative col-start-1 row-start-1 @min-[760px]:col-start-2 justify-self-end flex max-w-full flex-wrap items-center justify-end gap-1.5 rounded-full border border-border bg-card px-2 py-1 shadow-sm"
-    >
-      <DropdownMenu open={boardMenu} onOpenChange={setBoardMenu}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="toolbar"
-            aria-label="Board options"
-            title={title}
-            className="size-8 shrink-0 rounded-full p-0 text-primary"
-          >
-            <PanelsTopLeft size={16} aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          container={
-            typeof document === 'undefined' ? undefined : document.fullscreenElement
-          }
-          className="w-60 rounded-xl border border-border/60 shadow-sm"
-        >
-          <DropdownMenuLabel>Board options</DropdownMenuLabel>
-          <DropdownMenuItem className="min-h-11" onSelect={() => onExport('svg')}>
-            <Download />
-            Export board
-          </DropdownMenuItem>
-          <DropdownMenuItem className="min-h-11" onSelect={() => onExport('png')}>
-            <Download />
-            Export PNG
-          </DropdownMenuItem>
-          {teacher && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem
-                className="min-h-11"
-                checked={studentEditing}
-                disabled={busy}
-                onCheckedChange={onStudentEditing}
-              >
-                Allow participants to annotate
-              </DropdownMenuCheckboxItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+    <>
+      <DropdownMenuLabel>{title}</DropdownMenuLabel>
       <span
         role="status"
         aria-live="polite"
@@ -127,6 +77,25 @@ export function WhiteboardBoardDetails({
           )}
         </div>
       </div>
-    </header>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem className="min-h-11" onSelect={() => onExport('svg')}>
+        <Download />
+        Export board
+      </DropdownMenuItem>
+      <DropdownMenuItem className="min-h-11" onSelect={() => onExport('png')}>
+        <Download />
+        Export PNG
+      </DropdownMenuItem>
+      {teacher && (
+        <DropdownMenuCheckboxItem
+          className="min-h-11"
+          checked={studentEditing}
+          disabled={busy}
+          onCheckedChange={onStudentEditing}
+        >
+          Allow participants to annotate
+        </DropdownMenuCheckboxItem>
+      )}
+    </>
   );
 }

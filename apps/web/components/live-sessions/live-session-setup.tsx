@@ -1,5 +1,8 @@
 'use client';
 
+// flag-exempt: completes the existing guardian preview selection for a shared family device.
+
+import { formatMeetingStudentNames } from '@iconicedu/utils';
 import { Alert, AlertTitle, AlertDescription } from '@iconicedu/ui-web/ui/alert';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { useRouter } from 'next/navigation';
@@ -69,6 +72,10 @@ export function LiveSessionSetup({
   if (setup.waiting)
     return (
       <DevicePreviewStep
+        onBack={() => {
+          setup.leave();
+          router.replace(getLiveSessionReturnPath(returnPath));
+        }}
         displayName={participantName ?? 'Guest'}
         sessionTitle={sessionTitle}
         onJoin={setup.join}
@@ -94,17 +101,25 @@ export function LiveSessionSetup({
       </DevicePreviewStep>
     );
   if (students !== undefined && !setup.preferences) {
-    const selected = students.find(
-      (student) => student.profileId === setup.studentProfileId,
+    const selected = students.filter((student) =>
+      setup.studentProfileIds.includes(student.profileId),
     );
     return (
       <DevicePreviewStep
-        displayName={selected?.displayName ?? 'Choose a student'}
+        onBack={() => {
+          setup.leave();
+          router.replace(getLiveSessionReturnPath(returnPath));
+        }}
+        displayName={
+          selected.length
+            ? formatMeetingStudentNames(selected.map((student) => student.displayName))
+            : 'Choose students'
+        }
         sessionTitle={sessionTitle}
         onJoin={setup.join}
         busy={setup.busy}
         error={setup.error}
-        joinDisabled={!selected || (passcodeRequired && !setup.passcode?.trim())}
+        joinDisabled={!selected.length || (passcodeRequired && !setup.passcode?.trim())}
       >
         {students.length === 0 ? (
           <p role="alert" className="text-sm text-muted-foreground">
@@ -114,17 +129,20 @@ export function LiveSessionSetup({
         ) : students.length > 1 ? (
           <fieldset className="w-full space-y-2" disabled={setup.busy}>
             <legend className="mb-2 text-sm font-medium">Who is joining?</legend>
+            <p className="text-sm text-muted-foreground">
+              Select one or more students sharing this device.
+            </p>
             {students.map((student) => (
               <label
                 key={student.profileId}
                 className="flex cursor-pointer items-center gap-3 rounded-xl border border-border p-3 text-sm has-[:checked]:border-primary has-[:checked]:bg-accent"
               >
                 <input
-                  type="radio"
-                  name="joining-student"
+                  type="checkbox"
+                  name="joining-students"
                   value={student.profileId}
-                  checked={setup.studentProfileId === student.profileId}
-                  onChange={() => setup.setStudentProfileId(student.profileId)}
+                  checked={setup.studentProfileIds.includes(student.profileId)}
+                  onChange={() => setup.toggleStudent(student.profileId)}
                   className="accent-primary"
                 />
                 {student.displayName}
@@ -163,6 +181,10 @@ export function LiveSessionSetup({
   if (!setup.preferences)
     return (
       <DevicePreviewStep
+        onBack={() => {
+          setup.leave();
+          router.replace(getLiveSessionReturnPath(returnPath));
+        }}
         displayName={setup.credentials.displayName}
         sessionTitle={sessionTitle}
         onJoin={setup.join}

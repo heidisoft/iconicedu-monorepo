@@ -46,6 +46,7 @@ export default defineConfig({
     },
     include: [
       'app/**/*.test.ts',
+      'app/.well-known/**/*.test.ts',
       'app/**/*.test.tsx',
       'components/**/*.test.ts',
       'components/**/*.test.tsx',

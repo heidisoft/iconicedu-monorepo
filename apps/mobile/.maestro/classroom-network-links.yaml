@@ -1,0 +1,76 @@
+appId: com.heidisoft.iconicedu
+name: OS link through secure recovery and real HTTP entry/preview
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://live/e2e-invite-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
+- extendedWaitUntil:
+    visible: 'Guest name'
+    timeout: 30000
+- assertNotVisible: 'Session passcode'
+- tapOn: 'Guest name'
+- inputText: 'Network guest'
+- tapOn: 'Continue to preview'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- assertNotVisible: 'Leave class|Leave or end class|End class'
+# The same OS link must remount real entry and recover the stored name/token.
+- openLink: 'iconicedu://live/e2e-invite-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- assertNotVisible: 'Guest name'
+- assertNotVisible: 'Session passcode'
+- assertVisible: 'Change display name, currently Network guest'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- scrollUntilVisible:
+    element: '.*(Unable to join\. Check your connection and try again\.|The meeting encountered a connection or device error\. Please retry\.)'
+    direction: UP
+    timeout: 40000
+- assertVisible: 'Ready to join\?'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- scrollUntilVisible:
+    element: '.*(Unable to join\. Check your connection and try again\.|The meeting encountered a connection or device error\. Please retry\.)'
+    direction: UP
+    timeout: 40000
+- assertNotVisible: 'Leave class|Leave or end class|End class'
+- openLink: 'iconicedu://live/e2e-waiting-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
+- extendedWaitUntil:
+    visible: 'Guest name'
+    timeout: 30000
+- tapOn: 'Guest name'
+- inputText: 'Waiting network guest'
+- tapOn: 'Continue to preview'
+- extendedWaitUntil:
+    visible: 'Waiting for the teacher to admit you'
+    timeout: 30000
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- assertNotVisible: 'Leave class|Leave or end class|End class'
+# Synthetic API consumes the handoff and drops its first response.
+- openLink: 'iconicedu://live/e2e-handoff-${RUN_ID}#handoff=hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
+- extendedWaitUntil:
+    visible: 'Unable to open classroom|Ready to join\?'
+    timeout: 30000
+- runFlow:
+    when:
+      visible: 'Unable to open classroom'
+    commands:
+      - openLink: 'iconicedu://live/e2e-handoff-${RUN_ID}#handoff=hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- assertVisible: 'Change display name, currently Handoff teacher'
+- assertNotVisible: 'Guest name'
+- assertNotVisible: 'Session passcode'
+- openLink: 'iconicedu://live/e2e-expired-${RUN_ID}#invite=iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'
+- extendedWaitUntil:
+    visible: '.*Invalid or expired meeting link'
+    timeout: 30000
+- assertNotVisible: 'Join now'

@@ -20,6 +20,7 @@ on:
         options:
           - 'development'
           - 'preview'
+          - 'preview-store'
           - 'production'
       pr_number:
         description: 'PR number to comment on when building a non-main branch'
@@ -51,8 +52,22 @@ jobs:
             exit 1
           fi
 
+          PLATFORM="${{ github.event.inputs.platform }}"
+          APP_ENV="$BUILD_PROFILE"
+          AUTO_SUBMIT=false
+
+          # Store-signed preview builds keep the preview environment and update channel,
+          # and EAS submits them to TestFlight (iOS) and Play internal testing (Android).
+          if [[ "$BUILD_PROFILE" == "preview-store" ]]; then
+            APP_ENV="preview"
+            AUTO_SUBMIT=true
+          fi
+
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
           echo "build_profile=$BUILD_PROFILE" >> "$GITHUB_OUTPUT"
+          echo "platform=$PLATFORM" >> "$GITHUB_OUTPUT"
+          echo "app_env=$APP_ENV" >> "$GITHUB_OUTPUT"
+          echo "auto_submit=$AUTO_SUBMIT" >> "$GITHUB_OUTPUT"
           echo "should_build=true" >> "$GITHUB_OUTPUT"
 
           if [[ "$BUILD_PROFILE" == "production" ]]; then
@@ -331,6 +346,7 @@ jobs:
         if: steps.context.outputs.should_build == 'true'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          ASC_APP_ID: ${{ vars.ASC_APP_ID }}
         run: |
           set -euo pipefail
           npm install -g eas-cli --silent
@@ -340,7 +356,7 @@ jobs:
           tmp_eas_json=$(mktemp)
           jq \
             --arg profile "${{ steps.context.outputs.build_profile }}" \
-            --arg app_env "${{ steps.context.outputs.build_profile }}" \
+            --arg app_env "${{ steps.context.outputs.app_env }}" \
             --arg supabase_url "${{ steps.supabase-creds.outputs.api_url }}" \
             --arg anon_key "${{ steps.supabase-creds.outputs.anon_key }}" \
             --arg posthog_key "${{ secrets.POSTHOG_KEY }}" \
@@ -364,11 +380,23 @@ jobs:
             eas.json > "$tmp_eas_json"
           mv "$tmp_eas_json" eas.json
 
+          SUBMIT_ARGS=()
+          if [[ "${{ steps.context.outputs.auto_submit }}" == "true" ]]; then
+            SUBMIT_ARGS=(--auto-submit)
+            if [[ -n "${ASC_APP_ID}" ]]; then
+              tmp_eas_json=$(mktemp)
+              jq --arg profile "${{ steps.context.outputs.build_profile }}" --arg asc_app_id "${ASC_APP_ID}" \
+                '.submit[$profile].ios.ascAppId = $asc_app_id' eas.json > "$tmp_eas_json"
+              mv "$tmp_eas_json" eas.json
+            fi
+          fi
+
           if ! BUILD_OUTPUT=$(eas build \
             --profile "${{ steps.context.outputs.build_profile }}" \
-            --platform "${{ github.event.inputs.platform }}" \
+            --platform "${{ steps.context.outputs.platform }}" \
             --non-interactive \
             --no-wait \
+            ${SUBMIT_ARGS[@]+"${SUBMIT_ARGS[@]}"} \
             2>&1); then
             echo "$BUILD_OUTPUT"
             exit 1
@@ -388,7 +416,7 @@ jobs:
           script: |
             const prNumber = parseInt('${{ steps.context.outputs.pr_number }}');
             const branch = '${{ steps.context.outputs.branch_name }}';
-            const platform = '${{ github.event.inputs.platform }}';
+            const platform = '${{ steps.context.outputs.platform }}';
             const profile = '${{ steps.context.outputs.build_profile }}';
             const buildUrl = '${{ steps.eas-build.outputs.build_url }}';
             const supabaseUrl = '${{ steps.supabase-creds.outputs.api_url }}';
@@ -398,6 +426,10 @@ jobs:
                 ? 'iOS + Android'
                 : platform.charAt(0).toUpperCase() + platform.slice(1);
             const profileLabel = profile.charAt(0).toUpperCase() + profile.slice(1);
+            const distribution =
+              '${{ steps.context.outputs.auto_submit }}' === 'true'
+                ? 'install from TestFlight (iOS) or Play internal testing (Android) once the store finishes processing it'
+                : 'install via internal distribution once the build completes';
             const buildLink = buildUrl ? `[Track build](${buildUrl})` : 'Check your [Expo dashboard](https://expo.dev)';
 
             const body = [
@@ -408,7 +440,7 @@ jobs:
               `**Profile:** ${profileLabel}`,
               `**Supabase URL:** \`${supabaseUrl}\``,
               '',
-              `${buildLink} - install via internal distribution once the build completes.`,
+              `${buildLink} - ${distribution}.`,
             ].join('\n');
 
             try {

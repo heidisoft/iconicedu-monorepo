@@ -1,0 +1,48 @@
+appId: com.heidisoft.iconicedu
+name: Write and draw on the real native whiteboard canvas and reopen saved content
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- runFlow: open-classroom-whiteboard.yaml
+- extendedWaitUntil:
+    visible: 'Expand whiteboard to full screen'
+    timeout: 30000
+- tapOn: 'Pen'
+- swipe:
+    start: '45%,45%'
+    end: '60%,55%'
+    duration: 1000
+- extendedWaitUntil:
+    visible:
+      id: 'whiteboard-saved-elements-1'
+    timeout: 30000
+- tapOn: 'Text'
+- tapOn:
+    point: '45%,60%'
+- inputText: 'Tablet whiteboard writing'
+- hideKeyboard
+- extendedWaitUntil:
+    visible:
+      id: 'whiteboard-saved-elements-2'
+    timeout: 30000
+- runFlow: hide-classroom-whiteboard.yaml
+- assertNotVisible: 'Expand whiteboard to full screen'
+- runFlow: open-classroom-whiteboard.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'whiteboard-saved-elements-2'
+    timeout: 30000
+- runFlow: hide-classroom-whiteboard.yaml
+- tapOn: 'Leave or end class'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

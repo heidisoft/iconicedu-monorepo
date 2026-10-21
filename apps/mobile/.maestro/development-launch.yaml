@@ -1,0 +1,15 @@
+appId: com.heidisoft.iconicedu
+name: Cold launch a signed-out iOS development client
+---
+- stopApp
+- openLink: 'exp+iconicedu-mobile://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A8081'
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Continue'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Personalized tutoring for every child'
+    timeout: 60000
+- assertVisible: 'Email'

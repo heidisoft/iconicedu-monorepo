@@ -1,0 +1,18 @@
+appId: com.heidisoft.iconicedu
+name: Export opens the operating system share sheet
+---
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - extendedWaitUntil:
+          visible:
+            id: 'ActivityListView'
+          timeout: 20000
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - extendedWaitUntil:
+          visible: 'Save classroom image|Quick Share|Nearby Share'
+          timeout: 20000

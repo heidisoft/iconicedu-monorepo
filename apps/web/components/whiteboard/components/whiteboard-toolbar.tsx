@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { LaserPointerIcon } from '@iconicedu/ui-web/ui/laser-pointer-icon';
 import {
   ArrowUpRight,
@@ -10,7 +10,6 @@ import {
   MousePointer2,
   Pencil,
   Redo2,
-  Shapes,
   Square,
   Type,
   Undo2,
@@ -20,7 +19,6 @@ import {
   RotateCcw,
   Trash2,
   Ellipsis,
-  ChevronDown,
   Library,
   Diamond,
   Frame,
@@ -54,7 +52,6 @@ export const whiteboardTools = [
   { tool: 'frame', label: 'Frame', icon: Frame },
 ] as const;
 const actionClass = 'size-8 shrink-0 rounded-full';
-const dropdownClass = 'h-8 w-11 shrink-0 gap-1 rounded-full px-2';
 export function WhiteboardToolbar({
   engine,
   editable,
@@ -63,7 +60,8 @@ export function WhiteboardToolbar({
   onClear,
   canClear = editable,
   onLibrary,
-  libraryOpen,
+  followControl,
+  moreContent,
 }: {
   engine: WhiteboardEngine | null;
   editable: boolean;
@@ -73,14 +71,26 @@ export function WhiteboardToolbar({
   canClear?: boolean;
   onLibrary?: () => void;
   libraryOpen?: boolean;
+  followControl?: ReactNode;
+  moreContent?: ReactNode;
 }) {
+  const root = useRef<HTMLDivElement>(null);
+  const [spacious, setSpacious] = useState(false);
+  useEffect(() => {
+    const surface = root.current?.closest('section');
+    if (!surface || typeof ResizeObserver === 'undefined') return;
+    const measure = () =>
+      setSpacious(surface.clientWidth >= 760 && surface.clientHeight >= 600);
+    const observer = new ResizeObserver(measure);
+    observer.observe(surface);
+    measure();
+    return () => observer.disconnect();
+  }, []);
   const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
   const [snap, setSnap] = useState(false);
   const [menu, setMenu] = useState<string | null>(null);
   const portal = typeof document === 'undefined' ? undefined : document.fullscreenElement;
   const shapeTools = whiteboardTools.slice(6);
-  const activeShape = shapeTools.find((item) => item.tool === tool);
-  const ShapeIcon = activeShape?.icon ?? Shapes;
   const choose = (next: WhiteboardTool) => {
     onTool(next);
     engine?.setTool(next);
@@ -91,6 +101,7 @@ export function WhiteboardToolbar({
   });
   return (
     <div
+      ref={root}
       role="toolbar"
       aria-orientation="horizontal"
       aria-label="Whiteboard tools"
@@ -113,25 +124,71 @@ export function WhiteboardToolbar({
           </IconActionButton>
         ))}
       </div>
-      <DropdownMenu {...menuProps('shapes')}>
+
+      <span aria-hidden="true" className="mx-1 h-6 w-px bg-border" />
+      <IconActionButton
+        label="Undo"
+        tooltip="Undo (⌘/Ctrl+Z)"
+        variant="toolbar"
+        disabled={!editable || !engine}
+        className={actionClass}
+        onClick={() => engine?.undo()}
+      >
+        <Undo2 className="size-4" aria-hidden="true" />
+      </IconActionButton>
+
+      {spacious && (
+        <div className="flex">
+          <IconActionButton
+            label="Redo"
+            tooltip="Redo"
+            variant="toolbar"
+            className={actionClass}
+            disabled={!editable || !engine}
+            onClick={() => engine?.redo()}
+          >
+            <Redo2 className="size-4" aria-hidden="true" />
+          </IconActionButton>
+          {onLibrary && (
+            <IconActionButton
+              label="Library"
+              tooltip="Educational library"
+              variant="toolbar"
+              className={actionClass}
+              disabled={!editable || !engine}
+              onClick={onLibrary}
+            >
+              <Library className="size-4" aria-hidden="true" />
+            </IconActionButton>
+          )}
+        </div>
+      )}
+      <DropdownMenu {...menuProps('more')}>
         <DropdownMenuTrigger asChild>
           <Button
             type="button"
             variant="toolbar"
-            aria-label="Shapes"
-            aria-pressed={Boolean(activeShape)}
-            title={activeShape ? `Shapes · ${activeShape.label}` : 'Shapes'}
-            className={dropdownClass}
+            aria-label="More whiteboard actions"
+            aria-pressed={shapeTools.some((item) => item.tool === tool)}
+            title="More actions"
+            className={actionClass}
           >
-            <ShapeIcon className="size-4" aria-hidden="true" />
-            <ChevronDown className="size-2.5" aria-hidden="true" />
+            <Ellipsis className="size-4" aria-hidden="true" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent
           container={portal}
           className="w-56 rounded-xl border border-border/60 shadow-sm"
-          align="start"
+          align="end"
         >
+          <DropdownMenuLabel>More actions</DropdownMenuLabel>
+          {onLibrary && (
+            <DropdownMenuItem onSelect={onLibrary}>
+              <Library />
+              Library
+            </DropdownMenuItem>
+          )}
+          {followControl && <DropdownMenuItem asChild>{followControl}</DropdownMenuItem>}
           <DropdownMenuLabel>Shapes</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={tool}
@@ -149,49 +206,6 @@ export function WhiteboardToolbar({
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {onLibrary && (
-        <IconActionButton
-          label="Library"
-          tooltip="Educational library"
-          variant="toolbar"
-          aria-pressed={libraryOpen}
-          className={actionClass}
-          onClick={onLibrary}
-        >
-          <Library className="size-4" aria-hidden="true" />
-        </IconActionButton>
-      )}
-      <span aria-hidden="true" className="mx-1 h-6 w-px bg-border" />
-      <IconActionButton
-        label="Undo"
-        tooltip="Undo (⌘/Ctrl+Z)"
-        variant="toolbar"
-        disabled={!editable || !engine}
-        className={actionClass}
-        onClick={() => engine?.undo()}
-      >
-        <Undo2 className="size-4" aria-hidden="true" />
-      </IconActionButton>
-      <DropdownMenu {...menuProps('view')}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="toolbar"
-            aria-label="View controls"
-            title="Zoom and fit"
-            className={dropdownClass}
-          >
-            <Scan className="size-4" aria-hidden="true" />
-            <ChevronDown className="size-2.5" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          container={portal}
-          className="w-56 rounded-xl border border-border/60 shadow-sm"
-          align="start"
-        >
           <DropdownMenuLabel>View</DropdownMenuLabel>
           <DropdownMenuRadioGroup
             value={grid}
@@ -249,26 +263,9 @@ export function WhiteboardToolbar({
             <RotateCcw />
             Reset zoom to 100%
           </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DropdownMenu {...menuProps('more')}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="toolbar"
-            aria-label="More whiteboard actions"
-            title="More actions"
-            className={actionClass}
-          >
-            <Ellipsis className="size-4" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          container={portal}
-          className="w-56 rounded-xl border border-border/60 shadow-sm"
-          align="end"
-        >
-          <DropdownMenuLabel>More actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {moreContent}
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             className="min-h-11"
             disabled={!engine || !editable}

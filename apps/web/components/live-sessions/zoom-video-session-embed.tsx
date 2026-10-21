@@ -1,4 +1,7 @@
 'use client';
+import { ZoomCaptions } from './zoom-video/zoom-captions';
+import { MeetingWhiteboardControl } from './zoom-video/meeting-whiteboard-control';
+import { Presentation } from 'lucide-react';
 import { subscribeMeetingDeviceRecovery } from '@iconicedu/web/lib/live-sessions/browser-device-recovery';
 import { MeetingConnectionRecovery } from './zoom-video/meeting-connection-recovery';
 import { changeZoomCoHost } from '@iconicedu/web/lib/live-sessions/zoom-session-lifecycle';
@@ -33,7 +36,6 @@ import {
   MonitorUp,
   MonitorX,
   OctagonX,
-  Pencil,
   PictureInPicture2,
   PhoneOff,
   Settings,
@@ -52,7 +54,6 @@ import { ClassroomWhiteboard } from '../whiteboard/classroom-whiteboard';
 import type { WhiteboardAccessVM } from '@iconicedu/shared-types';
 import { useZoomMessagesFeature } from './zoom-video/use-zoom-messages-feature';
 import { useZoomRecordingFeature } from './zoom-video/use-zoom-recording-feature';
-import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -466,10 +467,9 @@ export function ZoomVideoSessionEmbed({
   const [audioProcessing, setAudioProcessing] = useState<AudioProcessingMode>(
     initialMediaSettings?.audioProcessing ?? 'noiseSuppression',
   );
-  // Matches Zoom's own default (the regular client's Share Screen Settings
-  // defaults to "Multiple participants can share simultaneously").
+  // Use single-presenter controls until the SDK reports the host's sharing setting.
   const [sharePrivilege, setSharePrivilege] = useState<SharePrivilege>(
-    SharePrivilege.MultipleShare,
+    SharePrivilege.Unlocked,
   );
   const [hwAccelEncode, setHwAccelEncode] = useState(
     initialMediaSettings?.hardwareAcceleration.encode ?? true,
@@ -493,6 +493,33 @@ export function ZoomVideoSessionEmbed({
     toggle: toggleWhiteboardContent,
     exportPdf: exportWhiteboardPdf,
   } = whiteboard;
+  const boardShareMode = useRef<SharePrivilege | null>(null);
+  const shareProtectionQueue = useRef<Promise<unknown>>(Promise.resolve());
+  useEffect(() => {
+    if (status !== 'connected' || !isSelfHost) return;
+    const stream = clientRef.current?.getMediaStream();
+    if (!stream) return;
+    const active = whiteboard.active || whiteboardStatus !== WhiteboardStatus.Closed;
+    const update = async () => {
+      if (active) {
+        boardShareMode.current ??= stream.getSharePrivilege();
+        const result = await stream.setSharePrivilege(SharePrivilege.Locked);
+        if (result !== '') throw new Error('Unable to protect whiteboard sharing.');
+        setSharePrivilege(SharePrivilege.Locked);
+      } else if (boardShareMode.current !== null) {
+        const previous = boardShareMode.current;
+        const result = await stream.setSharePrivilege(previous);
+        if (result !== '') throw new Error('Unable to restore screen sharing.');
+        boardShareMode.current = null;
+        setSharePrivilege(previous);
+      }
+    };
+    shareProtectionQueue.current = shareProtectionQueue.current
+      .then(update, update)
+      .catch(() => {
+        setShareError('Unable to update presentation controls. Please retry.');
+      });
+  }, [status, isSelfHost, whiteboard.active, whiteboardStatus]);
   const pauseRecordingForContentFailure = useCallback(() => {
     if (!isSelfHost || recordingStatus !== RecordingStatus.Recording) return;
     const recordingClient = clientRef.current?.getRecordingClient();
@@ -590,21 +617,22 @@ export function ZoomVideoSessionEmbed({
   };
   const toggleWhiteboard = async () => {
     try {
+      if (
+        (isSomeoneSharing || isSharingScreen) &&
+        !whiteboard.active &&
+        !isPresentingWhiteboard
+      )
+        return;
       const opening = whiteboardStatus === WhiteboardStatus.Closed;
       if (
         opening &&
+        !whiteboard.active &&
         whiteboard.nativeToken &&
         isSelfHost &&
         recordingStatus === RecordingStatus.Recording
       )
         await publishWhiteboardForRecording();
       await toggleWhiteboardContent();
-      if (!opening && boardPublicationRef.current) {
-        await clientRef.current?.getMediaStream().stopShareScreen();
-        boardPublicationRef.current = false;
-        recordingComposition.setMode('annotations');
-        setIsSharingScreen(false);
-      }
     } catch (error) {
       setShareError(
         error instanceof Error
@@ -613,6 +641,37 @@ export function ZoomVideoSessionEmbed({
       );
     }
   };
+  const previousBoardActive = useRef(false);
+  useEffect(() => {
+    const wasActive = previousBoardActive.current;
+    previousBoardActive.current = whiteboard.active;
+    if (
+      !wasActive ||
+      !whiteboard.nativeToken ||
+      whiteboard.active ||
+      !boardPublicationRef.current
+    )
+      return;
+    boardPublicationRef.current = false;
+    void clientRef.current
+      ?.getMediaStream()
+      .stopShareScreen()
+      .then((result) => {
+        if (result !== '') {
+          setShareError(
+            'Unable to stop whiteboard publishing. Please stop screen sharing.',
+          );
+          return;
+        }
+        recordingComposition.setMode('annotations');
+        setIsSharingScreen(false);
+      })
+      .catch(() =>
+        setShareError(
+          'Unable to stop whiteboard publishing. Please stop screen sharing.',
+        ),
+      );
+  }, [whiteboard.nativeToken, whiteboard.active, recordingComposition]);
   useEffect(() => {
     if (
       isSelfHost &&
@@ -849,6 +908,8 @@ export function ZoomVideoSessionEmbed({
     ) => {
       const updates = new Map(payload.map((user) => [user.userId, user]));
       const selfUpdate = updates.get(selfUserIdRef.current ?? -1);
+      if (typeof selfUpdate?.muted === 'boolean') setIsMuted(selfUpdate.muted);
+      if (typeof selfUpdate?.bVideoOn === 'boolean') setIsVideoOn(selfUpdate.bVideoOn);
       if (typeof selfUpdate?.isHost === 'boolean') setIsSelfHost(selfUpdate.isHost);
       setIsSelfCoHost(client.isManager());
       setCoHosts(
@@ -1136,6 +1197,11 @@ export function ZoomVideoSessionEmbed({
       captionClearTimerRef.current = setTimeout(() => setCaptionText(''), 6000);
     };
 
+    const handleCurrentAudioChange = (payload: { action: string }) => {
+      if (payload.action === 'muted' || payload.action === 'unmuted')
+        setIsMuted(payload.action === 'muted');
+    };
+    client.on('current-audio-change', handleCurrentAudioChange);
     client.on('user-added', handleUserAdded);
     client.on('user-removed', handleUserRemoved);
     client.on('user-updated', handleUserUpdated);
@@ -1307,6 +1373,7 @@ export function ZoomVideoSessionEmbed({
     return () => {
       stopDeviceRecovery();
       cancelled = true;
+      client.off('current-audio-change', handleCurrentAudioChange);
       client.off('user-added', handleUserAdded);
       client.off('user-removed', handleUserRemoved);
       client.off('user-updated', handleUserUpdated);
@@ -1347,18 +1414,24 @@ export function ZoomVideoSessionEmbed({
     leaveMeeting,
   ]);
 
+  const mutePending = useRef(false);
   const toggleMute = useCallback(async () => {
     const client = clientRef.current;
-    if (!client) {
-      return;
+    if (!client || mutePending.current) return;
+    mutePending.current = true;
+    const muted = !isMuted;
+    try {
+      await executeZoomCollaborationCommand(() =>
+        muted
+          ? client.getMediaStream().muteAudio()
+          : client.getMediaStream().unmuteAudio(),
+      );
+      setIsMuted(muted);
+    } catch (error) {
+      setMediaError(`Could not update microphone: ${describeZoomFailure(error)}`);
+    } finally {
+      mutePending.current = false;
     }
-    const stream = client.getMediaStream();
-    if (isMuted) {
-      await stream.unmuteAudio().catch(() => null);
-    } else {
-      await stream.muteAudio().catch(() => null);
-    }
-    setIsMuted((previous) => !previous);
   }, [isMuted]);
 
   const toggleVideo = useCallback(async () => {
@@ -1404,6 +1477,13 @@ export function ZoomVideoSessionEmbed({
 
   const prepareShareForRecording = recordingComposition.prepare;
   const toggleScreenShare = useCallback(async () => {
+    if (
+      !isSharingScreen &&
+      (whiteboard.active || whiteboardStatus !== WhiteboardStatus.Closed)
+    ) {
+      setShareError('Stop sharing the whiteboard before sharing your screen.');
+      return;
+    }
     const client = clientRef.current;
     if (!client || !localShareVideoRef.current || !localShareCanvasRef.current) {
       return;
@@ -1450,6 +1530,8 @@ export function ZoomVideoSessionEmbed({
     }
   }, [
     isSharingScreen,
+    whiteboard.active,
+    whiteboardStatus,
     sharePrivilege,
     endShareAnnotations,
     recordingStatus,
@@ -1541,9 +1623,19 @@ export function ZoomVideoSessionEmbed({
       }
       void executeZoomCollaborationCommand(() =>
         client.getMediaStream().muteAudio(userId),
-      ).catch((error) =>
-        setMediaError(`Could not mute participant: ${describeZoomFailure(error)}`),
-      );
+      )
+        .then(() => {
+          updateRemoteParticipants((previous) =>
+            previous.map((participant) =>
+              participant.userId === userId
+                ? { ...participant, muted: true }
+                : participant,
+            ),
+          );
+        })
+        .catch((error) =>
+          setMediaError(`Could not mute participant: ${describeZoomFailure(error)}`),
+        );
       void logLiveSessionAuditEvent(
         liveSessionId,
         {
@@ -1555,7 +1647,14 @@ export function ZoomVideoSessionEmbed({
         accessToken,
       );
     },
-    [isSelfHost, isSelfCoHost, liveSessionId, accessToken, meetingLinkToken],
+    [
+      isSelfHost,
+      isSelfCoHost,
+      liveSessionId,
+      accessToken,
+      meetingLinkToken,
+      updateRemoteParticipants,
+    ],
   );
 
   // Host-only "End session for everyone" — distinct from the regular Leave
@@ -1702,6 +1801,10 @@ export function ZoomVideoSessionEmbed({
   );
 
   const selectSharePrivilege = useCallback(async (privilege: SharePrivilege) => {
+    if (boardShareMode.current !== null) {
+      setShareError('Stop the whiteboard before changing screen sharing permissions.');
+      return;
+    }
     const client = clientRef.current;
     if (!client) {
       return;
@@ -1902,8 +2005,9 @@ export function ZoomVideoSessionEmbed({
             localCanvasRef={localShareCanvasRef}
             localVideoRef={localShareVideoRef}
             whiteboardContainerRef={whiteboardContainerRef}
+            whiteboardControlsFullscreen={!!whiteboard.nativeToken && whiteboard.active}
             whiteboardContent={
-              whiteboard.nativeToken && isWhiteboardActive ? (
+              whiteboard.nativeToken && whiteboard.active ? (
                 <ClassroomWhiteboard
                   token={whiteboard.nativeToken}
                   title={sessionTitle}
@@ -2000,16 +2104,6 @@ export function ZoomVideoSessionEmbed({
                   linkToken={meetingLinkToken}
                 />
               ) : null}
-              {!isSelfHost && clientRef.current?.isOriginalHost() ? (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  disabled={claimingHost}
-                  onClick={() => void claimHost()}
-                >
-                  {claimingHost ? 'Claiming host…' : 'Claim host'}
-                </Button>
-              ) : null}
 
               <MeetingControlButton
                 tooltip={isMuted ? 'Unmute' : 'Mute'}
@@ -2048,7 +2142,7 @@ export function ZoomVideoSessionEmbed({
                     ? 'Return to the call to start sharing'
                     : !supportsScreenShare
                       ? 'Screen sharing is not supported by this browser'
-                      : isWhiteboardActive
+                      : isWhiteboardActive || whiteboard.active
                         ? 'End the whiteboard to share your screen'
                         : 'Share screen'
                 }
@@ -2057,6 +2151,7 @@ export function ZoomVideoSessionEmbed({
                 aria-pressed={isSharingScreen}
                 disabled={
                   isWhiteboardActive ||
+                  whiteboard.active ||
                   !supportsScreenShare ||
                   (isPipActive && !isSharingScreen)
                 }
@@ -2112,40 +2207,41 @@ export function ZoomVideoSessionEmbed({
                 }
               />
 
-              {supportsWhiteboard && (!isSomeoneSharing || isPresentingWhiteboard) ? (
-                <MeetingControlButton
-                  tooltip={
-                    whiteboard.nativeToken
-                      ? isWhiteboardActive
-                        ? 'Hide whiteboard'
-                        : 'Open whiteboard'
-                      : isPresentingWhiteboard
+              {supportsWhiteboard ? (
+                whiteboard.nativeToken ? (
+                  <MeetingWhiteboardControl
+                    visible={isWhiteboardActive}
+                    presenting={isPresentingWhiteboard}
+                    canStop={whiteboard.canStop}
+                    active={whiteboard.active}
+                    disabled={!whiteboard.active && (isSomeoneSharing || isSharingScreen)}
+                    onToggle={() => void toggleWhiteboard()}
+                    onStop={() => void whiteboard.stop()}
+                  />
+                ) : (
+                  <MeetingControlButton
+                    tooltip={
+                      isPresentingWhiteboard
                         ? 'Stop whiteboard'
                         : isWhiteboardActive
                           ? 'The other person is presenting the whiteboard'
                           : 'Start whiteboard'
-                  }
-                  label={
-                    whiteboard.nativeToken
-                      ? isWhiteboardActive
-                        ? 'Hide whiteboard'
-                        : 'Open whiteboard'
-                      : isPresentingWhiteboard
-                        ? 'Stop whiteboard'
-                        : 'Start whiteboard'
-                  }
-                  tone={isPresentingWhiteboard ? 'active' : 'neutral'}
-                  disabled={
-                    !whiteboard.nativeToken &&
-                    !isPresentingWhiteboard &&
-                    (isSomeoneSharing || isWhiteboardActive)
-                  }
-                  onClick={() => void toggleWhiteboard()}
-                >
-                  <PoppingIcon toggleKey={isPresentingWhiteboard}>
-                    <Pencil className="size-4" />
-                  </PoppingIcon>
-                </MeetingControlButton>
+                    }
+                    label={
+                      isPresentingWhiteboard ? 'Stop whiteboard' : 'Start whiteboard'
+                    }
+                    tone={isPresentingWhiteboard ? 'active' : 'neutral'}
+                    disabled={
+                      !isPresentingWhiteboard &&
+                      (isSomeoneSharing || isSharingScreen || isWhiteboardActive)
+                    }
+                    onClick={() => void toggleWhiteboard()}
+                  >
+                    <PoppingIcon toggleKey={isPresentingWhiteboard}>
+                      <Presentation className="size-4" />
+                    </PoppingIcon>
+                  </MeetingControlButton>
+                )
               ) : null}
 
               {settings.invite.enabled ? (
@@ -2272,7 +2368,39 @@ export function ZoomVideoSessionEmbed({
                 {settings.participants.visible ? (
                   <ZoomParticipantsPanel
                     open={activePanel === 'users'}
+                    onClaimHost={
+                      !isSelfHost && clientRef.current?.isOriginalHost()
+                        ? () => void claimHost()
+                        : undefined
+                    }
+                    claimingHost={claimingHost}
                     canMuteOthers={isSelfHost || isSelfCoHost}
+                    onTransferHost={
+                      isSelfHost
+                        ? (userId) => {
+                            void clientRef.current
+                              ?.makeHost(userId)
+                              .catch((error) =>
+                                setMediaError(
+                                  `Could not transfer host: ${describeZoomFailure(error)}`,
+                                ),
+                              );
+                          }
+                        : undefined
+                    }
+                    onRemove={
+                      isSelfHost || isSelfCoHost
+                        ? (userId) => {
+                            void clientRef.current
+                              ?.removeUser(userId)
+                              .catch((error) =>
+                                setMediaError(
+                                  `Could not remove participant: ${describeZoomFailure(error)}`,
+                                ),
+                              );
+                          }
+                        : undefined
+                    }
                     canManageCoHosts={isSelfHost && !!settings.cohosts?.enabled}
                     onCoHost={(userId, enabled) => {
                       const client = clientRef.current;
@@ -2376,11 +2504,7 @@ export function ZoomVideoSessionEmbed({
           </div>
         ) : null}
 
-        {isCaptionsOn && captionText ? (
-          <div className="absolute inset-x-4 bottom-24 z-20 mx-auto w-fit max-w-lg rounded-lg bg-black/80 px-4 py-2 text-center text-sm text-white">
-            {captionText}
-          </div>
-        ) : null}
+        {isCaptionsOn && <ZoomCaptions text={captionText} />}
 
         {connectionState === ConnectionState.Reconnecting ? (
           <div

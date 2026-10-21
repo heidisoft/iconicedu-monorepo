@@ -52,7 +52,10 @@ export function AnnotationOverlay({
   shareKey: string;
   width: number;
   height: number;
-  useAnnotations?: typeof useScreenAnnotations;
+  useAnnotations?: (
+    ...args: Parameters<typeof useScreenAnnotations>
+  ) => Omit<ReturnType<typeof useScreenAnnotations>, 'retry'> &
+    Partial<Pick<ReturnType<typeof useScreenAnnotations>, 'retry'>>;
   onContext?: (context: AnnotationContext) => void;
 }) {
   const engine = useAnnotations(sessionId, shareKey, annotationToken);
@@ -74,7 +77,7 @@ export function AnnotationOverlay({
     () => new AnnotationCoordinateService({ width, height }),
     [width, height],
   );
-  const [tool, setToolState] = useState<AnnotationTool>('cursor');
+  const [tool, setToolState] = useState<AnnotationTool>('vanishingPen');
   const [chosenColor, setChosenColor] = useState<string | null>(null);
   const setColor = setChosenColor;
   const color =
@@ -83,6 +86,7 @@ export function AnnotationOverlay({
       engine.context?.actor.userId ?? 'participant',
       engine.context?.actors.map((person) => person.userId),
     );
+  const [backgroundColor, setBackgroundColor] = useState<string | undefined>(undefined);
   const [lineWidth, setLineWidth] = useState(3);
   const [opacity, setOpacity] = useState(1);
   const [fontSize, setFontSize] = useState(24);
@@ -93,7 +97,7 @@ export function AnnotationOverlay({
   const active = useRef<AnnotationObject | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [hoverName, setHoverName] = useState<string | null>(null);
-  const [showNames, setShowNames] = useState(false);
+  const [showNames, setShowNames] = useState(true);
   const [textEditor, setTextEditor] = useState<{
     object: AnnotationObject;
     value: string;
@@ -183,7 +187,15 @@ export function AnnotationOverlay({
       clearInterval(timer);
     };
   }, [flush]);
+  const defaultAnnotationTool = useRef(false);
   useEffect(() => {
+    defaultAnnotationTool.current = false;
+  }, [shareKey]);
+  useEffect(() => {
+    if (engine.canDraw && !defaultAnnotationTool.current) {
+      defaultAnnotationTool.current = true;
+      setToolState('vanishingPen');
+    }
     if (!engine.canDraw) {
       active.current = null;
       pendingPoints.current = [];
@@ -193,7 +205,7 @@ export function AnnotationOverlay({
       setTextEditor(null);
       setToolState('cursor');
     }
-  }, [engine.canDraw, releasePointer]);
+  }, [engine.canDraw, releasePointer, shareKey]);
   useEffect(() => {
     if (!transformer.current || !stage.current) return;
     transformer.current.nodes(
@@ -303,7 +315,15 @@ export function AnnotationOverlay({
       creatorName: actor.name,
       creatorRole: actor.role,
       points: [point],
-      style: { color, width: lineWidth, opacity, fontSize, bold, italic },
+      style: {
+        color,
+        backgroundColor,
+        width: lineWidth,
+        opacity,
+        fontSize,
+        bold,
+        italic,
+      },
       rotation: 0,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -325,7 +345,15 @@ export function AnnotationOverlay({
     if (now - lastPointer.current < 40) return;
     lastPointer.current = now;
     preview(
-      { kind: 'pointer', point, tool: pointerTool, color },
+      {
+        kind: 'pointer',
+        point,
+        tool: pointerTool,
+        color: participantColor(
+          actor?.userId ?? 'participant',
+          engine.context?.actors.map((person) => person.userId),
+        ),
+      },
       `pointer:${actor?.userId}`,
       ++pointerSequence.current,
     );
@@ -714,8 +742,48 @@ export function AnnotationOverlay({
           ))}
         </Layer>
         <Layer listening={false}>
+          {showNames &&
+            [
+              ...new Map(
+                [
+                  ...engine.objects.filter((object) => !object.deleted),
+                  ...engine.remoteDrafts,
+                  ...engine.vanishing
+                    .filter((stroke) => stroke.expiresAt > Date.now())
+                    .map((stroke) => stroke.object),
+                  ...(draft ? [draft] : []),
+                ].map((object) => [object.creatorId, object]),
+              ).values(),
+            ]
+              .filter(
+                (object) =>
+                  !engine.pointers[object.creatorId] ||
+                  engine.pointers[object.creatorId].expiresAt <= Date.now(),
+              )
+              .map((object) => {
+                const point = object.points[object.points.length - 1];
+                return (
+                  point && (
+                    <AnnotationPointer
+                      key={`name-${object.creatorId}`}
+                      point={point}
+                      width={width}
+                      height={height}
+                      tool="pointerArrow"
+                      name={object.creatorName}
+                      color={participantColor(
+                        object.creatorId,
+                        engine.context?.actors.map((person) => person.userId),
+                      )}
+                      showName
+                    />
+                  )
+                );
+              })}
+        </Layer>
+        <Layer listening={false}>
           {Object.entries(engine.pointers)
-            .filter(([, pointer]) => showNames && pointer.tool === 'pointerArrow')
+            .filter(([, pointer]) => pointer.tool === 'pointerArrow')
             .map(([id, pointer]) => (
               <AnnotationPointer
                 key={id}
@@ -723,13 +791,10 @@ export function AnnotationOverlay({
                 showName={showNames}
                 width={width}
                 height={height}
-                color={
-                  pointer.color ??
-                  participantColor(
-                    id,
-                    engine.context?.actors.map((person) => person.userId),
-                  )
-                }
+                color={participantColor(
+                  id,
+                  engine.context?.actors.map((person) => person.userId),
+                )}
               />
             ))}
         </Layer>
@@ -764,13 +829,10 @@ export function AnnotationOverlay({
                 showName={showNames}
                 width={width}
                 height={height}
-                color={
-                  pointer.color ??
-                  participantColor(
-                    id,
-                    engine.context?.actors.map((person) => person.userId),
-                  )
-                }
+                color={participantColor(
+                  id,
+                  engine.context?.actors.map((person) => person.userId),
+                )}
               />
             ))}
         </Layer>
@@ -865,7 +927,10 @@ export function AnnotationOverlay({
           showNames={showNames}
           setShowNames={setShowNames}
           onDelete={deleteSelection}
+          backgroundColor={backgroundColor}
           onQuickStyle={(style) => {
+            if (style.backgroundColor !== undefined)
+              setBackgroundColor(style.backgroundColor);
             for (const object of engine.objects)
               if (selected.includes(object.id) && canEdit(object))
                 swallow(
@@ -873,6 +938,9 @@ export function AnnotationOverlay({
                     ...object,
                     style: {
                       ...object.style,
+                      ...(style.backgroundColor !== undefined
+                        ? { backgroundColor: style.backgroundColor }
+                        : {}),
                       ...(style.strokeColor !== undefined && {
                         color: style.strokeColor,
                       }),
@@ -889,7 +957,15 @@ export function AnnotationOverlay({
                 swallow(
                   put({
                     ...object,
-                    style: { color, width: lineWidth, opacity, fontSize, bold, italic },
+                    style: {
+                      color,
+                      backgroundColor,
+                      width: lineWidth,
+                      opacity,
+                      fontSize,
+                      bold,
+                      italic,
+                    },
                   }),
                 );
           }}
@@ -916,9 +992,18 @@ export function AnnotationOverlay({
       {(engine.error || localError || !engine.connected) && (
         <div
           role="status"
-          className="pointer-events-none absolute left-2 top-2 max-w-sm rounded-md bg-background px-3 py-2 text-xs text-muted-foreground"
+          className="absolute left-2 top-2 max-w-sm rounded-md bg-background px-3 py-2 text-xs text-muted-foreground"
         >
           {localError ?? engine.error ?? 'Reconnecting annotations…'}
+          {engine.error && engine.retry && (
+            <button
+              type="button"
+              className="ml-2 underline"
+              onClick={() => void engine.retry?.().catch(() => undefined)}
+            >
+              Retry saving
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -54,11 +54,30 @@ export function parseGuestJoinLiveSessionDto(input: unknown): GuestJoinLiveSessi
   )
     throw new BadRequestException('Invalid student profile');
 
+  const studentProfileIds = body['studentProfileIds'];
+  if (
+    studentProfileIds !== undefined &&
+    (!Array.isArray(studentProfileIds) ||
+      !studentProfileIds.length ||
+      studentProfileIds.length > 10 ||
+      studentProfileIds.some(
+        (id) =>
+          typeof id !== 'string' ||
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id),
+      ) ||
+      new Set(studentProfileIds).size !== studentProfileIds.length ||
+      studentProfileId !== undefined)
+  )
+    throw new BadRequestException('Select between 1 and 10 distinct student profiles');
+
   return {
     ...(typeof admissionToken === 'string' ? { admissionToken } : {}),
     ...(typeof linkToken === 'string' ? { linkToken } : {}),
     ...(typeof override === 'string' ? { displayNameOverride: override.trim() } : {}),
     ...(typeof studentProfileId === 'string' ? { studentProfileId } : {}),
+    ...(Array.isArray(studentProfileIds)
+      ? { studentProfileIds: studentProfileIds as string[] }
+      : {}),
     displayName: displayName.trim().slice(0, MAX_DISPLAY_NAME_LENGTH),
     passcode: passcode.trim(),
   };

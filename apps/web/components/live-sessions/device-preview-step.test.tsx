@@ -47,27 +47,27 @@ describe('DevicePreviewStep', () => {
     });
   });
 
-  it('opens device checks beside settings and dismisses with Escape', async () => {
+  it('keeps device checks inside Settings and dismisses with Escape', async () => {
     const user = userEvent.setup();
     const onJoin = vi.fn();
     render(
       <DevicePreviewStep displayName="Alex" sessionTitle="Math class" onJoin={onJoin} />,
     );
-    const trigger = screen.getByRole('button', { name: 'Test audio and video' });
+    const trigger = screen.getByRole('button', { name: 'Settings' });
+    expect(
+      screen.queryByRole('button', { name: 'Test audio and video' }),
+    ).not.toBeInTheDocument();
     await waitFor(() => expect(trigger).toBeEnabled());
     expect(screen.queryByRole('meter')).not.toBeInTheDocument();
     await user.click(trigger);
     expect(
-      screen.getByRole('dialog', { name: 'Test your audio and video' }),
+      await screen.findByRole('dialog', { name: 'Settings' }, { timeout: 5000 }),
     ).toBeVisible();
     expect(screen.getByRole('meter', { name: 'Microphone activity' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Test speakers' })).toBeEnabled();
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(onJoin).not.toHaveBeenCalled();
-    await user.click(trigger);
-    await user.click(screen.getByRole('button', { name: 'Device settings' }));
-    expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeVisible();
   });
   it('uses visible, accessible device controls and returns the selected state', async () => {
     const user = userEvent.setup();
@@ -310,4 +310,20 @@ describe('DevicePreviewStep', () => {
       microphoneId: 'mic-two',
     });
   });
+});
+
+it('returns from ready-to-join without starting a session', async () => {
+  const onBack = vi.fn(),
+    onJoin = vi.fn();
+  render(
+    <DevicePreviewStep
+      displayName="Student"
+      sessionTitle="Class"
+      onJoin={onJoin}
+      onBack={onBack}
+    />,
+  );
+  await userEvent.click(screen.getByRole('button', { name: 'Back', exact: true }));
+  expect(onBack).toHaveBeenCalledOnce();
+  expect(onJoin).not.toHaveBeenCalled();
 });

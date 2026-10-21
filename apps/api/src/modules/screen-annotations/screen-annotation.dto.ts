@@ -83,6 +83,13 @@ export function parseAnnotationOperation(value: unknown): AnnotationOperation {
   });
   if (typeof style.color !== 'string' || !/^#[a-f0-9]{6}$/i.test(style.color))
     throw new BadRequestException('Invalid annotation color');
+  if (
+    style.backgroundColor !== undefined &&
+    style.backgroundColor !== 'transparent' &&
+    (typeof style.backgroundColor !== 'string' ||
+      !/^#[a-f0-9]{6}$/i.test(style.backgroundColor))
+  )
+    throw new BadRequestException('Invalid annotation background color');
   if (typeof style.bold !== 'boolean' || typeof style.italic !== 'boolean')
     throw new BadRequestException('Invalid text style');
   if (
@@ -101,6 +108,9 @@ export function parseAnnotationOperation(value: unknown): AnnotationOperation {
     points,
     style: {
       color: style.color,
+      ...(style.backgroundColor !== undefined
+        ? { backgroundColor: style.backgroundColor as string }
+        : {}),
       width: number(style.width, 0.1, 40),
       opacity: number(style.opacity, 0.05, 1),
       fontSize: number(style.fontSize, 8, 96),

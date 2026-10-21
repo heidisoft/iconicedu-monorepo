@@ -1,0 +1,21 @@
+appId: com.heidisoft.iconicedu
+name: Open the native development build used by classroom UI tests
+env:
+  METRO_PORT: 8085
+---
+- stopApp
+# disableOnboarding sits inside the app URL because iOS reads it there; otherwise the
+# developer-menu introduction covers the app on the first launch of a fresh simulator.
+- openLink: 'exp+iconicedu-mobile://expo-development-client/?url=http%3A%2F%2F127.0.0.1%3A${METRO_PORT}%2F%3FdisableOnboarding%3D1'
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Continue'
+    optional: true
+- tapOn:
+    point: '50%,10%'
+- extendedWaitUntil:
+    visible:
+      id: 'native-sdk-ready'
+    timeout: 60000

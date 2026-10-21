@@ -24,6 +24,8 @@ supabase/.temp
 .d.ts.map
 .temp
 playwright-report
+.classroom-e2e.local.json
+.classroom-auth*.json
 test-results
 apps/web/playwright/.auth
 local.properties
@@ -36,3 +38,6 @@ apps/web/.vercel/
 # live under paths that look like build output ("build" rule above) but
 # aren't — keep them trackable.
 !scripts/vendor-fixes/**
+
+# Offline drawing runtime generated for native builds.
+apps/mobile/src/components/classroom/canvas/canvas.generated.ts

@@ -163,6 +163,8 @@ export type LiveSessionJoinRequest = {
   displayName: string;
   passcode: string;
   studentProfileId?: UUID;
+  /** Students sharing this connection; every identity is verified by apps/api. */
+  studentProfileIds?: UUID[];
 };
 
 /** Credentials issued by apps/api after host authorization or passcode verification. */
@@ -170,10 +172,13 @@ export type LiveSessionJoinCredentialsVM = {
   sharePath?: string;
   /** API-verified student represented by a signed-in guardian. */
   studentProfileId?: UUID;
+  /** Students sharing this connection; every identity is verified by apps/api. */
+  studentProfileIds?: UUID[];
   /** Meeting-scoped opaque annotation capability for shared-link participants. */
   annotationToken?: string;
   whiteboard?: import('./whiteboard').WhiteboardAccessVM;
   token: string;
+  /** Canonical Zoom topic for this class session; web and native pass it to the SDK verbatim. */
   sessionName: string;
   displayName: string;
   meetingPasscode?: string | null;

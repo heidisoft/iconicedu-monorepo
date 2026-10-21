@@ -1,0 +1,15 @@
+appId: com.heidisoft.iconicedu
+---
+- extendedWaitUntil:
+    visible: 'Expand whiteboard to full screen'
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: 'Export whiteboard image'
+      enabled: true
+    timeout: 30000
+- tapOn: 'Educational library'
+- tapOn: 'Number line'
+- extendedWaitUntil:
+    visible: 'Saved'
+    timeout: 30000
