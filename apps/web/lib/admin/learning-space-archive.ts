@@ -1,6 +1,5 @@
 import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
-import { ensureSystemProfileId } from '@iconicedu/web/lib/automation/system-profile';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
+import { ensureSystemProfile } from '@iconicedu/web/lib/api/profiles';
 
 type LearningSpaceSummaryRow = {
   id: string;
@@ -54,6 +53,5 @@ export async function archiveLearningSpace(learningSpaceId: string) {
     throw new Error(updateResponse.error.message);
   }
 
-  const serviceSupabase = createSupabaseServiceClient();
-  await ensureSystemProfileId(serviceSupabase, orgId);
+  await ensureSystemProfile(supabase, { orgId });
 }

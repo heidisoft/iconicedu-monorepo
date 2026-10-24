@@ -1,27 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const {
-  requireAdminAuthContextMock,
-  createSupabaseServiceClientMock,
-  ensureSystemProfileIdMock,
-  publishActivityEventMock,
-} = vi.hoisted(() => ({
-  requireAdminAuthContextMock: vi.fn(),
-  createSupabaseServiceClientMock: vi.fn(),
-  ensureSystemProfileIdMock: vi.fn(),
-  publishActivityEventMock: vi.fn(),
-}));
+const { requireAdminAuthContextMock, ensureSystemProfileMock, publishActivityEventMock } =
+  vi.hoisted(() => ({
+    requireAdminAuthContextMock: vi.fn(),
+    ensureSystemProfileMock: vi.fn(),
+    publishActivityEventMock: vi.fn(),
+  }));
 
 vi.mock('@iconicedu/web/lib/admin/_auth-context', () => ({
   requireAdminAuthContext: requireAdminAuthContextMock,
 }));
 
-vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: createSupabaseServiceClientMock,
-}));
-
-vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
-  ensureSystemProfileId: ensureSystemProfileIdMock,
+vi.mock('@iconicedu/web/lib/api/profiles', () => ({
+  ensureSystemProfile: ensureSystemProfileMock,
 }));
 
 vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({
@@ -89,14 +80,15 @@ describe('archiveLearningSpace', () => {
         }),
       },
     });
-    createSupabaseServiceClientMock.mockReturnValue({});
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
+    ensureSystemProfileMock.mockResolvedValue({ id: 'system-profile-1' });
   });
 
   it('archives the class without publishing an archive activity', async () => {
     await archiveLearningSpace('space-1');
 
-    expect(ensureSystemProfileIdMock).toHaveBeenCalled();
+    expect(ensureSystemProfileMock).toHaveBeenCalledWith(expect.anything(), {
+      orgId: 'org-1',
+    });
     expect(publishActivityEventMock).not.toHaveBeenCalled();
   });
 });

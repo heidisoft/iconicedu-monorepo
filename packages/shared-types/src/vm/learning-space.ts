@@ -44,3 +44,65 @@ export interface LearningSpaceVM {
 
   participants: UserProfileVM[];
 }
+
+/** Snapshot of a learning space's current persisted state needed to diff an
+ * incoming admin-editor save against — schedules/recurrences/exceptions/
+ * overrides are scoped to just this learning space's own schedules (not
+ * every schedule in the org). */
+export interface LearningSpaceEditContextScheduleVM {
+  id: UUID;
+  title: string;
+  startAt: ISODateTime;
+  endAt: ISODateTime;
+  timezone: string | null;
+}
+
+export interface LearningSpaceEditContextRecurrenceVM {
+  id: UUID;
+  scheduleId: UUID;
+  frequency: string;
+  interval?: number | null;
+  count?: number | null;
+  until?: ISODateTime | null;
+  timezone: string | null;
+  bySecond?: number[] | null;
+  byMinute?: number[] | null;
+  byHour?: number[] | null;
+  byDay?: string[] | null;
+  byMonthDay?: number[] | null;
+  byYearDay?: number[] | null;
+  byWeekNo?: number[] | null;
+  byMonth?: number[] | null;
+  bySetPos?: number[] | null;
+  wkst?: string | null;
+}
+
+export interface LearningSpaceEditContextExceptionVM {
+  recurrenceId: UUID;
+  occurrenceKey: ISODateTime;
+  reason: string | null;
+}
+
+export interface LearningSpaceEditContextOverrideVM {
+  recurrenceId: UUID;
+  occurrenceKey: ISODateTime;
+  patch: Record<string, unknown> | null;
+}
+
+export interface LearningSpaceEditContextChannelVM {
+  topic: string | null;
+  description: string | null;
+  iconKey: string | null;
+  themeKey: string | null;
+  uiDefaults: unknown;
+  liveSessionConfig: unknown;
+}
+
+export interface LearningSpaceEditContextVM {
+  participantProfileIds: UUID[];
+  schedules: LearningSpaceEditContextScheduleVM[];
+  recurrences: LearningSpaceEditContextRecurrenceVM[];
+  exceptions: LearningSpaceEditContextExceptionVM[];
+  overrides: LearningSpaceEditContextOverrideVM[];
+  channel: LearningSpaceEditContextChannelVM | null;
+}

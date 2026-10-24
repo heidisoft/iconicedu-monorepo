@@ -42,6 +42,29 @@ export class SchedulesController {
     });
   }
 
+  @Get('schedules/learning-space/context')
+  @UseGuards(AuthGuard)
+  getLearningSpaceEditContext(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('learningSpaceId') learningSpaceId: string,
+    @Query('channelId') channelId: string,
+  ) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
+    if (!learningSpaceId || typeof learningSpaceId !== 'string') {
+      throw new BadRequestException('learningSpaceId is required');
+    }
+    if (!channelId || typeof channelId !== 'string') {
+      throw new BadRequestException('channelId is required');
+    }
+    return this.schedulesService.getLearningSpaceEditContext(
+      extractBearerToken(req.headers.authorization),
+      { orgId, learningSpaceId, channelId },
+    );
+  }
+
   @Post('schedules/exceptions')
   @UseGuards(AuthGuard)
   createException(
