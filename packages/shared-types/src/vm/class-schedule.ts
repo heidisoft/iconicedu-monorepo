@@ -211,6 +211,20 @@ export function isClassScheduleAfterArchiveCutoff(
   return startMs > archivedMs;
 }
 
+/** Bootstrap context needed before editing a single session (reschedule/split
+ * quick-edit flows) — resolves the schedule's org membership, source learning
+ * space/channel, and timezone in one call, rejecting not-found and archived
+ * classrooms server-side. */
+export interface ClassScheduleSessionContextVM {
+  scheduleId: UUID;
+  title: string;
+  startAt: ISODateTime;
+  endAt: ISODateTime;
+  timezone: IANATimezone | null;
+  sourceLearningSpaceId: UUID | null;
+  sourceChannelId: UUID | null;
+}
+
 export function applyArchiveCutoffToDisplaySchedules<
   T extends ArchiveAwareClassScheduleVM,
 >(schedules: T[]): T[] {
