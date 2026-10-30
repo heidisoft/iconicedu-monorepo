@@ -29,6 +29,11 @@ import type {
   ScheduleRowInput,
   SplitRecurringSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
+import {
+  mapClassScheduleRow,
+  type ClassScheduleQueryRow,
+} from '@iconicedu/api/modules/schedules/class-schedule.mapper';
+import type { ClassScheduleVM } from '@iconicedu/shared-types';
 
 const CLASS_SCHEDULE_SELECT = `
   id, org_id, title, description, location, meeting_link,
@@ -121,6 +126,41 @@ export class SchedulesService {
     const { data, error } = await query;
     if (error) throw new InternalServerErrorException(error.message);
     return this.attachLearningSpaceArchiveMetadata(input.orgId, data ?? []);
+  }
+
+  /** Powers the web/mobile calendar, live-session scope resolution, and
+   * learning-space schedule lookups — unlike `list()`, this includes every
+   * `source_kind` (class_session/availability_block/manual), matching what
+   * the calendar view has always shown, and returns mapped `ClassScheduleVM`s
+   * instead of raw rows so callers do no client-side mapping of their own. */
+  async listForCalendar(
+    accessToken: string,
+    input: { orgId: string; channelId?: string; scheduleIds?: string[] },
+  ): Promise<ClassScheduleVM[]> {
+    if (input.scheduleIds && input.scheduleIds.length === 0) {
+      return [];
+    }
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    let query = supabase
+      .from('class_schedules')
+      .select(CLASS_SCHEDULE_SELECT)
+      .eq('org_id', input.orgId)
+      .is('deleted_at', null)
+      .order('start_at', { ascending: true });
+    if (input.channelId) query = query.eq('source_channel_id', input.channelId);
+    if (input.scheduleIds) query = query.in('id', input.scheduleIds);
+
+    const { data, error } = await query;
+    if (error) throw new InternalServerErrorException(error.message);
+
+    const rowsWithArchiveMetadata = await this.attachLearningSpaceArchiveMetadata(
+      input.orgId,
+      data ?? [],
+    );
+    return (rowsWithArchiveMetadata as unknown as ClassScheduleQueryRow[]).map(
+      mapClassScheduleRow,
+    );
   }
 
   async createException(
