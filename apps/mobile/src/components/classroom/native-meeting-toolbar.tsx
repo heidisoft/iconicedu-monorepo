@@ -1,3 +1,7 @@
+import {
+  CLASSROOM_PRIMARY_CONTROL_ORDER,
+  CLASSROOM_MORE_CONTROL_ORDER,
+} from '@iconicedu/shared-types';
 import { NativeControlPop } from './native-meeting-motion';
 import React, { Children, isValidElement, useRef, useState } from 'react';
 import {
@@ -127,37 +131,45 @@ export function NativeMeetingToolbar({
   };
   const actions = Children.toArray(children).filter(isValidElement<ActionProps>);
   const pinned = (label: string) =>
-    /^(Mute microphone|Unmute microphone|Stop video|Start video|Share screen|Stop sharing screen|Whiteboard|Return to whiteboard|Annotate screen|Stop annotating|Leave class|Leave or end class|End class)/.test(
+    /^(Mute microphone|Unmute microphone|Stop video|Start video|Share screen|Stop sharing screen|Whiteboard|Return to whiteboard|Leave class|Leave or end class|End class)/.test(
       label,
     );
-  const priority = (label: string) =>
-    label.includes('microphone')
-      ? 0
+  const priority = (label: string) => {
+    const key = label.includes('microphone')
+      ? 'microphone'
       : label === 'Start video' || label === 'Stop video'
-        ? 1
-        : label.includes('whiteboard') || label === 'Whiteboard'
-          ? 2
-          : label.includes('annotat')
-            ? 3
-            : label.includes('screen')
-              ? 4
-              : 5;
+        ? 'camera'
+        : label === 'Share screen' || label === 'Stop sharing screen'
+          ? 'screen'
+          : label.includes('whiteboard') || label === 'Whiteboard'
+            ? 'whiteboard'
+            : 'leave';
+    return CLASSROOM_PRIMARY_CONTROL_ORDER.indexOf(key);
+  };
   actions.sort(
     (a, b) => priority(a.props.accessibilityLabel) - priority(b.props.accessibilityLabel),
   );
   const secondary = actions.filter((action) => !pinned(action.props.accessibilityLabel));
-  const menuPriority = (label: string) =>
-    label.toLowerCase().includes('recording')
-      ? 0
-      : label.includes('whiteboard')
-        ? 1
-        : label === 'Open floating call'
-          ? 2
-          : label.includes('captions')
-            ? 3
-            : label === 'Settings'
-              ? 10
-              : 5;
+  const menuPriority = (label: string) => {
+    const key = label.toLowerCase().includes('recording')
+      ? 'recording'
+      : label.startsWith('Participants')
+        ? 'participants'
+        : label.startsWith('Messages')
+          ? 'messages'
+          : label === 'Invite'
+            ? 'invite'
+            : label.includes('whiteboard')
+              ? 'whiteboard'
+              : label === 'Open floating call'
+                ? 'picture-in-picture'
+                : label.includes('captions')
+                  ? 'captions'
+                  : label.includes('annotat')
+                    ? 'annotations'
+                    : 'settings';
+    return CLASSROOM_MORE_CONTROL_ORDER.indexOf(key);
+  };
   secondary.sort(
     (a, b) =>
       menuPriority(a.props.accessibilityLabel) - menuPriority(b.props.accessibilityLabel),
@@ -183,8 +195,8 @@ export function NativeMeetingToolbar({
         disabled={action.props.disabled}
         onPress={action.props.onPress}
         style={{
-          width: 48,
-          height: 48,
+          width: 44,
+          height: 44,
           borderRadius: 24,
           gap: 4,
           alignItems: 'center',

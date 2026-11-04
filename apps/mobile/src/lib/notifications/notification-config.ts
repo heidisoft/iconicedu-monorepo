@@ -13,6 +13,7 @@ export type NotificationConfig = {
     threadId?: string | null;
     channelRouteKind?: string;
     activityFeedItemId?: string | null;
+    classroomCallId?: string;
   }) => string;
 };
 
@@ -48,6 +49,13 @@ const feedbackNotificationConfig: NotificationConfig = {
 };
 
 export const NOTIFICATION_REGISTRY: Record<string, NotificationConfig> = {
+  'classroom.call.missed': {
+    label: 'Missed class calls',
+    getRoute: ({ classroomCallId }) =>
+      classroomCallId
+        ? `/classroom-call/${encodeURIComponent(classroomCallId)}`
+        : '/(app)/(tabs)/inbox',
+  },
   'message.posted': messageNotificationConfig,
   'message.mentioned': messageNotificationConfig,
   'message.thread_reply.posted': messageNotificationConfig,

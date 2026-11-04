@@ -373,3 +373,29 @@ model LiveSessionAdmission {
   @@index([liveSessionId, status, expiresAt], map: "live_session_admissions_waiting_idx")
   @@map("live_session_admissions")
 }
+
+model ClassroomCallPresence {
+  connectionId  String   @map("connection_id") @db.Uuid
+  liveSessionId String   @map("live_session_id") @db.Uuid
+  profileId     String   @map("profile_id") @db.Uuid
+  lastSeenAt    DateTime @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+
+  @@id([connectionId, liveSessionId, profileId])
+  @@index([liveSessionId, lastSeenAt], map: "classroom_call_presence_session_idx")
+  @@map("classroom_call_presence")
+}
+
+model ClassroomCallInvitation {
+  missedProcessedAt DateTime? @map("missed_processed_at") @db.Timestamptz(6)
+  missedEventId String? @map("missed_event_id") @db.Uuid
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  liveSessionId      String   @map("live_session_id") @db.Uuid
+  callerProfileId    String   @map("caller_profile_id") @db.Uuid
+  recipientProfileId String   @map("recipient_profile_id") @db.Uuid
+  status             String   @default("ringing")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  expiresAt          DateTime @default(dbgenerated("(now() + '00:00:45'::interval)")) @map("expires_at") @db.Timestamptz(6)
+
+  @@index([recipientProfileId, createdAt(sort: Desc)], map: "classroom_call_invitations_recipient_idx")
+  @@map("classroom_call_invitations")
+}

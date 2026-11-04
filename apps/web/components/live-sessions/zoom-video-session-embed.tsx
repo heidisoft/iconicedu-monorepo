@@ -1,4 +1,7 @@
 'use client';
+import { Share } from 'lucide-react';
+import { useClassroomRoster } from './zoom-video/use-classroom-roster';
+import { ZoomClassRoster } from './zoom-video/zoom-class-roster';
 import { ZoomCaptions } from './zoom-video/zoom-captions';
 import { MeetingWhiteboardControl } from './zoom-video/meeting-whiteboard-control';
 import { Presentation } from 'lucide-react';
@@ -216,8 +219,10 @@ export function ZoomVideoSessionEmbed({
   settings = DEFAULT_LIVE_SESSION_SETTINGS,
   annotationToken,
   whiteboardAccess,
+  studentProfileIds = [],
 }: {
   sessionName: string;
+  studentProfileIds?: string[];
   annotationToken?: string;
   whiteboardAccess?: WhiteboardAccessVM;
   sessionTitle?: string;
@@ -272,6 +277,12 @@ export function ZoomVideoSessionEmbed({
   const preferredCameraRef = useRef(initialCameraId);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>(
     'connecting',
+  );
+  const [invitationOpen, setInvitationOpen] = useState(false);
+  const classRoster = useClassroomRoster(
+    liveSessionId,
+    status === 'connected',
+    studentProfileIds,
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -2246,6 +2257,9 @@ export function ZoomVideoSessionEmbed({
 
               {settings.invite.enabled ? (
                 <ZoomShareMeetingDialog
+                  open={invitationOpen}
+                  onOpenChange={setInvitationOpen}
+                  hideTrigger
                   meetingTitle={sessionTitle ?? sessionName}
                   meetingPasscode={sessionPasscode}
                   sharePath={sharePath}
@@ -2258,6 +2272,16 @@ export function ZoomVideoSessionEmbed({
                 onOpenChange={setShowMobileControls}
                 actions={[
                   ...(recording.action ? [recording.action] : []),
+                  ...(settings.invite.enabled
+                    ? [
+                        {
+                          id: 'invite',
+                          label: 'Invite',
+                          icon: <Share />,
+                          onSelect: () => setInvitationOpen(true),
+                        },
+                      ]
+                    : []),
                   {
                     id: 'participants',
                     label: `Participants (${remoteParticipants.length + 1})`,
@@ -2367,6 +2391,7 @@ export function ZoomVideoSessionEmbed({
 
                 {settings.participants.visible ? (
                   <ZoomParticipantsPanel
+                    classRoster={<ZoomClassRoster {...classRoster} />}
                     open={activePanel === 'users'}
                     onClaimHost={
                       !isSelfHost && clientRef.current?.isOriginalHost()

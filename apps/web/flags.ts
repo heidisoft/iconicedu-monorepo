@@ -516,7 +516,24 @@ export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | nu
   },
 });
 
+export const enableClassroomCalls = flag<boolean, { profileId?: string | null }>({
+  key: platformFeatureFlagKeys.enableClassroomCalls,
+  description: 'Class roster and teacher-initiated incoming class invitations.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableClassroomCalls,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
+  enableClassroomCalls,
   enableClassroomWhiteboard,
   enableClassroomMeetingSettings,
   enableAdminSessionAttendanceAnalytics,

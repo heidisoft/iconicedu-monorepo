@@ -19,9 +19,13 @@ describe('sendPushNotification', () => {
     global.fetch = originalFetch;
   });
 
-  it.each([undefined, 'high'] as const)(
+  it.each([
+    { priority: undefined, withCall: false },
+    { priority: 'high' as const, withCall: false },
+    { priority: 'high' as const, withCall: true },
+  ])(
     'sends priority %s and preserves the visible push body',
-    async (priority) => {
+    async ({ priority, withCall }) => {
       const longSummary =
         'Class session starts today at 4:00 PM EST · Advanced Algebra foundations and problem solving for Priya, Maya, and Sanvi with Ms. Chen and Mr. Patel';
       const pushTokensChain = {
@@ -65,7 +69,15 @@ describe('sendPushNotification', () => {
       await sendPushNotification({
         orgId: 'org-1',
         recipientProfileId: 'profile-1',
-        prefKey: 'session.reminder.sent',
+        prefKey: withCall ? 'classroom.call' : 'session.reminder.sent',
+        ...(withCall
+          ? {
+              call: {
+                id: 'synthetic-call',
+                expiresAt: new Date(Date.now() + 45_000).toISOString(),
+              },
+            }
+          : {}),
         title: 'Algebra for Priya and Maya with Ms. Chen',
         summary: longSummary,
         priority,
@@ -74,8 +86,17 @@ describe('sendPushNotification', () => {
       const body = JSON.parse(fetchMock.mock.calls[0]?.[1]?.body as string) as Array<{
         body?: string;
         priority?: string;
+        ttl?: number;
+        sound?: string;
+        data?: { classroomCallId?: string; expiresAt?: string };
       }>;
       expect(body[0]?.body).toBe(longSummary);
+      if (withCall) {
+        expect(body[0]?.ttl).toBeGreaterThan(0);
+        expect(body[0]?.ttl).toBeLessThanOrEqual(45);
+        expect(body[0]?.sound).toBe('default');
+        expect(body[0]?.data).toMatchObject({ classroomCallId: 'synthetic-call' });
+      } else expect(body[0]).not.toHaveProperty('ttl');
       if (priority) expect(body[0]?.priority).toBe('high');
       else expect(body[0]).not.toHaveProperty('priority');
     },

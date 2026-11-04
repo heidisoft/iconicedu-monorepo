@@ -81,6 +81,12 @@ export function useNotificationHandler() {
 
       subscription = Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data as NotificationData;
+        // The root incoming-call receiver validates and presents live invitations.
+        if (
+          data?.prefKey === 'classroom.call' ||
+          data?.prefKey === 'classroom.call.missed'
+        )
+          return;
         const config = data?.prefKey ? NOTIFICATION_REGISTRY[data.prefKey] : undefined;
         const route = config
           ? config.getRoute({

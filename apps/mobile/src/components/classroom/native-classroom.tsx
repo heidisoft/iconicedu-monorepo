@@ -1,3 +1,5 @@
+import { useClassroomRoster } from './use-classroom-roster';
+import { NativeClassRoster } from './native-class-roster';
 import { useMeetingAlert } from './use-meeting-alert';
 import { NativePresentationControls } from './native-presentation-controls';
 import { NativeBackgroundPicker } from './native-background-picker';
@@ -627,6 +629,11 @@ export function NativeClassroom({
   // deliberately so others see the avatar, and turn it back on when the app returns.
   const cameraPausedInBackground = useRef(false);
   const inClass = state.phase === 'meeting' || state.phase === 'reconnecting';
+  const classRoster = useClassroomRoster(
+    sessionId,
+    inClass && !adapterOverride,
+    credentials?.studentProfileIds ?? [],
+  );
   useEffect(() => {
     setShareContext(null);
     if (!inClass || !moderator || !state.sharingUserId) return;
@@ -1454,6 +1461,7 @@ export function NativeClassroom({
                 )}
               </NativeParticipantRow>
             ))}
+            <NativeClassRoster {...classRoster} />
           </View>
         </ScrollView>
       </NativeMeetingSheet>

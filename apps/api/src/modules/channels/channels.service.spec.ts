@@ -56,6 +56,7 @@ jest.mock('@iconicedu/api/lib/supabase/service', () => ({
 jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
   apiFeatureFlagKeys: {
     enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
+    enableClassroomCalls: 'classroom-calls',
   },
   evaluateApiBooleanFlag: jest.fn(),
 }));
@@ -841,4 +842,29 @@ describe('ChannelsService.getDirectMessages', () => {
       is_manually_unread: true,
     });
   });
+});
+
+it('keeps classroom-call contact and general DM creation behind their respective server permissions', async () => {
+  jest.clearAllMocks();
+  mockEvaluateApiBooleanFlag.mockResolvedValue(false);
+  await expect(
+    makeService().ensureDirectMessageChannel(
+      'token',
+      { orgId: 'org', profileId: 'recipient', otherProfileId: 'tutor' },
+      { classroomCallId: 'call' },
+    ),
+  ).resolves.toBeNull();
+  expect(mockEvaluateApiBooleanFlag).toHaveBeenLastCalledWith(
+    expect.objectContaining({ flagKey: 'classroom-calls' }),
+  );
+  await expect(
+    makeService().ensureDirectMessageChannel('token', {
+      orgId: 'org',
+      profileId: 'recipient',
+      otherProfileId: 'tutor',
+    }),
+  ).resolves.toBeNull();
+  expect(mockEvaluateApiBooleanFlag).toHaveBeenLastCalledWith(
+    expect.objectContaining({ flagKey: 'enable-mobile-direct-message-start' }),
+  );
 });

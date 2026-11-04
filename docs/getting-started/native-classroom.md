@@ -415,3 +415,75 @@ SDK event does not automatically hide an active native whiteboard. Sharing mode
 changes require stopping the board first. This coordinates existing presentation
 controls under the same maintenance exemption; presenter ownership and server
 access checks remain authoritative.
+
+### Class roster and app call invitations
+
+Web and native primary controls use the shared order: microphone, camera, screen
+share, whiteboard, More, leave. Invite lives in More on both platforms. Screen annotations remain contextual.
+Common More actions use the same relative order on both clients.
+
+The `classroom-calls` flag defaults off in the web catalogue and is enforced by
+`apps/api` for roster, presence and invitation endpoints. Enable it for all test
+class participants, including linked guardians, before testing both directions.
+Deploy migration `20261102160000_classroom_call_invitations.sql` before enabling it.
+No new environment variables or native modules are required.
+
+People keeps connected attendees in the existing meeting list and adds enrolled
+members who have not joined. The API excludes staff/system profiles and accounts
+with owner/admin/staff assigned or primary roles from the enrolled class roster;
+accidental memberships do not make these accounts call targets. Actual connected
+attendees remain visible in the meeting list. Only an enrolled educator with an
+active class connection can call an absent member. Children sharing a guardian's
+connection use the verified selected-student IDs. Linked guardians can receive
+and answer their child's invitation.
+
+Call creates a 45-second invitation, rings the foreground app, and sends a
+high-priority sound push to registered devices. Join opens the existing class
+preview and uses normal authentication and admission; it never starts camera or
+microphone automatically. Decline, Cancel, expiry and class end stop the invitation.
+The API enforces a 60-second recipient cooldown across teachers and sessions.
+Presence is refreshed every 10 seconds and expires after 45 seconds without a
+heartbeat. Transient presence is pruned after five minutes; invitations are
+retained for at most 30 days plus the five-minute cleanup cadence.
+
+Background/locked-device delivery uses the existing Expo notification transport
+and requires notification permission and valid push credentials/tokens. It does
+not add PushKit/CallKit or Android full-screen calling UI. Browser ringtone playback
+is subject to browser autoplay rules. Native notification taps refresh invitations,
+including cold launch; expired invitations show a call-ended message. Validate
+foreground/background, locked device, declined notification permission, recipient
+already joined, guardian delivery, cancellation, expiry and duplicate calls with
+synthetic accounts on physical devices before enabling production rollout.
+
+#### Declining, replying and missed calls
+
+Calling is allowed only within the current scheduled occurrence (`start <= now < end`).
+The API uses the recurrence resolver in strict mode, so early/late join grace,
+cancelled slots, stale sessions and unscheduled/ad-hoc classes cannot ring people.
+An open SDK session is not sufficient. The database also enforces the occurrence
+boundary when inserting invitations and caps ringing at the scheduled end. The API
+supplies the currently verified end when a lesson has been extended.
+
+Incoming invitations offer Decline, Join and Message tutor. Message tutor opens
+an authorized private conversation as the signed-in account (a guardian is not
+silently impersonated as their child), dismisses the ring, and sends no text until
+the user composes it. This invitation-scoped contact uses the `classroom-calls`
+permission and independently verifies the recipient, tutor and current class membership. General direct-message
+creation keeps its separate `enable-mobile-direct-message-start` rollout. Declining
+works locally during a network failure and retries acknowledgement when connectivity returns.
+
+Migration `20261103150000_classroom_call_follow_up.sql` adds durable missed-call
+processing. A once-per-minute database job finalizes unanswered invitations and
+queues one `classroom.call.missed` activity event per call through the existing
+activity/notification pipeline. Only the intended student and linked guardians
+receive it. Answered, declined and cancelled calls do not create missed-call
+notifications. Publication honors activity suppression; notification delivery
+honors the existing preference engine. Calls already expired before rollout are
+not retroactively notified.
+
+The inbox and missed-call push open call details with Join classroom and Message
+tutor. Join is checked again by the API and disabled outside the class window or
+while the recipient is already in another call. Messaging remains available after
+the scheduled class ends while the participant retains authorized classroom access.
+No call action starts camera/microphone or sends an automatic message. Validate
+missed-call push delivery and background/cold-launch actions on physical devices.

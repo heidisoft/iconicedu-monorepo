@@ -1,4 +1,5 @@
 import '../global.css';
+import { IncomingClassCall } from '@/components/classroom/incoming-class-call';
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
@@ -74,6 +75,7 @@ function RootContent() {
       <AppLifecycleTracker />
       <PresenceTracker />
       <Slot />
+      <IncomingClassCall />
       <WhatsNewModal
         visible={whatsNew.shouldShow && isWhatsNewEligible}
         releaseNotes={whatsNew.releaseNotes}

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -49,6 +49,7 @@ export type ParticipantListItem = {
 
 export function ZoomParticipantsPanel({
   open,
+  classRoster,
   participants,
   canMuteOthers,
   className,
@@ -62,6 +63,7 @@ export function ZoomParticipantsPanel({
   onRemove,
 }: {
   open: boolean;
+  classRoster?: ReactNode;
   participants: ParticipantListItem[];
   canMuteOthers: boolean;
   canManageCoHosts?: boolean;
@@ -290,6 +292,7 @@ export function ZoomParticipantsPanel({
                 ) : null}
               </div>
             ))}
+            {classRoster}
           </div>
         </SheetContent>
       </Sheet>

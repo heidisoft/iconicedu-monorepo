@@ -144,11 +144,35 @@ it('keeps whiteboard beside media and device settings in unified Settings', () =
   ).toEqual([
     'Mute microphone',
     'Stop video',
-    'Whiteboard',
     'Share screen',
+    'Whiteboard',
     'More controls',
     'Leave class',
   ]);
   press(screen.getByLabelText('More controls'));
   expect(screen.getByLabelText('Settings')).toBeTruthy();
+});
+
+it('matches the web media, presentation, invitation, More and leave order', () => {
+  const screen = render(
+    <NativeMeetingToolbar>
+      {[
+        'Leave class',
+        'Invite',
+        'Whiteboard',
+        'Share screen',
+        'Settings',
+        'Stop video',
+        'Mute microphone',
+      ].map((label) => action(label))}
+    </NativeMeetingToolbar>,
+  );
+  expect(screen.getAllByRole('button').map((b) => b.props.accessibilityLabel)).toEqual([
+    'Mute microphone',
+    'Stop video',
+    'Share screen',
+    'Whiteboard',
+    'More controls',
+    'Leave class',
+  ]);
 });

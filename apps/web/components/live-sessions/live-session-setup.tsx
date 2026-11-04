@@ -202,6 +202,7 @@ export function LiveSessionSetup({
         settings={setup.credentials.settings ?? settings}
         annotationToken={setup.credentials.annotationToken}
         whiteboardAccess={setup.credentials.whiteboard}
+        studentProfileIds={setup.credentials.studentProfileIds}
         liveSessionId={sessionId}
         sessionPasscode={setup.passcode}
         sharePath={setup.credentials.sharePath ?? sharePath}

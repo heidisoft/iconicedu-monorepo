@@ -1,3 +1,4 @@
+import { IncomingClassCall } from '@iconicedu/web/components/live-sessions/incoming-class-call';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
@@ -22,6 +23,7 @@ import {
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import {
+  enableClassroomCalls,
   enableAssessments,
   enableMessageDrafts,
   enableOrgAiProviderSettings,
@@ -107,6 +109,9 @@ export default async function Layout({
   const orgAiSettingsEnabled = await enableOrgAiProviderSettings.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
+  const classroomCallsEnabled = await enableClassroomCalls.run({
+    identify: { profileId: familyViewResolution.effectiveProfile.id },
+  });
   const includeReports = false;
 
   return (
@@ -124,6 +129,7 @@ export default async function Layout({
         subjectOptions={subjectOptions}
         enableMessageDrafts={messageDraftsEnabled}
       >
+        {classroomCallsEnabled && <IncomingClassCall />}
         {children}
       </SidebarShell>
     </SidebarProvider>

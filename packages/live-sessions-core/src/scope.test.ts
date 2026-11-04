@@ -140,3 +140,63 @@ describe('resolveChannelLiveSessionScope', () => {
     });
   });
 });
+
+describe('strict classroom calling scope', () => {
+  it.each([
+    ['before', '2026-11-03T14:59:59.999Z', 'scheduled', false],
+    ['start', '2026-11-03T15:00:00.000Z', 'scheduled', true],
+    ['during', '2026-11-03T15:30:00.000Z', 'scheduled', true],
+    ['end', '2026-11-03T16:00:00.000Z', 'scheduled', false],
+    ['cancelled', '2026-11-03T15:30:00.000Z', 'cancelled', false],
+  ])(
+    'uses no grace or cancelled occurrences: %s',
+    async (_label, now, status, allowed) => {
+      vi.mocked(buildClassSchedulesByOrg).mockResolvedValue([
+        {
+          ids: { id: 'schedule' },
+          title: 'Test class',
+          source: { kind: 'class_session', channelId: 'channel' },
+        },
+      ] as never);
+      vi.mocked(expandRecurringEvents).mockReturnValue([
+        {
+          startAt: '2026-11-03T15:00:00.000Z',
+          endAt: '2026-11-03T16:00:00.000Z',
+          status,
+        },
+      ] as never);
+      const result = await resolveChannelLiveSessionScope({
+        supabase: {} as never,
+        orgId: 'org',
+        channelId: 'channel',
+        now: new Date(now),
+        strictClassTime: true,
+      });
+      expect(!!result.schedule).toBe(allowed);
+    },
+  );
+});
+
+it('uses the live session’s own schedule when class windows overlap', async () => {
+  vi.mocked(buildClassSchedulesByOrg).mockResolvedValue([
+    { ids: { id: 'other' }, source: { kind: 'class_session', channelId: 'channel' } },
+    { ids: { id: 'target' }, source: { kind: 'class_session', channelId: 'channel' } },
+  ] as never);
+  vi.mocked(expandRecurringEvents).mockReturnValue([
+    {
+      startAt: '2026-11-03T15:00:00Z',
+      endAt: '2026-11-03T16:00:00Z',
+      status: 'scheduled',
+    },
+  ] as never);
+  const result = await resolveChannelLiveSessionScope({
+    supabase: {} as never,
+    orgId: 'org',
+    channelId: 'channel',
+    now: new Date('2026-11-03T15:30:00Z'),
+    strictClassTime: true,
+    scheduleId: 'target',
+    occurrenceKey: '2026-11-03T15:00:00Z',
+  });
+  expect(result.schedule?.ids.id).toBe('target');
+});

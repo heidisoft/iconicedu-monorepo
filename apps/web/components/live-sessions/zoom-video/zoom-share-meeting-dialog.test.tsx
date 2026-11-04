@@ -99,4 +99,32 @@ describe('ZoomShareMeetingDialog', () => {
     );
     expect(screen.getByRole('button', { name: 'Copy invitation' })).toBeVisible();
   });
+  it('opens from More through controlled state without an extra toolbar button', () => {
+    const changed = vi.fn();
+    const view = render(
+      <ZoomShareMeetingDialog
+        meetingTitle="Test class"
+        sessionId="test-session"
+        hideTrigger
+        open={false}
+        onOpenChange={changed}
+      />,
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Share meeting link' }),
+    ).not.toBeInTheDocument();
+    view.rerender(
+      <ZoomShareMeetingDialog
+        meetingTitle="Test class"
+        sessionId="test-session"
+        hideTrigger
+        open
+        onOpenChange={changed}
+      />,
+    );
+    expect(screen.getByRole('dialog')).toBeVisible();
+    expect(screen.getByLabelText('Meeting join link')).toHaveValue(
+      `${window.location.origin}/live/test-session`,
+    );
+  });
 });

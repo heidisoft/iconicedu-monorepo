@@ -1,4 +1,5 @@
 'use client';
+import { CLASSROOM_PRIMARY_CONTROL_ORDER } from '@iconicedu/shared-types';
 
 import type { ReactNode } from 'react';
 import { SpeakingAudioIcon } from '@iconicedu/ui-web/ui/speaking-audio-icon';
@@ -103,12 +104,28 @@ export function MeetingControlButton({
   tone = 'neutral',
   mobileSecondary = false,
   className,
+  style,
   children,
   ...props
 }: MeetingControlButtonProps) {
+  const text = label.toLowerCase();
+  const key = text.includes('microphone')
+    ? 'microphone'
+    : text.includes('camera') || text.includes('video')
+      ? 'camera'
+      : text === 'share screen' || text === 'stop sharing screen'
+        ? 'screen'
+        : text.includes('whiteboard')
+          ? 'whiteboard'
+          : text === 'share meeting link'
+            ? 'more'
+            : text.includes('more controls')
+              ? 'more'
+              : 'leave';
   return (
     <IconActionButton
       {...props}
+      style={{ ...style, order: CLASSROOM_PRIMARY_CONTROL_ORDER.indexOf(key) }}
       size="icon-lg"
       variant={
         tone === 'danger' ? 'destructive' : tone === 'active' ? 'default' : 'meeting'

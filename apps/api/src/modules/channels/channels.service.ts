@@ -1,3 +1,4 @@
+import { authorizeClassroomCallContact } from './classroom-call-contact';
 import { randomUUID } from 'crypto';
 import {
   ForbiddenException,
@@ -749,9 +750,11 @@ export class ChannelsService {
     return buildDirectMessageChannelResult(channel.id, targetProfile);
   }
 
+  // Call context is backend-only and independently verified; public ensure-dm cannot supply it.
   async ensureDirectMessageChannel(
     accessToken: string,
     input: { orgId: string; profileId: string; otherProfileId: string },
+    options?: { classroomCallId: string },
   ): Promise<DirectMessageChannelResult | null> {
     if (
       !input.orgId ||
@@ -763,7 +766,9 @@ export class ChannelsService {
     }
 
     const canCreateDirectMessage = await evaluateApiBooleanFlag({
-      flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+      flagKey: options?.classroomCallId
+        ? apiFeatureFlagKeys.enableClassroomCalls
+        : apiFeatureFlagKeys.enableMobileDirectMessageStart,
       distinctId: input.profileId,
       personProperties: {
         profileId: input.profileId,
@@ -825,6 +830,17 @@ export class ChannelsService {
       profile: currentProfile,
     });
     if (!canActAsCurrentProfile) return null;
+    if (
+      options?.classroomCallId &&
+      (targetProfile.kind !== 'educator' ||
+        !(await authorizeClassroomCallContact(
+          writeSupabase,
+          supabase,
+          input,
+          options.classroomCallId,
+        )))
+    )
+      return null;
 
     const [
       { data: currentMemberships, error: currentMembershipsError },

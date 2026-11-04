@@ -519,6 +519,14 @@ export function buildPersonalizedSessionCopy(
     };
   }
 
+  if (eventType === 'classroom.call.missed') {
+    const tutor = firstDefinedString(payload.tutorName) ?? 'your tutor';
+    return {
+      title: `Missed call from ${tutor}`,
+      summary: `Join ${firstDefinedString(payload.classTitle) ?? 'the classroom'} or message your tutor.`,
+    };
+  }
+
   if (eventType === 'session.reminder.sent') {
     const startAt = firstDefinedString(
       payload.sessionDateTime,

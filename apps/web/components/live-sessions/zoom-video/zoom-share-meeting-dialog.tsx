@@ -24,13 +24,24 @@ export function ZoomShareMeetingDialog({
   meetingPasscode,
   sharePath,
   sessionId,
+  open: controlledOpen,
+  onOpenChange,
+  hideTrigger = false,
 }: {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
   meetingTitle: string;
   sharePath?: string;
   sessionId?: string | null;
   meetingPasscode?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = controlledOpen ?? localOpen;
+  const setOpen = (value: boolean) => {
+    setLocalOpen(value);
+    onOpenChange?.(value);
+  };
   const [meetingUrl, setMeetingUrl] = useState('');
   const [copiedTarget, setCopiedTarget] = useState<
     'link' | 'passcode' | 'invitation' | null
@@ -78,13 +89,15 @@ export function ZoomShareMeetingDialog({
       title="Share meeting link"
       description="Anyone with an invitation link can join without entering the passcode."
       trigger={
-        <MeetingControlButton
-          label="Share meeting link"
-          className="zoom-toolbar-share-link"
-          tone={open ? 'active' : 'neutral'}
-        >
-          <Share className="size-4" />
-        </MeetingControlButton>
+        hideTrigger ? undefined : (
+          <MeetingControlButton
+            label="Share meeting link"
+            className="zoom-toolbar-share-link"
+            tone={open ? 'active' : 'neutral'}
+          >
+            <Share className="size-4" />
+          </MeetingControlButton>
+        )
       }
     >
       <div className="space-y-4">

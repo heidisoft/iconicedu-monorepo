@@ -1,4 +1,5 @@
 'use client';
+import { CLASSROOM_MORE_CONTROL_ORDER } from '@iconicedu/shared-types';
 import { NotificationCard } from '@iconicedu/ui-web/ui/notification-card';
 
 import type { MeetingFeatureAction } from './meeting-feature-action';
@@ -68,7 +69,11 @@ export function ZoomMoreControls({
   const mobileViewport = useIsMobile();
   // A compact floating call uses a menu in its own document instead of a mobile sheet.
   const isMobile = mobileViewport && !portalContainer;
-  const menuActions = actions;
+  const rank = (id: string) =>
+    CLASSROOM_MORE_CONTROL_ORDER.findIndex((key) => id.includes(key));
+  const menuActions = [...actions].sort(
+    (a, b) => (rank(a.id) < 0 ? 99 : rank(a.id)) - (rank(b.id) < 0 ? 99 : rank(b.id)),
+  );
   const featureError = error ? (
     <NotificationCard
       role="alert"

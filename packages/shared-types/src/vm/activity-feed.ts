@@ -20,6 +20,7 @@ export type ActivityVerbVM =
   | 'class.schedule.ended'
   | 'class.session.rescheduled'
   | 'class.session.canceled'
+  | 'classroom.call.missed'
   | 'session.reminder.sent'
   | 'session.feedback_request.sent'
   | 'session.completion_check.sent'
