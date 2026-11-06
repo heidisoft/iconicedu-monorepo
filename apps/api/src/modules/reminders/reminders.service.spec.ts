@@ -704,6 +704,7 @@ describe('RemindersService', () => {
           title: 'Algebra',
           learningSpaceTitle: 'Algebra',
           channelRouteKind: 'space',
+          reminderDedupeKey: claimedJob.dedupe_key,
         }),
       }),
     );

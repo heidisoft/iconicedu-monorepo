@@ -10,12 +10,13 @@ Engineers operating or debugging scheduled reminder delivery.
 
 ## Last Updated
 
-2026-04-20
+2026-09-16
 
 ## Related Docs
 
 - [Documentation Hub](../README.md)
 - [Deployment](deployment.md)
+- [Push Notifications](push-notifications.md)
 
 This sets up a Supabase scheduled Edge Function that calls:
 
@@ -305,6 +306,13 @@ a minute bucket. It preserves active leases, retry attempts and terminal results
 it does not automatically resend a succeeded delivery. A deliberate replay should
 inspect and retry the existing failed/dead-letter job. Preferences and recipient
 eligibility still apply independently of worker scheduling.
+
+Session reminder jobs also publish `reminderDedupeKey` (the raw
+`reminder_jobs.dedupe_key`) on the `session.reminder.sent` activity payload. The
+push provider turns it into a tray `collapseId`, so a repeat send of the same
+reminder replaces the earlier device notification instead of stacking another
+copy — see
+[Reminder Push Collapsing](push-notifications.md#reminder-push-collapsing).
 
 Both queues reclaim expired leases. Retryable failures use exponential backoff
 from 15 seconds up to ten minutes, with eight attempts by default. Delivery is

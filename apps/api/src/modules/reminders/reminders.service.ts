@@ -1323,6 +1323,9 @@ export class RemindersService {
           title: payload.title,
           learningSpaceTitle: payload.title,
           channelRouteKind: payload.channelRouteKind ?? 'space',
+          // Carried so the push provider can collapse repeat sends of this same
+          // reminder in the device tray instead of stacking them.
+          reminderDedupeKey: job.dedupe_key,
         },
         dedupeKey: `${job.dedupe_key}:activity`,
         refreshOnDedupe: true,
