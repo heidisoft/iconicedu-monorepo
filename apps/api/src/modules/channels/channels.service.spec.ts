@@ -26,7 +26,17 @@ const mockEvaluateApiBooleanFlag = evaluateApiBooleanFlag as jest.Mock;
 // Build a fluent chain that returns `mockMaybeSingle` at the leaf.
 function makeChain() {
   const chain: Record<string, jest.Mock> = {};
-  const methods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit', 'insert'];
+  const methods = [
+    'from',
+    'select',
+    'eq',
+    'in',
+    'is',
+    'order',
+    'limit',
+    'insert',
+    'update',
+  ];
   for (const m of methods) {
     chain[m] = jest.fn().mockReturnValue(chain);
   }
@@ -210,6 +220,7 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
       'order',
       'limit',
       'insert',
+      'update',
     ];
     for (const m of serviceMethods) {
       (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
@@ -217,6 +228,7 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
       );
     }
     mockEvaluateApiBooleanFlag.mockResolvedValue(true);
+    mockRpc.mockResolvedValue({ data: true, error: null });
   });
 
   it('loads the target profile through the service client when creating a DM', async () => {
@@ -406,6 +418,139 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
       channelId: 'dm-channel-1',
       topic: 'Ms Barbara',
     });
+    expect(mockServiceClient.insert).not.toHaveBeenCalled();
+  });
+
+  it('does not create a tutor DM when no active class connects the pair', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'student-auth-user-1' } },
+      error: null,
+    });
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+          kind: 'child',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'educator-profile-1', org_id: 'org-1', kind: 'educator' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'student-account-1' }, error: null });
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
+
+    const result = await svc.ensureDirectMessageChannel('student-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toBeNull();
+    expect(mockRpc).toHaveBeenCalledWith('tutor_contact_has_active_class', {
+      p_org_id: 'org-1',
+      p_educator_profile_id: 'educator-profile-1',
+      p_contact_profile_id: 'student-profile-1',
+    });
+    expect(mockServiceClient.insert).not.toHaveBeenCalled();
+  });
+
+  it('does not apply the class check to staff DMs', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'staff-auth-user-1' } },
+      error: null,
+    });
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'staff-profile-1',
+          org_id: 'org-1',
+          account_id: 'staff-account-1',
+          kind: 'staff',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'student-profile-1', org_id: 'org-1', kind: 'child' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'staff-account-1' }, error: null });
+    mockServiceClient.insert
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null });
+
+    await svc.ensureDirectMessageChannel('staff-token', {
+      orgId: 'org-1',
+      profileId: 'staff-profile-1',
+      otherProfileId: 'student-profile-1',
+    });
+
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockServiceClient.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('reopens a tutor DM that was archived with its class once the pair is connected again', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'student-auth-user-1' } },
+      error: null,
+    });
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+          kind: 'child',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'educator-profile-1', org_id: 'org-1', kind: 'educator' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'student-account-1' }, error: null });
+    let isCallCount = 0;
+    mockServiceClient.is.mockImplementation(() => {
+      isCallCount += 1;
+      if (isCallCount === 4 || isCallCount === 5) {
+        return Promise.resolve({ data: [{ channel_id: 'dm-channel-1' }], error: null });
+      }
+      return mockServiceClient;
+    });
+    mockServiceClient.limit.mockResolvedValueOnce({
+      data: [
+        { id: 'dm-channel-1', status: 'archived', updated_at: '2026-11-13T00:00:00Z' },
+      ],
+      error: null,
+    });
+    let eqAfterUpdate = 0;
+    mockServiceClient.update.mockImplementation(() => {
+      eqAfterUpdate = 0;
+      const updateChain = {
+        eq: jest.fn(() => {
+          eqAfterUpdate += 1;
+          return eqAfterUpdate === 2 ? Promise.resolve({ error: null }) : updateChain;
+        }),
+      };
+      return updateChain;
+    });
+
+    const result = await svc.ensureDirectMessageChannel('student-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toMatchObject({ channelId: 'dm-channel-1' });
+    expect(mockServiceClient.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'active', archived_at: null }),
+    );
     expect(mockServiceClient.insert).not.toHaveBeenCalled();
   });
 });

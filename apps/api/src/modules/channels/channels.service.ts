@@ -143,6 +143,26 @@ function resolveMessageUiThemeKey(uiDefaults: unknown): 'classic' | 'feed' | nul
   return value === 'classic' || value === 'feed' ? value : null;
 }
 
+const TUTOR_CONTACT_KINDS = new Set(['child', 'guardian']);
+
+/**
+ * Educator <-> child/guardian DMs are only allowed while an active class
+ * connects the pair (public.tutor_contact_has_active_class). Other pairs
+ * (staff, tutor <-> tutor, family) are not class-scoped.
+ */
+export function resolveTutorContactPair(
+  a: { id: string; kind?: string | null },
+  b: { id: string; kind?: string | null },
+): { educatorProfileId: string; contactProfileId: string } | null {
+  if (a.kind === 'educator' && TUTOR_CONTACT_KINDS.has(b.kind ?? '')) {
+    return { educatorProfileId: a.id, contactProfileId: b.id };
+  }
+  if (b.kind === 'educator' && TUTOR_CONTACT_KINDS.has(a.kind ?? '')) {
+    return { educatorProfileId: b.id, contactProfileId: a.id };
+  }
+  return null;
+}
+
 function isDmChannelUniqueConflict(error: { code?: string; message?: string }) {
   return (
     error.code === '23505' &&
@@ -780,11 +800,11 @@ export class ChannelsService {
     ] = await Promise.all([
       writeSupabase
         .from('profiles')
-        .select('id, org_id, account_id')
+        .select('id, org_id, account_id, kind')
         .eq('id', input.profileId)
         .eq('org_id', input.orgId)
         .is('deleted_at', null)
-        .maybeSingle<ProfileActorRow>(),
+        .maybeSingle<ProfileActorRow & { kind?: string | null }>(),
       writeSupabase
         .from('profiles')
         .select(
@@ -826,6 +846,22 @@ export class ChannelsService {
     });
     if (!canActAsCurrentProfile) return null;
 
+    const tutorContactPair = resolveTutorContactPair(currentProfile, targetProfile);
+    if (tutorContactPair) {
+      const { data: connected, error: connectedError } = await writeSupabase.rpc(
+        'tutor_contact_has_active_class',
+        {
+          p_org_id: input.orgId,
+          p_educator_profile_id: tutorContactPair.educatorProfileId,
+          p_contact_profile_id: tutorContactPair.contactProfileId,
+        },
+      );
+      if (connectedError) {
+        throw new InternalServerErrorException(connectedError.message);
+      }
+      if (connected !== true) return null;
+    }
+
     const [
       { data: currentMemberships, error: currentMembershipsError },
       { data: targetMemberships, error: targetMembershipsError },
@@ -857,22 +893,40 @@ export class ChannelsService {
       .map((row) => row.channel_id as string)
       .filter((channelId) => currentChannelIds.has(channelId));
     if (sharedChannelIds.length) {
+      // A tutor DM archived when its class ended is reopened (history intact)
+      // once an active class connects the pair again.
       const { data: existingChannels, error: existingChannelsError } = await writeSupabase
         .from('channels')
-        .select('id, updated_at')
+        .select('id, status, updated_at')
         .eq('org_id', input.orgId)
         .eq('kind', 'dm')
-        .eq('status', 'active')
+        .in('status', tutorContactPair ? ['active', 'archived'] : ['active'])
         .in('id', sharedChannelIds)
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
-        .limit(1);
+        .limit(10);
       if (existingChannelsError) {
         throw new InternalServerErrorException(existingChannelsError.message);
       }
-      const existingChannel = existingChannels?.[0];
-      if (existingChannel) {
-        return buildDirectMessageChannelResult(existingChannel.id, targetProfile);
+      const channels = (existingChannels ?? []) as Array<{ id: string; status?: string }>;
+      const activeChannel = channels.find((channel) => channel.status !== 'archived');
+      if (activeChannel) {
+        return buildDirectMessageChannelResult(activeChannel.id, targetProfile);
+      }
+      const archivedChannel = channels[0];
+      if (archivedChannel) {
+        const { error: reopenError } = await writeSupabase
+          .from('channels')
+          .update({
+            status: 'active',
+            archived_at: null,
+            updated_at: new Date().toISOString(),
+            updated_by: input.profileId,
+          })
+          .eq('id', archivedChannel.id)
+          .eq('status', 'archived');
+        if (reopenError) throw new InternalServerErrorException(reopenError.message);
+        return buildDirectMessageChannelResult(archivedChannel.id, targetProfile);
       }
     }
 

@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { assertChannelWritable } from '@iconicedu/api/lib/messages/assert-channel-writable';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
 @Injectable()
@@ -65,6 +66,11 @@ export class ReactionsService {
     if (!messageResponse.data.channel_id) {
       throw new NotFoundException('Message channel not found');
     }
+    await assertChannelWritable(
+      serviceSupabase,
+      body.orgId,
+      messageResponse.data.channel_id,
+    );
 
     const { data: existing, error: selectError } = await supabase
       .from('message_reactions')

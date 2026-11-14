@@ -34,6 +34,7 @@ import {
 } from '@iconicedu/api/lib/messages/message-activity';
 import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
+import { assertChannelWritable } from '@iconicedu/api/lib/messages/assert-channel-writable';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import {
   apiFeatureFlagKeys,
@@ -1640,6 +1641,7 @@ export class MessagesService {
     if (message.type !== 'text') {
       throw new BadRequestException('Only text messages can be edited');
     }
+    await assertChannelWritable(serviceSupabase, input.orgId, message.channel_id);
 
     const actor = await this.resolveWritableProfile({
       authUserId,

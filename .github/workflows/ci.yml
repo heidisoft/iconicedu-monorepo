@@ -1251,6 +1251,14 @@ jobs:
               if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
                 raise exception 'missing edge-function-channel-read-state-repair cron job';
               end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'learning-space-archive-retention'
+                  and active and schedule = '23 3 * * *'
+                  and command = 'select public.purge_archived_learning_space_artifacts();'
+              ) then
+                raise exception 'missing or misconfigured learning-space-archive-retention cron job';
+              end if;
               if exists (
                 select 1
                 from cron.job
@@ -1960,6 +1968,14 @@ jobs:
               end if;
               if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
                 raise exception 'missing edge-function-channel-read-state-repair cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'learning-space-archive-retention'
+                  and active and schedule = '23 3 * * *'
+                  and command = 'select public.purge_archived_learning_space_artifacts();'
+              ) then
+                raise exception 'missing or misconfigured learning-space-archive-retention cron job';
               end if;
               if exists (
                 select 1

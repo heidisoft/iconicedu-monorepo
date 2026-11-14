@@ -1,6 +1,7 @@
 import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 
-type ArchivableTable = 'learning_spaces' | 'channels';
+// Classes (learning_spaces) go through apps/api: see learning-space-lifecycle.ts.
+type ArchivableTable = 'channels';
 type EntityStatus = 'active' | 'archived';
 
 export async function setEntityStatus(

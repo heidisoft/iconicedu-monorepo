@@ -64,6 +64,8 @@ function setUpServiceClient(input: {
   senderAccountId?: string;
   /** Simulates the is_edited UPDATE matching zero rows (defaults to a single matching row). */
   messagesUpdateMatchedRows?: Array<{ id: string }>;
+  /** Status of the message's channel (defaults to active). */
+  channelStatus?: string;
 }) {
   const accountId = input.accountId ?? 'account-1';
   const senderAccountId = input.senderAccountId ?? accountId;
@@ -88,6 +90,10 @@ function setUpServiceClient(input: {
     error: null,
   });
   const familyLinksChain = makeChain({ data: null, error: null });
+  const channelsChain = makeChain({
+    data: { status: input.channelStatus ?? 'active', deleted_at: null },
+    error: null,
+  });
   const messageTextUpdateChain = makeChain({ data: null, error: null });
   const messagesUpdateChain = makeChain({
     data: input.messagesUpdateMatchedRows ?? [{ id: MESSAGE_ID }],
@@ -103,6 +109,7 @@ function setUpServiceClient(input: {
     if (table === 'accounts') return accountsChain;
     if (table === 'profiles') return profilesChain;
     if (table === 'family_links') return familyLinksChain;
+    if (table === 'channels') return channelsChain;
     if (table === 'message_text') return messageTextUpdateChain;
     throw new Error(`Unexpected table access in test: ${table}`);
   });
@@ -131,6 +138,22 @@ describe('MessagesService.editTextMessage', () => {
         content: 'nope',
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('rejects edits in an archived conversation', async () => {
+    const { messageTextUpdateChain } = setUpServiceClient({
+      messageRow: baseMessageRow(),
+      channelStatus: 'archived',
+    });
+
+    await expect(
+      service.editTextMessage(AUTH_USER_ID, 'token', MESSAGE_ID, {
+        orgId: ORG_ID,
+        messageId: MESSAGE_ID,
+        content: 'too late',
+      }),
+    ).rejects.toThrow('This conversation is archived and read-only');
+    expect(messageTextUpdateChain.update).not.toHaveBeenCalled();
   });
 
   it('updates the message_text payload and marks the message edited', async () => {
