@@ -445,6 +445,131 @@ function buildSupportVisibilityFields(input: {
   };
 }
 
+export async function resolveChannelAudienceVisibility(input: {
+  serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
+  activityContext: ActivityChannelContext;
+  orgId: string;
+  channelId: string;
+  senderProfileId: string;
+  isStaffSender: boolean;
+  threadParentId?: string | null;
+  replyToMessageId?: string | null;
+  requestedProfileIds?: unknown;
+  supportVisibility: {
+    visibility_type: 'all' | 'specific-users';
+    visibility_user_ids?: string[];
+  };
+}) {
+  if (
+    input.requestedProfileIds !== undefined &&
+    input.requestedProfileIds !== null &&
+    (!Array.isArray(input.requestedProfileIds) ||
+      input.requestedProfileIds.some((id) => typeof id !== 'string'))
+  ) {
+    throw new BadRequestException('Message audience profileIds must be a string array');
+  }
+  const requestedIds = Array.from(
+    new Set(
+      ((input.requestedProfileIds ?? []) as string[])
+        .map((id) => id.trim())
+        .filter(Boolean),
+    ),
+  );
+  const hasAudienceInput = input.requestedProfileIds !== undefined;
+  if (input.activityContext.channelPurpose === 'support') {
+    if (requestedIds.length) {
+      throw new BadRequestException(
+        'Support channel audiences are managed by the support conversation',
+      );
+    }
+    return input.supportVisibility;
+  }
+
+  const audienceSourceMessageId = input.threadParentId ?? input.replyToMessageId;
+  if (audienceSourceMessageId) {
+    if (requestedIds.length) {
+      throw new BadRequestException('Replies inherit the referenced message audience');
+    }
+    const parentResponse = await input.serviceSupabase
+      .from('messages')
+      .select('visibility_type, visibility_user_ids')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('id', audienceSourceMessageId)
+      .is('deleted_at', null)
+      .maybeSingle<{
+        visibility_type: string | null;
+        visibility_user_ids: string[] | null;
+      }>();
+    if (parentResponse.error) {
+      throw new InternalServerErrorException(parentResponse.error.message);
+    }
+    if (!parentResponse.data) {
+      throw new BadRequestException('Referenced message was not found');
+    }
+    if (parentResponse.data.visibility_type === 'specific-users') {
+      const inheritedIds = Array.from(
+        new Set(parentResponse.data.visibility_user_ids ?? []),
+      );
+      if (!inheritedIds.length) {
+        throw new BadRequestException('Referenced message has an invalid empty audience');
+      }
+      return {
+        visibility_type: 'specific-users' as const,
+        visibility_user_ids: inheritedIds,
+      };
+    }
+    return { visibility_type: 'all' as const };
+  }
+
+  if (!requestedIds.length) {
+    if (hasAudienceInput) {
+      throw new BadRequestException('Message audience cannot be empty');
+    }
+    return { visibility_type: 'all' as const };
+  }
+  if (requestedIds.length > 100) {
+    throw new BadRequestException('A message audience can contain at most 100 people');
+  }
+  if (input.activityContext.channelRouteKind === 'dm') {
+    throw new BadRequestException('Direct message audiences cannot be changed');
+  }
+  if (!input.isStaffSender) {
+    throw new ForbiddenException('Only staff can choose a channel message audience');
+  }
+  const audienceEnabled = await evaluateApiBooleanFlag({
+    flagKey: apiFeatureFlagKeys.enableChannelCommunications,
+    distinctId: input.senderProfileId,
+  });
+  if (!audienceEnabled) {
+    throw new ForbiddenException('Channel message audiences are not available');
+  }
+
+  const memberResponse = await input.serviceSupabase
+    .from('channel_members')
+    .select('profile_id')
+    .eq('org_id', input.orgId)
+    .eq('channel_id', input.channelId)
+    .in('profile_id', requestedIds)
+    .is('deleted_at', null)
+    .returns<Array<{ profile_id: string }>>();
+  if (memberResponse.error) {
+    throw new InternalServerErrorException(memberResponse.error.message);
+  }
+  const activeMemberIds = new Set(
+    (memberResponse.data ?? []).map((member) => member.profile_id),
+  );
+  const invalidIds = requestedIds.filter((id) => !activeMemberIds.has(id));
+  if (invalidIds.length) {
+    throw new BadRequestException('Every audience member must belong to this channel');
+  }
+
+  return {
+    visibility_type: 'specific-users' as const,
+    visibility_user_ids: Array.from(new Set([input.senderProfileId, ...requestedIds])),
+  };
+}
+
 async function ensureChannelMembershipForMessageWrite(input: {
   serviceSupabase: ReturnType<typeof createSupabaseServiceClient>;
   shouldEnsureMembership: boolean;
@@ -1463,6 +1588,18 @@ export class MessagesService {
         questionOwnerProfileId: supportQuestionOwnerProfileId,
         privilegedProfileIds: supportPrivilegedProfileIds,
       });
+      const messageVisibility = await resolveChannelAudienceVisibility({
+        serviceSupabase,
+        activityContext,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: actor.profile.id,
+        isStaffSender: staffSender,
+        threadParentId: input.threadParentId,
+        replyToMessageId: input.replyToMessageId,
+        requestedProfileIds: input.audience?.profileIds,
+        supportVisibility,
+      });
       const writeAccess = await resolveChannelWriteAccessForMessage({
         serviceSupabase,
         activityContext,
@@ -1493,8 +1630,8 @@ export class MessagesService {
             : previewMetadata
               ? 'link-preview'
               : 'text',
-          visibility_type: supportVisibility.visibility_type,
-          visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
+          visibility_type: messageVisibility.visibility_type,
+          visibility_user_ids: messageVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
           reply_to_message_id: replyReference?.messageId ?? null,
@@ -1813,6 +1950,17 @@ export class MessagesService {
         questionOwnerProfileId: supportQuestionOwnerProfileId,
         privilegedProfileIds: supportPrivilegedProfileIds,
       });
+      const messageVisibility = await resolveChannelAudienceVisibility({
+        serviceSupabase,
+        activityContext,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: actor.profile.id,
+        isStaffSender: staffSender,
+        threadParentId: input.threadParentId,
+        requestedProfileIds: input.audience?.profileIds,
+        supportVisibility,
+      });
       const writeAccess = await resolveChannelWriteAccessForMessage({
         serviceSupabase,
         activityContext,
@@ -1847,8 +1995,8 @@ export class MessagesService {
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
           type: messageType,
-          visibility_type: supportVisibility.visibility_type,
-          visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
+          visibility_type: messageVisibility.visibility_type,
+          visibility_user_ids: messageVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
           created_at: now,
@@ -2074,6 +2222,17 @@ export class MessagesService {
         questionOwnerProfileId: supportQuestionOwnerProfileId,
         privilegedProfileIds: supportPrivilegedProfileIds,
       });
+      const messageVisibility = await resolveChannelAudienceVisibility({
+        serviceSupabase,
+        activityContext,
+        orgId: input.orgId,
+        channelId: input.channelId,
+        senderProfileId: actor.profile.id,
+        isStaffSender: staffSender,
+        threadParentId: input.threadParentId,
+        requestedProfileIds: input.audience?.profileIds,
+        supportVisibility,
+      });
       const writeAccess = await resolveChannelWriteAccessForMessage({
         serviceSupabase,
         activityContext,
@@ -2116,8 +2275,8 @@ export class MessagesService {
           channel_id: input.channelId,
           sender_profile_id: actor.profile.id,
           type: messageType,
-          visibility_type: supportVisibility.visibility_type,
-          visibility_user_ids: supportVisibility.visibility_user_ids ?? null,
+          visibility_type: messageVisibility.visibility_type,
+          visibility_user_ids: messageVisibility.visibility_user_ids ?? null,
           thread_id: threadId,
           thread_parent_id: input.threadParentId ?? null,
           created_at: now,

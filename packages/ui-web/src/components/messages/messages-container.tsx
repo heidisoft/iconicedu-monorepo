@@ -119,6 +119,7 @@ export interface MessagesContainerProps {
     content?: string;
     threadId?: string | null;
     threadParentId?: string | null;
+    audienceProfileIds?: string[];
   }) => Promise<MessageVM[]>;
   joinLiveSession?: () => Promise<void>;
   /** Gates draft autosave/restore for the main channel composer. Default off. */
@@ -127,6 +128,7 @@ export interface MessagesContainerProps {
   enableMessageEdit?: boolean;
   /** Gates clientMessageId-based idempotent retry of failed sends. Default off. */
   enableMessageSendReliability?: boolean;
+  enableMessageAudience?: boolean;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>
@@ -419,6 +421,7 @@ export function MessagesContainer({
   enableMessageDrafts = false,
   enableMessageEdit = false,
   enableMessageSendReliability = false,
+  enableMessageAudience = false,
 }: MessagesContainerProps) {
   const messageListRef = useRef<MessageListRef>(null);
   const messagesRef = useRef<MessageVM[]>([]);
@@ -935,6 +938,7 @@ export function MessagesContainer({
       mentions?: MessageMentionVM[],
       homework?: AssignmentSendInput,
       clientMessageId?: string,
+      audienceProfileIds?: string[],
     ) => {
       if (readOnly) return;
       if (!senderProfile) return;
@@ -967,6 +971,9 @@ export function MessagesContainer({
                 homework,
                 replyToMessageId,
                 clientMessageId,
+                audience: audienceProfileIds?.length
+                  ? { profileIds: audienceProfileIds }
+                  : undefined,
               }),
             );
             clearFailedSend(optimisticMessage.ids.id);
@@ -2259,7 +2266,12 @@ export function MessagesContainer({
           ) : (
             <MessageInput
               onSend={handleSendMessage}
-              onAttachFiles={(attachments, content) => {
+              onAttachFiles={(
+                attachments,
+                content,
+                _clientMessageId,
+                audienceProfileIds,
+              ) => {
                 if (readOnly || !uploadFileMessage) {
                   return;
                 }
@@ -2268,6 +2280,7 @@ export function MessagesContainer({
                     uploadFileMessage({
                       attachments,
                       content,
+                      audienceProfileIds,
                     }),
                   );
                   createdMessages.forEach((created) => {
@@ -2322,6 +2335,14 @@ export function MessagesContainer({
               }}
               placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
               participants={participants}
+              audienceParticipants={
+                enableMessageAudience &&
+                currentUserProfile?.kind === 'staff' &&
+                channel.basics.kind === 'channel' &&
+                channel.basics.purpose !== 'support'
+                  ? participants
+                  : undefined
+              }
               currentUserId={resolvedCurrentUserId}
               channelId={channel.ids.id}
               showCreateMessageTypeButton={showCreateMessageTypeButton}

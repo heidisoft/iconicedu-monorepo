@@ -1,0 +1,21 @@
+appId: ${APP_ID}
+name: Staff channel message audiences
+---
+- launchApp:
+    clearState: false
+- openLink: ${CLASSROOM_DEEP_LINK}
+- assertVisible:
+    id: message-audience-picker
+- tapOn: 'Parents'
+- tapOn:
+    id: message-input
+- inputText: 'Maestro parent-only welcome'
+- tapOn: 'Send message'
+- assertVisible: 'Maestro parent-only welcome'
+- assertVisible: 'Private.*'
+- tapOn: 'Tutors'
+- tapOn:
+    id: message-input
+- inputText: 'Maestro tutor-only handover'
+- tapOn: 'Send message'
+- assertVisible: 'Maestro tutor-only handover'

@@ -111,6 +111,13 @@ export type MessageSendMeta = {
   mentions?: MessageMentionVM[];
   /** Present when enableSendReliability is on — reuse it verbatim on retry. */
   clientMessageId?: string;
+  audienceProfileIds?: string[];
+};
+
+export type MessageAudienceParticipant = {
+  id: string;
+  name: string;
+  role: string | null;
 };
 
 /** Message currently being edited — drives the composer's edit mode. */
@@ -127,6 +134,7 @@ type MessageInputProps = {
     attachments: AttachmentPayload[],
     caption?: string,
     clientMessageId?: string,
+    audienceProfileIds?: string[],
   ) => Promise<void>;
   placeholder?: string;
   disabled?: boolean;
@@ -188,6 +196,8 @@ type MessageInputProps = {
   // ── Send-failure recovery (capability #2) — gate with enableMessageSendReliability ──
   /** When true, onSend receives a fresh clientMessageId in `meta` on every attempt. */
   enableSendReliability?: boolean;
+  /** Eligible recipients for staff audience selection; omitted in DMs and for non-staff. */
+  audienceParticipants?: MessageAudienceParticipant[];
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -587,6 +597,24 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       gap: 8,
     },
     mentionItemLabel: { fontSize: 15, color: C.text, fontWeight: '500' },
+    audienceBar: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: C.border,
+      backgroundColor: C.bg,
+      paddingVertical: 8,
+    },
+    audienceContent: { paddingHorizontal: 12, gap: 6, alignItems: 'center' },
+    audienceLabel: { color: C.textMuted, fontSize: 12, fontWeight: '600' },
+    audienceChip: {
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      backgroundColor: C.card,
+    },
+    audienceChipActive: { backgroundColor: C.actionSubtle, borderColor: C.action },
+    audienceChipText: { color: C.text, fontSize: 12, fontWeight: '600' },
   });
 }
 
@@ -618,8 +646,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   mentionCandidates = [],
   enableFormatting = false,
   enableSendReliability = false,
+  audienceParticipants = [],
 }) => {
   const [text, setText] = useState('');
+  const [audienceProfileIds, setAudienceProfileIds] = useState<string[]>([]);
   const [inputKey, setInputKey] = useState(0);
   const [sending, setSending] = useState(false);
   const sendProgress = useRef(new Animated.Value(0)).current;
@@ -981,8 +1011,12 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       try {
         await runSendProgress(
           () =>
-            onSendAttachment?.(attachments, caption, clientMessageId) ??
-            Promise.resolve(),
+            onSendAttachment?.(
+              attachments,
+              caption,
+              clientMessageId,
+              audienceProfileIds.length ? audienceProfileIds : undefined,
+            ) ?? Promise.resolve(),
         );
         // Only clear the draft once the attachment send is confirmed — the
         // caption text was autosaved the same way plain text is, so leaving
@@ -991,6 +1025,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         if (enableDrafts) {
           await draft.clearDraft();
         }
+        setAudienceProfileIds([]);
       } catch {
         // Failure — leave any persisted draft caption in place, matching the
         // text-send failure path below.
@@ -1014,6 +1049,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     if (enableSendReliability) {
       meta.clientMessageId = generateClientMessageId();
     }
+    if (audienceProfileIds.length) {
+      meta.audienceProfileIds = audienceProfileIds;
+    }
     const hasMeta = Object.keys(meta).length > 0;
 
     try {
@@ -1027,6 +1065,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       if (enableDrafts) {
         await draft.clearDraft();
       }
+      setAudienceProfileIds([]);
     } catch {
       // Failure — leave any persisted draft in place so the user's text isn't
       // lost. The parent screen (when send-reliability is on) is responsible
@@ -1044,6 +1083,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     runSendProgress,
     enableMentions,
     mentionCandidates,
+    audienceProfileIds,
     enableSendReliability,
     enableDrafts,
     draft,
@@ -1052,6 +1092,10 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const handleSendLongPress = useCallback(() => {
     if (!enableScheduledSend || !onScheduleSend) return;
     if (!text.trim() || pendingAttachments.length > 0) return;
+    if (audienceProfileIds.length) {
+      Alert.alert('Send now', 'Private channel messages cannot be scheduled.');
+      return;
+    }
     Alert.alert('Send message', undefined, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Schedule send', onPress: () => setSchedulePickerVisible(true) },
@@ -1059,7 +1103,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     ]);
     // handleSend is stable via useCallback below; referenced here intentionally.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enableScheduledSend, onScheduleSend, text, pendingAttachments]);
+  }, [enableScheduledSend, onScheduleSend, text, pendingAttachments, audienceProfileIds]);
 
   const handleConfirmSchedule = useCallback(
     async (date: Date) => {
@@ -1196,9 +1240,58 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
   const resolvedPlaceholder = truncatePlaceholder(placeholder);
   const canSaveEdit = text.trim().length > 0 && !savingEdit;
+  const selectableAudienceParticipants = audienceParticipants.filter(
+    (participant) => participant.id !== profileId,
+  );
+  const parentAudienceIds = selectableAudienceParticipants
+    .filter((participant) => participant.role === 'guardian')
+    .map((participant) => participant.id);
+  const tutorAudienceIds = selectableAudienceParticipants
+    .filter((participant) => participant.role === 'educator')
+    .map((participant) => participant.id);
 
   return (
     <>
+      {selectableAudienceParticipants.length > 0 && !replyTo && !quoteReplyTo && (
+        <View style={s.audienceBar} testID="message-audience-picker">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={s.audienceContent}
+          >
+            <Text style={s.audienceLabel}>To:</Text>
+            {[
+              { label: 'Everyone', ids: [] as string[] },
+              ...(parentAudienceIds.length
+                ? [{ label: 'Parents', ids: parentAudienceIds }]
+                : []),
+              ...(tutorAudienceIds.length
+                ? [{ label: 'Tutors', ids: tutorAudienceIds }]
+                : []),
+              ...selectableAudienceParticipants.map((participant) => ({
+                label: participant.name,
+                ids: [participant.id],
+              })),
+            ].map((option) => {
+              const active =
+                option.ids.length === audienceProfileIds.length &&
+                option.ids.every((id) => audienceProfileIds.includes(id));
+              return (
+                <TouchableOpacity
+                  key={`${option.label}:${option.ids.join(',')}`}
+                  style={[s.audienceChip, active && s.audienceChipActive]}
+                  onPress={() => setAudienceProfileIds(option.ids)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`Message audience ${option.label}`}
+                >
+                  <Text style={s.audienceChipText}>{option.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
       {/* Reply preview banner — either a thread reply or a quote reply (mutually exclusive) */}
       {(quoteReplyTo ?? replyTo) && (
         <View style={s.replyPreview}>
@@ -1207,6 +1300,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             <Text style={s.replyKindLabel}>
               {quoteReplyTo ? 'Replying to' : 'Reply in thread'}
             </Text>
+            {!quoteReplyTo && replyTo?.core.visibility.type === 'specific-users' ? (
+              <Text style={s.replyKindLabel}>
+                Private · same {replyTo.core.visibility.userIds.length}-person audience
+              </Text>
+            ) : null}
             <RoleNameIndicator
               name={(quoteReplyTo ?? replyTo)!.core.sender.profile.displayName}
               role={(quoteReplyTo ?? replyTo)!.core.sender.kind}
@@ -1524,6 +1622,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             scrollEnabled
             editable={!disabled}
             accessibilityLabel="Message input"
+            testID="message-input"
           />
           {showRefineTrigger && (
             <TouchableOpacity

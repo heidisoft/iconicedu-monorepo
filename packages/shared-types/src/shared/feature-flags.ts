@@ -20,6 +20,7 @@ export const platformFeatureFlagKeys = {
   enableMessageEdit: 'enable-message-edit',
   enableMobileMessageComposerParity: 'enable-mobile-message-composer-parity',
   enableMessageSendReliability: 'enable-message-send-reliability',
+  enableChannelCommunications: 'enable-channel-communications',
   enableSessionCompletionVerifiedDuration: 'enable-session-completion-verified-duration',
   enableSessionCompletionDisputeDetails: 'enable-session-completion-dispute-details',
   enableOrgAiProviderSettings: 'enable-org-ai-provider-settings',

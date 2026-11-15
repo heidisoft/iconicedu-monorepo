@@ -505,7 +505,7 @@ export const MessageBase = memo(function MessageBase({
                       onClick={handleProfileClick}
                       className="block max-w-full truncate text-left text-sm font-semibold leading-tight text-foreground hover:underline"
                     >
-                      {senderLabel}
+                      {senderNameWithRole}
                     </button>
                     <div className="mt-1 flex min-w-0 items-center gap-1 text-xs leading-none text-muted-foreground">
                       <FeedRoleIcon className="h-3 w-3 shrink-0" aria-hidden="true" />

@@ -36,7 +36,7 @@ export function RoleNameIndicator({
         <Tooltip>
           <TooltipTrigger asChild>
             <span
-              className="inline-flex items-center text-muted-foreground"
+              className="inline-flex items-center gap-1 rounded-full border border-border bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground"
               aria-label={STAFF_LABEL}
             >
               <IdCardLanyard
@@ -44,6 +44,7 @@ export function RoleNameIndicator({
                 data-testid="staff-name-indicator"
                 aria-hidden="true"
               />
+              <span aria-hidden="true">Staff</span>
             </span>
           </TooltipTrigger>
           <TooltipContent>{STAFF_LABEL}</TooltipContent>

@@ -55,7 +55,7 @@ export function RoleNameIndicator({
         {name}
       </Text>
       {showStaffIcon ? (
-        <View style={s.iconWrap}>
+        <View style={[s.iconWrap, { backgroundColor: colors.actionSubtle }]}>
           <Tooltip delayDuration={0}>
             <TooltipTrigger
               accessibilityRole="button"
@@ -68,6 +68,7 @@ export function RoleNameIndicator({
                 color={colors.textMuted}
                 strokeWidth={2}
               />
+              <Text style={[s.badgeText, { color: colors.textMuted }]}>Staff</Text>
             </TooltipTrigger>
             <TooltipContent
               testID="staff-tooltip"
@@ -99,8 +100,19 @@ const s = StyleSheet.create({
     minWidth: 0,
   },
   iconWrap: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 3,
+    borderRadius: 999,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
   tooltipText: {
     fontSize: 12,

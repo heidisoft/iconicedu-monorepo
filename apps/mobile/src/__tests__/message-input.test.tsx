@@ -4,6 +4,30 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import { MessageInput } from '@/components/messages/message-input';
 
 describe('MessageInput', () => {
+  it('includes a selected channel audience in send metadata', async () => {
+    const onSend = jest.fn().mockResolvedValue(undefined);
+    render(
+      <MessageInput
+        onSend={onSend}
+        profileId="staff-1"
+        audienceParticipants={[
+          { id: 'parent-1', name: 'Alex Parent', role: 'guardian' },
+          { id: 'tutor-1', name: 'Taylor Tutor', role: 'educator' },
+        ]}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Message audience Parents'));
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Welcome');
+    fireEvent.press(screen.getByLabelText('Send message'));
+
+    await waitFor(() =>
+      expect(onSend).toHaveBeenCalledWith('Welcome', {
+        audienceProfileIds: ['parent-1'],
+      }),
+    );
+  });
+
   it('renders input field', () => {
     render(<MessageInput onSend={jest.fn()} />);
     expect(screen.getByLabelText('Message input')).toBeTruthy();
