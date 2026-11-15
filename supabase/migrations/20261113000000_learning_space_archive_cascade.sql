@@ -322,6 +322,29 @@ begin
 end;
 $$;
 
+-- True when a channel's archived_at was written by the class lifecycle: the
+-- archive or delete stamp of a class in the same org, or the backfill stamp.
+-- A channel an admin archived by hand carries an unrelated stamp.
+create or replace function public.is_class_lifecycle_archive_stamp(
+  p_org_id uuid,
+  p_archived_at timestamptz
+)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select p_archived_at is not null and (
+    p_archived_at = public.learning_space_archive_backfill_stamp()
+    or exists (
+      select 1 from public.learning_spaces ls
+      where ls.org_id = p_org_id
+        and (ls.archived_at = p_archived_at or ls.deleted_at = p_archived_at)
+    )
+  )
+$$;
+
 create or replace function public.restore_learning_space_core(
   p_learning_space_id uuid,
   p_stamp timestamptz
@@ -355,10 +378,14 @@ begin
     v_result := v_result || jsonb_build_object('channel_members_restored', v_count);
   end if;
 
+  -- Only class channels this archive stamped. A class channel archived on its
+  -- own before the class keeps its earlier stamp (archive uses coalesce) and
+  -- stays archived.
   update public.channels
      set status = 'active', archived_at = null
    where id = any(v_channel_ids) and deleted_at is null
-     and (status <> 'active' or archived_at is not null);
+     and (status <> 'active' or archived_at is not null)
+     and archived_at is not distinct from p_stamp;
   get diagnostics v_count = row_count;
   v_result := v_result || jsonb_build_object('class_channels_restored', v_count);
 
@@ -376,12 +403,7 @@ begin
        and c.status = 'archived'
        and (
          c.archived_at = p_stamp
-         or c.archived_at = public.learning_space_archive_backfill_stamp()
-         or exists (
-           select 1 from public.learning_spaces ls
-           where ls.org_id = c.org_id
-             and (ls.archived_at = c.archived_at or ls.deleted_at = c.archived_at)
-         )
+         or public.is_class_lifecycle_archive_stamp(c.org_id, c.archived_at)
        );
     get diagnostics v_count = row_count;
     v_dm_count := v_dm_count + v_count;
@@ -407,6 +429,42 @@ revoke all on function public.tutor_contact_dm_channel_ids(uuid, uuid, uuid)
 revoke all on function public.tutor_contact_has_active_class(uuid, uuid, uuid)
   from public, anon, authenticated;
 grant execute on function public.tutor_contact_has_active_class(uuid, uuid, uuid)
+  to service_role;
+revoke all on function public.is_class_lifecycle_archive_stamp(uuid, timestamptz)
+  from public, anon, authenticated;
+
+-- ensure-dm reopens an archived tutor DM when a class connects the pair again,
+-- but only if the class lifecycle archived it. A DM an admin archived by hand
+-- stays archived; returns false.
+create or replace function public.reopen_class_lifecycle_dm(
+  p_org_id uuid,
+  p_channel_id uuid,
+  p_actor_profile_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  update public.channels c
+     set status = 'active',
+         archived_at = null,
+         updated_at = now(),
+         updated_by = p_actor_profile_id
+   where c.id = p_channel_id
+     and c.org_id = p_org_id
+     and c.kind = 'dm'
+     and c.status = 'archived'
+     and c.deleted_at is null
+     and public.is_class_lifecycle_archive_stamp(c.org_id, c.archived_at);
+  return found;
+end;
+$$;
+
+revoke all on function public.reopen_class_lifecycle_dm(uuid, uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.reopen_class_lifecycle_dm(uuid, uuid, uuid)
   to service_role;
 
 -- ─── Sync trigger ──────────────────────────────────────────────────────────

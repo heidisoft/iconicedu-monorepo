@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(53);
+select plan(59);
 -- Synthetic identities only: never depend on seed accounts or production data.
 -- O org · E tutor · C/C2/C3/C4 children · G guardian of C
 -- S1 class (E, C, C2, C3; C4 removed earlier) · S2 class (E, C2)
@@ -31,7 +31,11 @@ insert into public.learning_spaces(id, org_id, kind, title) values
 insert into public.channels(id, org_id, kind, topic, visibility, purpose, primary_entity_kind, primary_entity_id) values
  ('c7000000-0000-4000-8000-000000000001','c1000000-0000-4000-8000-000000000001','channel','Class one','private','learning-space','learning_space','c6000000-0000-4000-8000-000000000001'),
  ('c7000000-0000-4000-8000-000000000002','c1000000-0000-4000-8000-000000000001','channel','Class two','private','learning-space','learning_space','c6000000-0000-4000-8000-000000000002');
+-- S1 also has a side channel an admin archived before the class was archived.
+insert into public.channels(id, org_id, kind, topic, visibility, purpose, status, archived_at) values
+ ('c7000000-0000-4000-8000-000000000003','c1000000-0000-4000-8000-000000000001','channel','Class one side','private','learning-space','archived','2026-03-03 00:00:00+00');
 insert into public.learning_space_channels(org_id, learning_space_id, channel_id, is_primary) values
+ ('c1000000-0000-4000-8000-000000000001','c6000000-0000-4000-8000-000000000001','c7000000-0000-4000-8000-000000000003',false),
  ('c1000000-0000-4000-8000-000000000001','c6000000-0000-4000-8000-000000000001','c7000000-0000-4000-8000-000000000001',true),
  ('c1000000-0000-4000-8000-000000000001','c6000000-0000-4000-8000-000000000002','c7000000-0000-4000-8000-000000000002',true);
 insert into public.learning_space_participants(org_id, learning_space_id, profile_id, deleted_at) values
@@ -95,6 +99,7 @@ select ok(not has_function_privilege('authenticated','public.delete_learning_spa
 select ok(not has_function_privilege('anon','public.purge_archived_learning_space_artifacts(integer,integer)','execute'), 'anonymous cannot purge');
 select ok(not has_function_privilege('service_role','public.archive_learning_space_core(uuid,timestamptz,uuid)','execute'), 'cascade core is internal');
 select ok(has_function_privilege('service_role','public.archive_learning_space(uuid,uuid,uuid)','execute'), 'API can archive');
+select ok(not has_function_privilege('authenticated','public.reopen_class_lifecycle_dm(uuid,uuid,uuid)','execute'), 'frontend cannot reopen DMs directly');
 select ok(has_function_privilege('service_role','public.tutor_contact_has_active_class(uuid,uuid,uuid)','execute'), 'API can check DM eligibility');
 select is((select count(*) from cron.job where jobname = 'learning-space-archive-retention' and schedule = '23 3 * * *' and active), 1::bigint, 'retention job is scheduled daily');
 
@@ -113,6 +118,7 @@ update public.channel_live_sessions set status = 'ended', ended_at = now() where
 select is(public.archive_learning_space('c1000000-0000-4000-8000-000000000001','c6000000-0000-4000-8000-000000000001','c4000000-0000-4000-8000-00000000000e'), '{"archived": true}'::jsonb, 'archive succeeds');
 select ok((select status = 'archived' and archived_at is not null from public.learning_spaces where id='c6000000-0000-4000-8000-000000000001'), 'class is archived');
 select is((select status::text from public.channels where id='c7000000-0000-4000-8000-000000000001'), 'archived', 'class channel is archived');
+select is((select archived_at from public.channels where id='c7000000-0000-4000-8000-000000000003'), '2026-03-03 00:00:00+00'::timestamptz, 'class channel archived earlier keeps its own stamp');
 select is((select count(*) from public.channel_members where channel_id='c7000000-0000-4000-8000-000000000001' and deleted_at is null), 0::bigint, 'class channel members are removed');
 select is((select count(*) from public.learning_space_participants where learning_space_id='c6000000-0000-4000-8000-000000000001' and deleted_at is null), 0::bigint, 'class participants are removed');
 select is((select count(*) from public.learning_space_participants p join public.learning_spaces ls on ls.id=p.learning_space_id where ls.id='c6000000-0000-4000-8000-000000000001' and p.deleted_at = ls.archived_at and p.deleted_by='c4000000-0000-4000-8000-00000000000e'), 4::bigint, 'removals carry the archive stamp and actor');
@@ -142,6 +148,7 @@ select is((select count(*) from public.learning_space_participants where learnin
 select ok(exists(select 1 from public.learning_space_participants where learning_space_id='c6000000-0000-4000-8000-000000000001' and profile_id='c4000000-0000-4000-8000-000000000004' and deleted_at='2026-01-01 00:00:00+00'), 'participants removed before the archive stay removed');
 select is((select count(*) from public.channel_members where channel_id='c7000000-0000-4000-8000-000000000001' and deleted_at is null), 4::bigint, 'class channel members are restored');
 select is((select status::text from public.channels where id='c7000000-0000-4000-8000-000000000001'), 'active', 'class channel is active again');
+select is((select status::text from public.channels where id='c7000000-0000-4000-8000-000000000003'), 'archived', 'class channel archived before the class stays archived');
 select is((select count(*) from public.channels where id in ('c8000000-0000-4000-8000-000000000001','c8000000-0000-4000-8000-000000000002') and status='active'), 2::bigint, 'DMs archived by the class are reopened');
 select is((select status::text from public.channels where id='c8000000-0000-4000-8000-000000000005'), 'archived', 'admin-archived DM is not reopened');
 select ok(public.can_post_to_channel_as_profile('c1000000-0000-4000-8000-000000000001','c8000000-0000-4000-8000-000000000001','c4000000-0000-4000-8000-00000000000c'), 'student can message tutor again');
@@ -161,6 +168,11 @@ select ok(not exists(select 1 from public.classroom_whiteboards where channel_id
 select ok(not exists(select 1 from public.message_saves where channel_id='c7000000-0000-4000-8000-000000000001'), 'saves of a deleted class are purged after 30 days');
 select ok(exists(select 1 from public.messages where id='cc000000-0000-4000-8000-000000000001') and exists(select 1 from public.class_session_completions where id='ca000000-0000-4000-8000-000000000001') and exists(select 1 from public.channel_live_sessions where id='cb000000-0000-4000-8000-000000000001'), 'purge keeps messages and reports');
 select throws_ok($$select public.restore_learning_space('c1000000-0000-4000-8000-000000000001','c6000000-0000-4000-8000-000000000001',null)$$, '55000', null, 'restore is refused after the 30-day window');
+
+-- ─── ensure-dm reopen ───
+select is(public.reopen_class_lifecycle_dm('c1000000-0000-4000-8000-000000000001','c8000000-0000-4000-8000-000000000005','c4000000-0000-4000-8000-00000000000e'), false, 'admin-archived DM is not reopened by ensure-dm');
+select is((select status::text from public.channels where id='c8000000-0000-4000-8000-000000000005'), 'archived', 'admin-archived DM stays archived');
+select is(public.reopen_class_lifecycle_dm('c1000000-0000-4000-8000-000000000001','c8000000-0000-4000-8000-000000000003','c4000000-0000-4000-8000-00000000000e'), true, 'DM archived by the class lifecycle is reopened');
 
 select * from finish();
 rollback;

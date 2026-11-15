@@ -1,6 +1,6 @@
 # Class Archive Lifecycle
 
-Last Updated: 2026-11-13
+Last Updated: 2026-11-14
 
 What happens to a class (`learning_spaces` row) and everything attached to it
 when it is archived, restored, or deleted, and what is kept for reporting.
@@ -59,10 +59,16 @@ Staff, support, and tutor ↔ tutor DMs are never touched.
 Archived channels are read-only everywhere: message inserts through RLS, and
 reactions and message edits through `assertChannelWritable` in `apps/api`.
 
+An archived DM still opens by id (`GET /channels/:channelId/dm-meta` returns
+it with `is_archived: true`) so members can read the history; DM lists show active
+DMs only.
+
 `POST /channels/ensure-dm` only starts an educator ↔ child/guardian DM while
 `tutor_contact_has_active_class()` is true. When the pair is connected again
-by a new class, the archived DM is reopened with its history instead of a new
-one being created.
+by a new class, `reopen_class_lifecycle_dm()` reopens the archived DM with its
+history, but only if the class lifecycle archived it
+(`is_class_lifecycle_archive_stamp()`). A DM an admin archived by hand stays
+archived and is returned as read-only history; no second DM is created.
 
 ## What Is Always Kept
 
@@ -85,7 +91,9 @@ the request allows to be retained.
 
 - members and participants whose `deleted_at` equals the archive stamp come
   back, but people removed before the archive stay removed;
-- class channels become active again;
+- class channels whose `archived_at` equals the archive stamp become active
+  again; a class channel archived on its own before the class keeps its
+  earlier stamp and stays archived;
 - tutor DMs are reopened when the class lifecycle archived them (their
   `archived_at` matches a class archive or delete stamp, or the backfill stamp).
   A DM an admin archived by hand keeps its own timestamp and stays archived.

@@ -51,6 +51,8 @@ type ChannelListItem = {
   supervised_child_name?: string | null;
   is_learning_space?: boolean;
   is_support?: boolean;
+  /** Archived DM: readable history, no new messages, edits, or reactions. */
+  is_archived?: boolean;
   student_profiles?: Array<{ name: string; themeKey?: string | null }>;
   participant_profiles?: Array<{
     name: string;
@@ -58,6 +60,11 @@ type ChannelListItem = {
     themeKey?: string | null;
   }>;
 };
+
+/** DM lists show active DMs; a detail lookup also opens archived history. */
+function dmStatusesFor(channelId: string | undefined): string[] {
+  return channelId ? ['active', 'archived'] : ['active'];
+}
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
@@ -416,7 +423,13 @@ export class ChannelsService {
 
   async getDirectMessages(
     accessToken: string,
-    input: { orgId: string; profileId: string; accountId: string },
+    input: {
+      orgId: string;
+      profileId: string;
+      accountId: string;
+      /** Detail lookup: only this DM, archived ones included (read-only history). */
+      channelId?: string;
+    },
   ): Promise<ChannelListItem[]> {
     if (!input.orgId || !input.profileId || !input.accountId) return [];
     const supabase = createSupabaseSessionClient(accessToken);
@@ -430,16 +443,17 @@ export class ChannelsService {
     if (myError) throw new InternalServerErrorException(myError.message);
     if (!myMemberships?.length) return [];
 
-    const userChannelIds = myMemberships.map(
-      (membership) => membership.channel_id as string,
-    );
+    const userChannelIds = myMemberships
+      .map((membership) => membership.channel_id as string)
+      .filter((channelId) => !input.channelId || channelId === input.channelId);
+    if (!userChannelIds.length) return [];
     const { data: chRows, error: chError } = await supabase
       .from('channels')
-      .select('id, org_id, topic, description, kind, updated_at, ui_defaults')
+      .select('id, org_id, topic, description, kind, status, updated_at, ui_defaults')
       .in('id', userChannelIds)
       .eq('org_id', input.orgId)
       .eq('kind', 'dm')
-      .eq('status', 'active')
+      .in('status', dmStatusesFor(input.channelId))
       .is('deleted_at', null)
       .order('updated_at', { ascending: false });
     if (chError) throw new InternalServerErrorException(chError.message);
@@ -527,13 +541,20 @@ export class ChannelsService {
         last_message_sender: last?.sender ?? null,
         participants: participantMap.get(channel.id) ?? [],
         messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'classic',
+        is_archived: channel.status === 'archived',
       };
     });
   }
 
   async getSupervisedDirectMessages(
     accessToken: string,
-    input: { orgId: string; guardianAccountId: string; guardianProfileId: string },
+    input: {
+      orgId: string;
+      guardianAccountId: string;
+      guardianProfileId: string;
+      /** Detail lookup: only this DM, archived ones included (read-only history). */
+      channelId?: string;
+    },
   ): Promise<ChannelListItem[]> {
     if (!input.orgId || !input.guardianAccountId || !input.guardianProfileId) return [];
     const supabase = createSupabaseSessionClient(accessToken);
@@ -587,16 +608,17 @@ export class ChannelsService {
 
       const childOnlyChannelIds = (childMemberships ?? [])
         .map((membership) => membership.channel_id as string)
-        .filter((id) => !guardianChannelIds.has(id));
+        .filter((id) => !guardianChannelIds.has(id))
+        .filter((id) => !input.channelId || id === input.channelId);
       if (!childOnlyChannelIds.length) continue;
 
       const { data: chRows, error: channelsError } = await supabase
         .from('channels')
-        .select('id, org_id, topic, description, kind, updated_at, ui_defaults')
+        .select('id, org_id, topic, description, kind, status, updated_at, ui_defaults')
         .in('id', childOnlyChannelIds)
         .eq('org_id', input.orgId)
         .eq('kind', 'dm')
-        .eq('status', 'active')
+        .in('status', dmStatusesFor(input.channelId))
         .is('deleted_at', null)
         .order('updated_at', { ascending: false });
       if (channelsError) throw new InternalServerErrorException(channelsError.message);
@@ -685,6 +707,7 @@ export class ChannelsService {
           is_supervised: true,
           supervised_child_name: childName,
           messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'classic',
+          is_archived: channel.status === 'archived',
         });
       }
     }
@@ -913,20 +936,25 @@ export class ChannelsService {
       if (activeChannel) {
         return buildDirectMessageChannelResult(activeChannel.id, targetProfile);
       }
-      const archivedChannel = channels[0];
-      if (archivedChannel) {
-        const { error: reopenError } = await writeSupabase
-          .from('channels')
-          .update({
-            status: 'active',
-            archived_at: null,
-            updated_at: new Date().toISOString(),
-            updated_by: input.profileId,
-          })
-          .eq('id', archivedChannel.id)
-          .eq('status', 'archived');
+      // Only a DM the class lifecycle archived is reopened. A DM an admin
+      // archived by hand stays archived and opens as read-only history; the
+      // dm_key is unique, so a second DM is never created beside it.
+      for (const archivedChannel of channels) {
+        const { data: reopened, error: reopenError } = await writeSupabase.rpc(
+          'reopen_class_lifecycle_dm',
+          {
+            p_org_id: input.orgId,
+            p_channel_id: archivedChannel.id,
+            p_actor_profile_id: input.profileId,
+          },
+        );
         if (reopenError) throw new InternalServerErrorException(reopenError.message);
-        return buildDirectMessageChannelResult(archivedChannel.id, targetProfile);
+        if (reopened === true) {
+          return buildDirectMessageChannelResult(archivedChannel.id, targetProfile);
+        }
+      }
+      if (channels[0]) {
+        return buildDirectMessageChannelResult(channels[0].id, targetProfile);
       }
     }
 
@@ -1010,6 +1038,7 @@ export class ChannelsService {
       orgId: input.orgId,
       profileId: input.profileId,
       accountId: input.accountId,
+      channelId: input.channelId,
     });
     const directMatch = directMessages.find((channel) => channel.id === input.channelId);
     if (directMatch) {
@@ -1020,6 +1049,7 @@ export class ChannelsService {
       orgId: input.orgId,
       guardianAccountId: input.accountId,
       guardianProfileId: input.profileId,
+      channelId: input.channelId,
     });
     return supervisedMessages.find((channel) => channel.id === input.channelId) ?? null;
   }
