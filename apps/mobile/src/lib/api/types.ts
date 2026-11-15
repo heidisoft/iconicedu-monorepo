@@ -23,6 +23,12 @@ export type ChannelListItem = {
   updated_at: string;
   unread_count: number;
   thread_unread_count?: number;
+  /**
+   * True when the user explicitly marked this conversation unread. Set
+   * optimistically on mark-unread and honored by the conversation list so the
+   * row keeps its unread treatment even with an unread_count of 0.
+   */
+  is_manually_unread?: boolean;
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;

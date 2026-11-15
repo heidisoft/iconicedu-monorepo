@@ -1,11 +1,20 @@
+jest.mock('@/lib/messages/open-live-session', () => ({
+  openLiveSession: jest.fn((href: string) =>
+    require('react-native').Linking.openURL(
+      require('@/lib/messages/live-session-join').resolveJoinHrefForMobile(href),
+    ),
+  ),
+  getLiveSessionShareUrl: jest.fn(async (href: string) => href),
+}));
 import React from 'react';
-import { Linking, Share, StyleSheet } from 'react-native';
+import { Linking, Share, StyleSheet, Modal, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { SessionCard, type ClassSession } from './session-card';
 
 const mockPush = jest.fn();
 const mockOpenURL = jest.fn();
 const mockFetchSpaceChannelMetaByChannelId = jest.fn();
+const mockJoinLiveSessionMutateAsync = jest.fn();
 
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({
@@ -33,6 +42,11 @@ jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('@/lib/api/queries', () => ({
   fetchSpaceChannelMetaByChannelId: (...args: unknown[]) =>
     mockFetchSpaceChannelMetaByChannelId(...args),
+}));
+jest.mock('@/hooks/use-join-live-session', () => ({
+  useJoinLiveSession: () => ({
+    mutateAsync: (...args: unknown[]) => mockJoinLiveSessionMutateAsync(...args),
+  }),
 }));
 jest.mock('lucide-react-native', () => ({
   Video: ({ testID }: { testID?: string }) => {
@@ -98,6 +112,10 @@ describe('SessionCard', () => {
     mockPush.mockClear();
     mockOpenURL.mockClear();
     mockFetchSpaceChannelMetaByChannelId.mockReset();
+    mockJoinLiveSessionMutateAsync.mockReset();
+    mockJoinLiveSessionMutateAsync.mockRejectedValue(
+      new Error('Live sessions are not enabled for this channel'),
+    );
   });
 
   it('renders without crashing', () => {
@@ -226,6 +244,32 @@ describe('SessionCard', () => {
     expect(mockOpenURL).not.toHaveBeenCalled();
   });
 
+  it('opens the iPad meeting only after the ready dialog has dismissed', () => {
+    const originalOS = Platform.OS;
+    Platform.OS = 'ios';
+    try {
+      render(
+        <SessionCard
+          session={{
+            ...baseSession,
+            meetingLink: 'https://app.invalid/live/aaaa-bbbb-cccc',
+          }}
+        />,
+      );
+      fireEvent.press(screen.getByLabelText('Join session'));
+      const onDismiss = screen.UNSAFE_getByType(Modal).props.onDismiss;
+      fireEvent.press(screen.getByLabelText('Open session'));
+      expect(mockOpenURL).not.toHaveBeenCalled();
+      expect(screen.UNSAFE_getByType(Modal).props.visible).toBe(false);
+      act(() => onDismiss());
+      expect(mockOpenURL).toHaveBeenCalledWith('https://app.invalid/live/aaaa-bbbb-cccc');
+      act(() => onDismiss());
+      expect(mockOpenURL).toHaveBeenCalledTimes(1);
+    } finally {
+      Platform.OS = originalOS;
+    }
+  });
+
   it('opens internal meeting links directly from the join button', () => {
     render(
       <SessionCard session={{ ...baseSession, meetingLink: '/live-sessions/abc' }} />,
@@ -307,6 +351,94 @@ describe('SessionCard', () => {
         params: { channelId: 'channel-1', tab: 'sessions' },
       }),
     );
+  });
+
+  it('creates and joins a live session via the API when no link is configured', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: null,
+    });
+    mockJoinLiveSessionMutateAsync.mockResolvedValue({
+      sessionId: 'session-1',
+      joinPath: '/acme/live-sessions/session-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() =>
+      expect(mockJoinLiveSessionMutateAsync).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith(
+        'http://localhost:3000/acme/live-sessions/session-1',
+      ),
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it('prefers the API join over a configured channel-level link, matching web', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'custom',
+        mode: 'video',
+        joinUrl: 'https://zoom.us/j/from-channel',
+      },
+    });
+    mockJoinLiveSessionMutateAsync.mockResolvedValue({
+      sessionId: 'session-1',
+      joinPath: '/acme/live-sessions/session-1',
+      status: 'live',
+      created: true,
+      provider: 'daily',
+    });
+
+    render(<SessionCard session={baseSession} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() =>
+      expect(mockJoinLiveSessionMutateAsync).toHaveBeenCalledWith('channel-1'),
+    );
+    await waitFor(() =>
+      expect(mockOpenURL).toHaveBeenCalledWith(
+        'http://localhost:3000/acme/live-sessions/session-1',
+      ),
+    );
+    expect(mockFetchSpaceChannelMetaByChannelId).not.toHaveBeenCalled();
+    expect(screen.queryByText('https://zoom.us/j/from-channel')).toBeNull();
+  });
+
+  it('falls back to the configured channel-level link when the API join fails', async () => {
+    mockFetchSpaceChannelMetaByChannelId.mockResolvedValue({
+      liveSession: {
+        enabled: true,
+        provider: 'custom',
+        mode: 'video',
+        joinUrl: 'https://zoom.us/j/from-channel',
+      },
+    });
+    mockJoinLiveSessionMutateAsync.mockRejectedValue(new Error('API unavailable'));
+
+    render(<SessionCard session={baseSession} />);
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join session'));
+    });
+
+    await waitFor(() =>
+      expect(mockJoinLiveSessionMutateAsync).toHaveBeenCalledWith('channel-1'),
+    );
+    expect(await screen.findByText('Session ready to join')).toBeTruthy();
+    expect(await screen.findByText('https://zoom.us/j/from-channel')).toBeTruthy();
   });
 
   it('shows Recording button for past sessions', () => {

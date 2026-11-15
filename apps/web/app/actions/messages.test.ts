@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   deleteMessageAction,
+  editTextMessageAction,
   sendFileMessageAction,
   sendFilesMessageAction,
   sendTextMessageAction,
@@ -15,8 +16,12 @@ const buildUserProfileById = vi.fn();
 const publishActivityEvent = vi.fn();
 const apiPost = vi.fn();
 const apiDelete = vi.fn();
+const apiPatch = vi.fn();
 const resolveActiveProfileForAccountInOrg = vi.fn();
 const buildThreadById = vi.fn(async () => ({ ids: { id: 'thread-1', orgId: 'org-1' } }));
+const buildMessageById = vi.fn(async () => ({
+  ids: { id: 'message-1', orgId: 'org-1' },
+}));
 
 function createChannelLookupChain(
   data: {
@@ -89,11 +94,15 @@ vi.mock('../../lib/api/http-client', () => ({
   createApiClient: vi.fn(() => ({
     post: (...args: unknown[]) => apiPost(...args),
     delete: (...args: unknown[]) => apiDelete(...args),
+    patch: (...args: unknown[]) => apiPatch(...args),
   })),
 }));
 
 vi.mock('@iconicedu/web/lib/messages/builders/thread.builder', () => ({
   buildThreadById: (...args: unknown[]) => buildThreadById(...args),
+}));
+vi.mock('@iconicedu/web/lib/messages/builders/message.builder', () => ({
+  buildMessageById: (...args: unknown[]) => buildMessageById(...args),
 }));
 vi.mock('@iconicedu/web/lib/messages/link-preview', () => ({
   extractFirstUrl: vi.fn(
@@ -3380,5 +3389,110 @@ describe('toggleSavedMessageAction', () => {
     expect(unsaveChain.eq).toHaveBeenCalledWith('message_id', 'message-1');
     expect(unsaveChain.eq).toHaveBeenCalledWith('profile_id', 'profile-1');
     expect(unsaveChain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+});
+
+describe('editTextMessageAction', () => {
+  function setUpSupabase() {
+    return {
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(() => ({})),
+    };
+  }
+
+  beforeEach(() => {
+    apiPatch.mockReset();
+    buildMessageById.mockReset();
+    buildMessageById.mockResolvedValue({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('routes the edit through the API (not a direct Supabase write) and returns the rebuilt VM', async () => {
+    const supabase = setUpSupabase();
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    const result = await editTextMessageAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      content: '  updated text  ',
+    });
+
+    // Trimmed client-side, otherwise passed straight through — the API
+    // (resolveWritableProfile) does the real ownership/window/type
+    // authorization, including family-link-authorized guardian edits that
+    // a direct RLS-scoped Supabase write can't express.
+    expect(apiPatch).toHaveBeenCalledWith('/messages/message-1/text', {
+      orgId: 'org-1',
+      messageId: 'message-1',
+      content: 'updated text',
+    });
+    expect(supabase.from).not.toHaveBeenCalledWith('messages');
+    expect(supabase.from).not.toHaveBeenCalledWith('message_text');
+    expect(buildMessageById).toHaveBeenCalledWith(supabase, 'org-1', 'message-1', {
+      accountId: 'account-1',
+      profileId: 'profile-1',
+    });
+    expect(result).toEqual({ ids: { id: 'message-1', orgId: 'org-1' } });
+  });
+
+  it('passes mentions through for the API to sanitize', async () => {
+    const supabase = setUpSupabase();
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    const mentions = [{ profileId: 'profile-2', displayName: 'Alex', start: 0, end: 4 }];
+    await editTextMessageAction({
+      orgId: 'org-1',
+      messageId: 'message-1',
+      content: '@Alex hi',
+      mentions,
+    });
+
+    expect(apiPatch).toHaveBeenCalledWith('/messages/message-1/text', {
+      orgId: 'org-1',
+      messageId: 'message-1',
+      content: '@Alex hi',
+      mentions,
+    });
+  });
+
+  it('rejects empty content before calling the API', async () => {
+    const supabase = setUpSupabase();
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+
+    await expect(
+      editTextMessageAction({ orgId: 'org-1', messageId: 'message-1', content: '   ' }),
+    ).rejects.toThrow('Message text is required');
+    expect(apiPatch).not.toHaveBeenCalled();
+  });
+
+  it('surfaces the API error message (e.g. ownership/window rejection) as-is', async () => {
+    const supabase = setUpSupabase();
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue(supabase);
+    apiPatch.mockRejectedValueOnce(
+      new Error('The edit window for this message has passed'),
+    );
+
+    await expect(
+      editTextMessageAction({
+        orgId: 'org-1',
+        messageId: 'message-1',
+        content: 'too late',
+      }),
+    ).rejects.toThrow('The edit window for this message has passed');
   });
 });

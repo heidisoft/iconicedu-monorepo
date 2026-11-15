@@ -63,11 +63,18 @@ interface MessageItemProps {
   onToggleHidden?: (messageId: string) => void;
   onToggleImportant?: (messageId: string) => void;
   onDelete?: (messageId: string) => void;
+  onRetrySend?: (messageId: string) => void;
+  onEditFailedSend?: (messageId: string) => void;
+  onDiscardFailedSend?: (messageId: string) => void;
   actionState?: MessageActionState;
   messageUiThemeKey?: MessageUiThemeKeyVM;
   inlineThreadContent?: ReactNode;
   feedGroupPosition?: 'single' | 'first' | 'middle' | 'last';
   showActionControls?: boolean;
+  canPinMessages?: boolean;
+  pinnedMessageIds?: ReadonlySet<string>;
+  pinningMessageIds?: ReadonlySet<string>;
+  onTogglePinned?: (messageId: string) => void;
 }
 
 export const MessageItem = memo(function MessageItem({
@@ -83,11 +90,18 @@ export const MessageItem = memo(function MessageItem({
   onToggleHidden,
   onToggleImportant,
   onDelete,
+  onRetrySend,
+  onEditFailedSend,
+  onDiscardFailedSend,
   actionState,
   messageUiThemeKey = 'classic',
   inlineThreadContent,
   feedGroupPosition,
   showActionControls,
+  canPinMessages = false,
+  pinnedMessageIds,
+  pinningMessageIds,
+  onTogglePinned,
 }: MessageItemProps) {
   if (!isMessageVisibleToUser(message, currentUserId)) {
     return null;
@@ -113,6 +127,22 @@ export const MessageItem = memo(function MessageItem({
     onDelete?.(message.ids.id);
   };
 
+  const handleTogglePinned = () => {
+    onTogglePinned?.(message.ids.id);
+  };
+
+  const handleRetrySend = () => {
+    onRetrySend?.(message.ids.id);
+  };
+
+  const handleEditFailedSend = () => {
+    onEditFailedSend?.(message.ids.id);
+  };
+
+  const handleDiscardFailedSend = () => {
+    onDiscardFailedSend?.(message.ids.id);
+  };
+
   const commonProps = {
     onOpenThread,
     isThreadReply,
@@ -123,6 +153,9 @@ export const MessageItem = memo(function MessageItem({
     onToggleHidden: handleToggleHidden,
     onToggleImportant: handleToggleImportant,
     onDelete: handleDelete,
+    onRetrySend: onRetrySend ? handleRetrySend : undefined,
+    onEditFailedSend: onEditFailedSend ? handleEditFailedSend : undefined,
+    onDiscardFailedSend: onDiscardFailedSend ? handleDiscardFailedSend : undefined,
     currentUserId,
     canDeleteAnyMessages: currentUserCanDeleteAnyMessages,
     actionState,
@@ -130,6 +163,10 @@ export const MessageItem = memo(function MessageItem({
     inlineThreadContent,
     feedGroupPosition,
     showActionControls,
+    canPinMessages,
+    isPinned: pinnedMessageIds?.has(message.ids.id) ?? false,
+    isPinning: pinningMessageIds?.has(message.ids.id) ?? false,
+    onTogglePinned: handleTogglePinned,
   };
 
   if (isTextMessage(message)) {

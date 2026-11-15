@@ -19,6 +19,12 @@ jest.mock('@/lib/api/queries', () => ({
   fetchSpaceChannelMetaByChannelId: jest.fn().mockResolvedValue(null),
 }));
 
+jest.mock('@/hooks/use-join-live-session', () => ({
+  useJoinLiveSession: () => ({
+    mutateAsync: jest.fn().mockRejectedValue(new Error('not configured in test')),
+  }),
+}));
+
 jest.mock('lucide-react-native', () => {
   const ReactModule = require('react');
   const { View } = require('react-native');

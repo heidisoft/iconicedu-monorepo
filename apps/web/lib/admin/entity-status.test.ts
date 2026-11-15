@@ -41,7 +41,7 @@ describe('setEntityStatus', () => {
   });
 
   it('unarchives an entity by clearing archived_at', async () => {
-    await setEntityStatus('learning_spaces', 'space-1', 'active');
+    await setEntityStatus('channels', 'channel-1', 'active');
 
     expect(update).toHaveBeenCalledWith({
       status: 'active',

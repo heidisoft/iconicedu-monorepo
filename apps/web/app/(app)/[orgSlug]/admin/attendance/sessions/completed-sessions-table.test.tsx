@@ -76,9 +76,79 @@ describe('CompletedSessionsTable', () => {
     expect(within(people[2]).getByText('Rating: 4.0 / 5')).toBeInTheDocument();
     expect(within(people[3]).getByText('(Parent) · Disputed')).toBeInTheDocument();
     expect(screen.queryByText('4.5 / 5')).not.toBeInTheDocument();
-    // A disputed participant blocks the staff "Confirm" action for the occurrence.
+    // A disputed participant swaps the plain "Confirm" action for "Confirm
+    // anyway" even with allowVerifiedDurationOverride off (default here) — see
+    // the dedicated test below for the flagged-on dispute-resolution path,
+    // which additionally offers a verified-duration override.
     expect(screen.getByText('Dispute reported')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm anyway' })).toBeInTheDocument();
+  });
+
+  const rowWithDisputeDetails: AdminSessionCompletionVM = {
+    ...row,
+    participants: [
+      ...row.participants!.slice(0, 3),
+      {
+        profileId: 'parent-three',
+        displayName: 'Parent Three',
+        role: 'guardian',
+        status: 'disputed',
+        disputeDetails: {
+          category: 'technical_issue',
+          reason: 'Not completed full 1h',
+          rescheduleRequested: true,
+          disputedAt: '2026-09-01T13:05:00Z',
+        },
+      },
+    ],
+  };
+
+  it('hides the dispute category and reason when the flag is off', () => {
+    render(
+      <CompletedSessionsTable
+        rows={[rowWithDisputeDetails]}
+        schedules={[]}
+        orgId="org"
+      />,
+    );
+    expect(
+      screen.queryByText(/Technical issue: Not completed full 1h/),
+    ).not.toBeInTheDocument();
+  });
+
+  it('shows the reported dispute category and reason when the flag is on', () => {
+    render(
+      <CompletedSessionsTable
+        rows={[rowWithDisputeDetails]}
+        schedules={[]}
+        orgId="org"
+        showDisputeDetails
+      />,
+    );
+    expect(
+      screen.getByText('Technical issue: Not completed full 1h · Reschedule requested'),
+    ).toBeInTheDocument();
+  });
+
+  it('lets staff resolve a dispute with a verified duration when the flag is on', () => {
+    render(
+      <CompletedSessionsTable
+        rows={[row]}
+        schedules={[]}
+        orgId="org"
+        allowVerifiedDurationOverride
+      />,
+    );
+    // A disputed occurrence still offers a way to resolve it (with a verified
+    // partial duration), just labeled differently from a fresh confirmation,
+    // and no longer offers "Report a problem" again.
+    expect(screen.getByText('Dispute reported')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Confirm' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm anyway' })).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Report a problem' }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows who confirmed on a participant’s behalf when staff overrode it', () => {

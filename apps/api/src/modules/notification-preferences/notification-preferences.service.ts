@@ -9,6 +9,24 @@ import { resolveEffectivePreference } from '@iconicedu/api/lib/notifications/res
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
+/**
+ * A "per-conversation" control (issue #264 capability 12) is meant to govern
+ * every message-shaped notification for that channel/learning-space, not one
+ * narrow pref_key — each event type otherwise resolves its own independent
+ * pref_key (see policy-config.ts), so setting a conversation's mode fans out
+ * to all of these.
+ */
+const CONVERSATION_MESSAGE_PREF_KEYS = [
+  'message.posted',
+  'message.mentioned',
+  'message.thread_reply.posted',
+  'message.unviewed_intended_participants',
+  'file.uploaded',
+  'image.uploaded',
+  'audio.uploaded',
+  'reaction.added',
+] as const;
+
 @Injectable()
 export class NotificationPreferencesService {
   private readonly signupDefaultPreferences = [
@@ -165,6 +183,8 @@ export class NotificationPreferencesService {
         prefKey: row.pref_key,
         channels: row.channels ?? [],
         muted: row.muted ?? null,
+        mode: row.mode ?? 'normal',
+        mutedUntil: row.muted_until ?? null,
       })) ?? []
     );
   }
@@ -177,6 +197,8 @@ export class NotificationPreferencesService {
       prefKey: string;
       channels: string[];
       muted?: boolean | null;
+      mode?: 'normal' | 'mentions_only' | 'muted_until' | 'muted_until_enabled';
+      mutedUntil?: string | null;
       scopeKind: string;
       scopeId: string;
     },
@@ -184,12 +206,22 @@ export class NotificationPreferencesService {
     if (!this.isScopeKind(body.scopeKind)) {
       throw new ForbiddenException('Invalid scopeKind.');
     }
+    if (body.mode === 'muted_until' && !body.mutedUntil) {
+      throw new ForbiddenException('mutedUntil is required when mode is muted_until.');
+    }
 
     const { account, serviceSupabase } = await this.requireOrgActor(
       accessToken,
       body.orgId,
     );
     const channels = this.normalizeChannels(body.channels);
+    const mode = body.mode ?? 'normal';
+    // Keep the legacy boolean in sync for any reader that only understands it.
+    const derivedMuted =
+      mode === 'muted_until_enabled' ||
+      (mode === 'muted_until' &&
+        Boolean(body.mutedUntil) &&
+        new Date(body.mutedUntil as string).getTime() > Date.now());
     const now = new Date().toISOString();
     const { data, error } = await serviceSupabase
       .from('notification_preference_scopes')
@@ -201,12 +233,12 @@ export class NotificationPreferencesService {
           scope_id: body.scopeId,
           pref_key: body.prefKey,
           channels,
+          mode,
+          muted_until: mode === 'muted_until' ? body.mutedUntil : null,
           muted:
             typeof body.muted === 'boolean'
               ? body.muted
-              : channels.length === 0
-                ? true
-                : null,
+              : derivedMuted || (channels.length === 0 ? true : null),
           updated_at: now,
           updated_by: account.active_profile_id ?? account.id,
           deleted_at: null,
@@ -224,6 +256,8 @@ export class NotificationPreferencesService {
         pref_key: string;
         channels: string[];
         muted?: boolean | null;
+        mode?: string | null;
+        muted_until?: string | null;
       }>();
 
     if (error) throw new InternalServerErrorException(error.message);
@@ -238,7 +272,127 @@ export class NotificationPreferencesService {
         prefKey: data.pref_key,
         channels: this.normalizeChannels(data.channels ?? []),
         muted: data.muted ?? null,
+        mode: data.mode ?? 'normal',
+        mutedUntil: data.muted_until ?? null,
       },
+    };
+  }
+
+  /** Sets the conversation-wide notification mode across every message-shaped pref_key for this scope. */
+  async setConversationMode(
+    accessToken: string,
+    body: {
+      orgId: string;
+      profileId: string;
+      scopeKind: string;
+      scopeId: string;
+      mode: 'normal' | 'mentions_only' | 'muted_until' | 'muted_until_enabled';
+      mutedUntil?: string | null;
+    },
+  ) {
+    if (!this.isScopeKind(body.scopeKind)) {
+      throw new ForbiddenException('Invalid scopeKind.');
+    }
+    if (body.mode === 'muted_until' && !body.mutedUntil) {
+      throw new ForbiddenException('mutedUntil is required when mode is muted_until.');
+    }
+
+    const { serviceSupabase } = await this.requireOrgActor(accessToken, body.orgId);
+    const [existingScopedResponse, existingGlobalResponse] = await Promise.all([
+      serviceSupabase
+        .from('notification_preference_scopes')
+        .select('pref_key, channels')
+        .eq('org_id', body.orgId)
+        .eq('profile_id', body.profileId)
+        .eq('scope_kind', body.scopeKind)
+        .eq('scope_id', body.scopeId)
+        .in('pref_key', CONVERSATION_MESSAGE_PREF_KEYS)
+        .is('deleted_at', null),
+      serviceSupabase
+        .from('notification_preferences')
+        .select('pref_key, channels')
+        .eq('org_id', body.orgId)
+        .eq('profile_id', body.profileId)
+        .in('pref_key', CONVERSATION_MESSAGE_PREF_KEYS)
+        .is('deleted_at', null),
+    ]);
+    if (existingScopedResponse.error) {
+      throw new InternalServerErrorException(existingScopedResponse.error.message);
+    }
+    if (existingGlobalResponse.error) {
+      throw new InternalServerErrorException(existingGlobalResponse.error.message);
+    }
+    const existingChannelsByPrefKey = new Map(
+      (existingScopedResponse.data ?? []).map((row) => [
+        row.pref_key as string,
+        (row.channels as string[] | null) ?? [],
+      ]),
+    );
+    const globalChannelsByPrefKey = new Map(
+      (existingGlobalResponse.data ?? []).map((row) => [
+        row.pref_key as string,
+        (row.channels as string[] | null) ?? [],
+      ]),
+    );
+    const signupDefaultChannelsByPrefKey = new Map(
+      this.signupDefaultPreferences.map((pref) => [pref.prefKey, [...pref.channels]]),
+    );
+
+    // A scope with no row yet must inherit the profile's effective channels
+    // (its own global preference, else the signup default) rather than a
+    // hard-coded ['push'] — otherwise choosing any mode here silently drops
+    // channels (e.g. email) the user already has enabled globally.
+    await Promise.all(
+      CONVERSATION_MESSAGE_PREF_KEYS.map((prefKey) =>
+        this.upsertScope(accessToken, {
+          orgId: body.orgId,
+          profileId: body.profileId,
+          prefKey,
+          channels: existingChannelsByPrefKey.get(prefKey) ??
+            globalChannelsByPrefKey.get(prefKey) ??
+            signupDefaultChannelsByPrefKey.get(prefKey) ?? ['push'],
+          mode: body.mode,
+          mutedUntil: body.mutedUntil,
+          scopeKind: body.scopeKind,
+          scopeId: body.scopeId,
+        }),
+      ),
+    );
+
+    return { success: true };
+  }
+
+  /** Reads the conversation-wide mode from the first message pref_key row that has one set. */
+  async getConversationMode(
+    accessToken: string,
+    input: { orgId: string; profileId: string; scopeKind: string; scopeId: string },
+  ) {
+    if (!this.isScopeKind(input.scopeKind)) {
+      throw new ForbiddenException('Invalid scopeKind.');
+    }
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    const { data, error } = await supabase
+      .from('notification_preference_scopes')
+      .select('mode, muted_until')
+      .eq('org_id', input.orgId)
+      .eq('profile_id', input.profileId)
+      .eq('scope_kind', input.scopeKind)
+      .eq('scope_id', input.scopeId)
+      .eq('pref_key', 'message.posted')
+      .is('deleted_at', null)
+      .maybeSingle<{ mode: string | null; muted_until: string | null }>();
+    if (error) throw new InternalServerErrorException(error.message);
+
+    return {
+      mode:
+        (data?.mode as
+          | 'normal'
+          | 'mentions_only'
+          | 'muted_until'
+          | 'muted_until_enabled'
+          | null) ?? 'normal',
+      mutedUntil: data?.muted_until ?? null,
     };
   }
 

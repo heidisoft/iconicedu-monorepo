@@ -52,6 +52,10 @@ import { QueryError } from '@/components/errors/query-error';
 import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
+import { useIsFocused } from '@react-navigation/native';
+import { useMessageDraftChannelIds } from '@/hooks/use-message-draft';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 type Tab = 'all' | 'dms' | 'channels';
 type ClassroomStudentTab = 'all' | string;
@@ -490,6 +494,14 @@ function makeStyles(C: AppColors) {
       paddingHorizontal: 6,
     },
     badgeTxt: { color: '#ffffff', fontSize: 12, fontWeight: '700' },
+    // Shown when the user explicitly marked a conversation unread but there are
+    // no actual unread messages to count.
+    badgeDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: C.teal,
+    },
 
     emptyWrap: {
       flex: 1,
@@ -526,6 +538,19 @@ function makeStyles(C: AppColors) {
       borderColor: C.teal,
     },
     supervisedBadgeTxt: { fontSize: 11, fontWeight: '700', color: C.teal },
+
+    // ── Draft indicator badge (issue #264 capability #3) ────────────────────────
+    draftBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: C.card,
+      borderRadius: 6,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
+    },
+    draftBadgeTxt: { fontSize: 11, fontWeight: '700', color: C.textMuted },
 
     // ── Section header ─────────────────────────────────────────────────────────
     sectionHeaderWrap: { paddingHorizontal: 0, paddingTop: 18, paddingBottom: 7 },
@@ -707,6 +732,7 @@ function ChannelRow({
   presenceByProfileId,
   currentProfileName,
   currentProfileKind,
+  hasDraft = false,
   s,
   colors,
 }: {
@@ -715,6 +741,8 @@ function ChannelRow({
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
   currentProfileName?: string | null;
   currentProfileKind?: string | null;
+  /** Non-expired main-composer draft exists for this channel (issue #264 capability #3). */
+  hasDraft?: boolean;
   s: ReturnType<typeof makeStyles>;
   colors: AppColors;
 }) {
@@ -767,7 +795,10 @@ function ChannelRow({
   const sender = item.last_message_sender;
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = (item.unread_count ?? 0) + (item.thread_unread_count ?? 0);
-  const hasUnread = unread > 0;
+  // An explicit "mark unread" keeps the row in its unread treatment even when
+  // there is nothing left to count.
+  const isManuallyUnread = item.is_manually_unread === true;
+  const hasUnread = unread > 0 || isManuallyUnread;
   const isClassroom = !isDm && Boolean(item.is_learning_space);
   const studentProfiles = !isDm ? (item.student_profiles ?? []) : [];
   const participantProfiles = !isDm ? (item.participant_profiles ?? []) : [];
@@ -854,6 +885,11 @@ function ChannelRow({
                   <Text style={s.supervisedBadgeTxt}>Supervised</Text>
                 </View>
               )}
+              {hasDraft && (
+                <View style={s.draftBadge} accessibilityLabel="Draft saved">
+                  <Text style={s.draftBadgeTxt}>Draft</Text>
+                </View>
+              )}
             </View>
             {!isDm && hasClassroomMeta ? (
               <View style={s.rowMetaWrap}>
@@ -903,9 +939,13 @@ function ChannelRow({
               {time}
             </Text>
             {hasUnread ? (
-              <View style={s.badge}>
-                <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
-              </View>
+              unread > 0 ? (
+                <View style={s.badge}>
+                  <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
+                </View>
+              ) : (
+                <View testID="channel-row-manual-unread-dot" style={s.badgeDot} />
+              )
             ) : (
               <View />
             )}
@@ -938,13 +978,29 @@ export default function MessagesScreen() {
   const { guardianAccountId, guardianProfileId } = useFamilyView();
   const { colors } = useTheme();
   const router = useRouter();
+  const isFocused = useIsFocused();
   const s = useMemo(() => makeStyles(colors), [colors]);
+  const enableMessageDrafts = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMessageDrafts,
+  );
 
   const orgId = account?.org_id ?? '';
   const accountId =
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const myProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
+  const { channelIds: draftChannelIds, refresh: refreshDraftChannelIds } =
+    useMessageDraftChannelIds(
+      { accountId, profileId: myProfileId, orgId },
+      enableMessageDrafts,
+    );
+  // Re-read AsyncStorage whenever this tab regains focus — a draft saved on
+  // the channel/DM screen should show up here as soon as the user backs out.
+  React.useEffect(() => {
+    if (isFocused) {
+      void refreshDraftChannelIds();
+    }
+  }, [isFocused, refreshDraftChannelIds]);
   const currentProfileName =
     (
       (profile as Record<string, unknown> | undefined)?.display_name as string | undefined
@@ -998,9 +1054,16 @@ export default function MessagesScreen() {
       refetchChannels(),
       refetchListedChannels(),
       refetchSupervised(),
+      refreshDraftChannelIds(),
     ]);
     setRefreshing(false);
-  }, [refetchDms, refetchChannels, refetchListedChannels, refetchSupervised]);
+  }, [
+    refetchDms,
+    refetchChannels,
+    refetchListedChannels,
+    refetchSupervised,
+    refreshDraftChannelIds,
+  ]);
 
   const allDms = useMemo(() => dms ?? [], [dms]);
   const allChannels = useMemo(() => channels ?? [], [channels]);
@@ -1153,7 +1216,11 @@ export default function MessagesScreen() {
     () =>
       data
         .filter((item): item is ChannelListItem => !('_type' in item))
-        .filter((item) => (item.unread_count ?? 0) + (item.thread_unread_count ?? 0) > 0)
+        .filter(
+          (item) =>
+            (item.unread_count ?? 0) + (item.thread_unread_count ?? 0) > 0 ||
+            item.is_manually_unread === true,
+        )
         .map((item) => item.id),
     [data],
   );
@@ -1273,6 +1340,7 @@ export default function MessagesScreen() {
           presenceByProfileId={presenceByProfileId}
           currentProfileName={currentProfileName}
           currentProfileKind={profileKind}
+          hasDraft={enableMessageDrafts && draftChannelIds.has(channel.id)}
           s={s}
           colors={colors}
           onPress={() => {
@@ -1311,7 +1379,16 @@ export default function MessagesScreen() {
         />
       );
     },
-    [s, colors, router, presenceByProfileId, currentProfileName, profileKind],
+    [
+      s,
+      colors,
+      router,
+      presenceByProfileId,
+      currentProfileName,
+      profileKind,
+      enableMessageDrafts,
+      draftChannelIds,
+    ],
   );
 
   return (

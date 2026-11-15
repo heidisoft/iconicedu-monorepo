@@ -49,6 +49,12 @@ jest.mock('@/hooks/use-profile', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-join-live-session', () => ({
+  useJoinLiveSession: () => ({
+    mutateAsync: jest.fn().mockRejectedValue(new Error('not configured in test')),
+  }),
+}));
+
 jest.mock('@/hooks/use-messages', () => ({
   useMessages: () => ({
     data: [],

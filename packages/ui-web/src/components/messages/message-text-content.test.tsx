@@ -65,4 +65,76 @@ describe('MessageTextContent', () => {
     expect(link).toHaveAttribute('target', '_blank');
     expect(screen.getByText('.')).toBeInTheDocument();
   });
+
+  describe('list formatting (enableMessageListFormatting)', () => {
+    const listText = 'Shopping list:\n- milk\n- eggs\n- bread';
+
+    it('renders bullet-prefixed lines as a plain paragraph when the flag is off', () => {
+      const { container } = render(
+        <MessageTextContent text={listText} enableListFormatting={false} />,
+      );
+
+      expect(container.querySelector('ul')).not.toBeInTheDocument();
+      expect(container.querySelector('p')).toBeInTheDocument();
+      expect(container.textContent).toBe(listText);
+    });
+
+    it('renders consecutive bullet lines as a <ul> when the flag is on', () => {
+      const { container } = render(
+        <MessageTextContent text={listText} enableListFormatting />,
+      );
+
+      const list = container.querySelector('ul');
+      expect(list).toBeInTheDocument();
+      expect(list).toHaveClass('list-disc');
+      const items = container.querySelectorAll('li');
+      expect(items).toHaveLength(3);
+      expect(items[0]).toHaveTextContent('milk');
+      expect(items[1]).toHaveTextContent('eggs');
+      expect(items[2]).toHaveTextContent('bread');
+      expect(container.textContent).toContain('Shopping list:');
+    });
+
+    it('renders consecutive numbered lines as an <ol> when the flag is on', () => {
+      const { container } = render(
+        <MessageTextContent
+          text={'1. First\n2. Second\n3. Third'}
+          enableListFormatting
+        />,
+      );
+
+      const list = container.querySelector('ol');
+      expect(list).toBeInTheDocument();
+      expect(list).toHaveClass('list-decimal');
+      expect(container.querySelectorAll('li')).toHaveLength(3);
+    });
+
+    it('still renders plain paragraphs when the flag is on but there are no list markers', () => {
+      const { container } = render(
+        <MessageTextContent text="Just a normal message" enableListFormatting />,
+      );
+
+      expect(container.querySelector('ul')).not.toBeInTheDocument();
+      expect(container.querySelector('ol')).not.toBeInTheDocument();
+      expect(container.querySelector('p')).toBeInTheDocument();
+    });
+
+    it('formats mentions inside list items using offsets relative to the item', async () => {
+      const text = '- @Taylor Reed please review\n- ok';
+      const { container } = render(
+        <MessageTextContent
+          text={text}
+          enableListFormatting
+          mentions={[
+            { profileId: 'profile-1', displayName: 'Taylor Reed', start: 2, end: 14 },
+          ]}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText('@Taylor Reed')).toBeInTheDocument();
+      });
+      expect(container.querySelectorAll('li')).toHaveLength(2);
+    });
+  });
 });

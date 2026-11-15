@@ -122,6 +122,60 @@ describe('buildNotificationDecision', () => {
     expect(withEmail.shouldWriteInbox).toBe(true);
   });
 
+  it('suppresses a non-mention event when the conversation is set to mentions-only', async () => {
+    const { client } = createSupabaseMock({});
+    resolveEffectivePreferenceMock.mockResolvedValueOnce({
+      source: 'scoped_preference',
+      muted: false,
+      mentionsOnly: true,
+      channels: ['push'],
+      scopeKind: 'channel',
+      scopeId: 'chan-1',
+    });
+
+    const result = await buildNotificationDecision({
+      supabase: client as never,
+      event: {
+        id: 'event-1',
+        org_id: 'org-1',
+        event_type: 'message.posted',
+        occurred_at: '2026-04-21T11:59:30.000Z',
+        payload: {},
+        scope: { kind: 'channel', channelId: 'chan-1' },
+      } as never,
+      recipientProfileId: 'profile-1',
+    });
+
+    expect(result.deliveryChannels).toEqual([]);
+  });
+
+  it('still delivers a mention event when the conversation is set to mentions-only', async () => {
+    const { client } = createSupabaseMock({});
+    resolveEffectivePreferenceMock.mockResolvedValueOnce({
+      source: 'scoped_preference',
+      muted: false,
+      mentionsOnly: true,
+      channels: ['push'],
+      scopeKind: 'channel',
+      scopeId: 'chan-1',
+    });
+
+    const result = await buildNotificationDecision({
+      supabase: client as never,
+      event: {
+        id: 'event-1',
+        org_id: 'org-1',
+        event_type: 'message.mentioned',
+        occurred_at: '2026-04-21T11:59:30.000Z',
+        payload: {},
+        scope: { kind: 'channel', channelId: 'chan-1' },
+      } as never,
+      recipientProfileId: 'profile-1',
+    });
+
+    expect(result.deliveryChannels).toEqual(['push']);
+  });
+
   it('suppresses external delivery when the source event requests silent notifications', async () => {
     const { client } = createSupabaseMock({
       channelLastReadAt: null,

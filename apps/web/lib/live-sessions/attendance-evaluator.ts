@@ -7,7 +7,7 @@ import type {
 import {
   getLiveSessionAttendancePolicy,
   __test__ as expectedParticipantsTest,
-} from '@iconicedu/web/lib/live-sessions/expected-participants';
+} from '@iconicedu/live-sessions-core';
 import type { SupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 
 const ATTENDANCE_EVALUATION_VERSION = 'v1';

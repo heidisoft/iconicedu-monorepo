@@ -10,7 +10,7 @@ import {
   Alert,
   Animated,
 } from 'react-native';
-import type { MessageVM } from '@iconicedu/shared-types';
+import { MESSAGE_EDIT_WINDOW_MINUTES, type MessageVM } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { EmojiPicker } from './emoji-picker';
@@ -22,7 +22,30 @@ import {
   EyeOff,
   Trash2,
   SmilePlus,
+  Pin,
+  PinOff,
+  Quote,
+  Mail,
+  Pencil,
 } from 'lucide-react-native';
+
+/**
+ * Sender-only, text-only, not-deleted, within the server's edit window
+ * (see MESSAGE_EDIT_WINDOW_MINUTES). This is a UX convenience check only —
+ * the server is authoritative and re-validates on PATCH /messages/:id/text.
+ */
+export function isMessageEditEligible(
+  message: MessageVM,
+  isOwn: boolean,
+  now: number = Date.now(),
+): boolean {
+  if (!isOwn) return false;
+  if (message.core?.type !== 'text') return false;
+  const createdAtMs = Date.parse(message.core.createdAt);
+  if (Number.isNaN(createdAtMs)) return false;
+  const windowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
+  return now - createdAtMs <= windowMs;
+}
 
 // Facebook Messenger-style quick reactions
 const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '😡', '👍'];
@@ -39,6 +62,28 @@ type MessageActionsSheetProps = {
   onDelete: (messageId: string) => void;
   onSave?: (messageId: string, saved: boolean) => void;
   onHide?: (messageId: string) => void;
+  /**
+   * Gated by `enableMessagePinning`. Pinning is authorization-restricted
+   * server-side (staff/educators/org admins who can manage *this specific*
+   * channel, plus a 25-active-pins-per-channel cap) — a client-side kind
+   * check (e.g. profile.kind === 'staff') can't reliably predict that, since
+   * an educator's kind doesn't tell us whether they're assigned to this
+   * channel. So we show the action to everyone when the flag is on, and
+   * surface a 403/cap error from `onTogglePin` via `Alert` instead of
+   * hiding the row for users who might actually be authorized.
+   */
+  enablePinning?: boolean;
+  isPinned?: boolean;
+  onTogglePin?: (messageId: string, nextPinned: boolean) => Promise<void> | void;
+  /** When provided (feature-flag gated by the caller), shows a "Quote reply" row. */
+  onQuoteReply?: (message: MessageVM) => void;
+  /** When provided (feature-flag gated by the caller), shows a "Mark unread" row. */
+  onMarkUnread?: (message: MessageVM) => void;
+  /** Hides the "Mark unread" row when the channel is already showing as unread. */
+  isChannelUnread?: boolean;
+  /** Gated behind enableMessageEdit — hides the Edit row entirely when false/omitted. */
+  enableEdit?: boolean;
+  onEdit?: (message: MessageVM) => void;
 };
 
 // ─── Animated reaction bubble (Facebook Messenger style) ──────────────────────
@@ -176,11 +221,20 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   onDelete,
   onSave,
   onHide,
+  enablePinning = false,
+  isPinned = false,
+  onTogglePin,
+  onQuoteReply,
+  onMarkUnread,
+  isChannelUnread = false,
+  enableEdit = false,
+  onEdit,
 }) => {
   const { colors } = useTheme();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [pinning, setPinning] = useState(false);
   const messageId = message?.ids.id;
   const isMessageSaved =
     (message?.state as { isSaved?: boolean } | undefined)?.isSaved ?? false;
@@ -189,6 +243,11 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   useEffect(() => {
     setSaved(isMessageSaved);
   }, [messageId, isMessageSaved]);
+
+  // Reset in-flight pin state when the message changes
+  useEffect(() => {
+    setPinning(false);
+  }, [messageId]);
 
   const handleReact = useCallback(
     (emoji: string) => {
@@ -205,6 +264,24 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
     onClose();
   }, [message, onThread, onClose]);
 
+  const handleQuoteReply = useCallback(() => {
+    if (!message) return;
+    onQuoteReply?.(message);
+    onClose();
+  }, [message, onQuoteReply, onClose]);
+
+  const handleMarkUnread = useCallback(() => {
+    if (!message) return;
+    onMarkUnread?.(message);
+    onClose();
+  }, [message, onMarkUnread, onClose]);
+
+  const handleEdit = useCallback(() => {
+    if (!message) return;
+    onEdit?.(message);
+    onClose();
+  }, [message, onEdit, onClose]);
+
   const handleSave = useCallback(() => {
     if (!message) return;
     const next = !saved;
@@ -212,6 +289,25 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
     onSave?.(message.ids.id, next);
     onClose();
   }, [message, saved, onSave, onClose]);
+
+  const handleTogglePin = useCallback(async () => {
+    if (!message || !onTogglePin || pinning) return;
+    const next = !isPinned;
+    setPinning(true);
+    try {
+      await onTogglePin(message.ids.id, next);
+      onClose();
+    } catch (error) {
+      Alert.alert(
+        next ? 'Unable to pin message' : 'Unable to unpin message',
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong. Please try again.',
+      );
+    } finally {
+      setPinning(false);
+    }
+  }, [message, onTogglePin, pinning, isPinned, onClose]);
 
   const handleCopyText = useCallback(async () => {
     const text = (message as { content?: { text?: string } })?.content?.text ?? '';
@@ -256,6 +352,8 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   }, [message, onDelete, onClose]);
 
   const textContent = (message as { content?: { text?: string } })?.content?.text ?? '';
+  const canEdit =
+    !isReadOnly && enableEdit && !!message && isMessageEditEligible(message, isOwn);
 
   if (!message) return null;
 
@@ -301,6 +399,30 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                 </TouchableOpacity>
               )}
 
+              {/* Quote reply — distinct from "Reply in thread"; feature-flag gated by the caller */}
+              {!isReadOnly && !!onQuoteReply && (
+                <TouchableOpacity style={s.actionItem} onPress={handleQuoteReply}>
+                  <Quote size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Quote reply</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Mark unread — hidden for your own messages and once the channel is already unread; feature-flag gated by the caller */}
+              {!isReadOnly && !!onMarkUnread && !isOwn && !isChannelUnread && (
+                <TouchableOpacity style={s.actionItem} onPress={handleMarkUnread}>
+                  <Mail size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Mark unread</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Edit — sender's own eligible text message only */}
+              {canEdit && (
+                <TouchableOpacity style={s.actionItem} onPress={handleEdit}>
+                  <Pencil size={20} color={colors.text} />
+                  <Text style={s.actionLabel}>Edit message</Text>
+                </TouchableOpacity>
+              )}
+
               {/* Save / Unsave */}
               <TouchableOpacity style={s.actionItem} onPress={handleSave}>
                 <Bookmark size={20} color={saved ? colors.teal : colors.text} />
@@ -308,6 +430,34 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
                   {saved ? 'Saved' : 'Save message'}
                 </Text>
               </TouchableOpacity>
+
+              {/* Pin / Unpin — hidden in read-only mode */}
+              {!isReadOnly && enablePinning && (
+                <TouchableOpacity
+                  style={s.actionItem}
+                  onPress={() => {
+                    void handleTogglePin();
+                  }}
+                  disabled={pinning}
+                  accessibilityLabel={isPinned ? 'Unpin message' : 'Pin message'}
+                  accessibilityState={{ disabled: pinning }}
+                >
+                  {isPinned ? (
+                    <PinOff size={20} color={colors.teal} />
+                  ) : (
+                    <Pin size={20} color={colors.text} />
+                  )}
+                  <Text style={isPinned ? s.savedLabel : s.actionLabel}>
+                    {pinning
+                      ? isPinned
+                        ? 'Unpinning…'
+                        : 'Pinning…'
+                      : isPinned
+                        ? 'Unpin message'
+                        : 'Pin message'}
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {/* Copy text + Forward — text messages only */}
               {!!textContent && (

@@ -1,5 +1,13 @@
+jest.mock('@/lib/messages/open-live-session', () => ({
+  openLiveSession: jest.fn((href: string) =>
+    require('react-native').Linking.openURL(
+      require('@/lib/messages/live-session-join').resolveJoinHrefForMobile(href),
+    ),
+  ),
+  getLiveSessionShareUrl: jest.fn(async (href: string) => href),
+}));
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Animated, Linking, Share } from 'react-native';
 import { ConversationHeader } from './conversation-header';
 import {
@@ -292,7 +300,9 @@ describe('ConversationHeader', () => {
 
     fireEvent.press(screen.getByLabelText('Join live session'));
 
-    expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-1');
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      'http://localhost:3000/live-sessions/session-1',
+    );
     expect(screen.queryByTestId('more-icon')).toBeNull();
   });
 
@@ -350,8 +360,100 @@ describe('ConversationHeader', () => {
 
     fireEvent.press(screen.getByLabelText('Join live session'));
 
-    expect(Linking.openURL).toHaveBeenCalledWith('/live-sessions/session-1');
+    expect(Linking.openURL).toHaveBeenCalledWith(
+      'http://localhost:3000/live-sessions/session-1',
+    );
     expect(screen.queryByText('Session ready to join')).toBeNull();
+  });
+
+  it('shows the API-issued passcode in the classroom join dialog', async () => {
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        onResolveJoinHref={async () => ({
+          href: 'https://app.invalid/live/a3f8-b2d4-c9e1',
+          provider: 'zoom',
+          passcode: 'test-secret',
+        })}
+        onMore={jest.fn()}
+      />,
+    );
+    await act(async () => fireEvent.press(screen.getByLabelText('Join live session')));
+    expect(await screen.findByText('test-secret')).toBeTruthy();
+    expect(screen.getByLabelText('Share passcode')).toBeTruthy();
+  });
+  it('resolves and opens a join href when no static link is configured', async () => {
+    const onResolveJoinHref = jest
+      .fn()
+      .mockResolvedValue({ href: '/live-sessions/session-2' });
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        onResolveJoinHref={onResolveJoinHref}
+        onMore={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join live session'));
+    });
+
+    expect(onResolveJoinHref).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(Linking.openURL).toHaveBeenCalledWith(
+        'http://localhost:3000/live-sessions/session-2',
+      ),
+    );
+  });
+
+  it('prefers the resolved API href over a configured static link, matching web', async () => {
+    const onResolveJoinHref = jest
+      .fn()
+      .mockResolvedValue({ href: '/live-sessions/session-2' });
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        liveJoinUrl="https://zoom.us/j/room-123"
+        onResolveJoinHref={onResolveJoinHref}
+        onMore={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join live session'));
+    });
+
+    expect(onResolveJoinHref).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(Linking.openURL).toHaveBeenCalledWith(
+        'http://localhost:3000/live-sessions/session-2',
+      ),
+    );
+    expect(screen.queryByText('Session ready to join')).toBeNull();
+  });
+
+  it('falls back to the configured static link when the API href resolution fails', async () => {
+    const onResolveJoinHref = jest.fn().mockRejectedValue(new Error('API unavailable'));
+    render(
+      <ConversationHeader
+        {...baseProps}
+        kind="space"
+        liveJoinUrl="https://zoom.us/j/room-123"
+        onResolveJoinHref={onResolveJoinHref}
+        onMore={jest.fn()}
+      />,
+    );
+
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Join live session'));
+    });
+
+    expect(onResolveJoinHref).toHaveBeenCalledTimes(1);
+    expect(await screen.findByText('Session ready to join')).toBeTruthy();
+    expect(await screen.findByText('https://zoom.us/j/room-123')).toBeTruthy();
   });
 
   it('renders dual avatar initials when secondaryAvatarSeed provided', () => {

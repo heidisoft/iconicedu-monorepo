@@ -1,5 +1,7 @@
 'use client';
 
+import { ClassroomMeetingFeatureSettings } from '@iconicedu/web/components/admin/classroom-meeting-feature-settings';
+
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -112,6 +114,7 @@ export function LearningSpaceForm({
   initialData,
 }: LearningSpaceFormProps) {
   const router = useRouter();
+  const createdClassroomId = React.useRef<string | undefined>(undefined);
   const backUrl = `/${orgSlug}/admin/classrooms`;
 
   const initialState = React.useMemo<FormState>(
@@ -214,11 +217,13 @@ export function LearningSpaceForm({
     setIsSaving(true);
     try {
       const endpoint =
-        mode === 'edit' ? '/api/admin/spaces/update' : '/api/admin/spaces/create';
+        mode === 'edit' || createdClassroomId.current
+          ? '/api/admin/spaces/update'
+          : '/api/admin/spaces/create';
       const body =
-        mode === 'edit'
+        mode === 'edit' || createdClassroomId.current
           ? JSON.stringify({
-              learningSpaceId: initialData?.ids.id,
+              learningSpaceId: initialData?.ids.id ?? createdClassroomId.current,
               payload,
               initialScheduleHashKey,
               scheduleHashKey: currentScheduleHashKey,
@@ -236,6 +241,8 @@ export function LearningSpaceForm({
         message?: string;
         data?: { learningSpaceId?: string };
       };
+      if (mode === 'create' && result.data?.learningSpaceId)
+        createdClassroomId.current = result.data.learningSpaceId;
       if (!response.ok || !result.success) {
         toast.error(
           result.message ??
@@ -396,6 +403,11 @@ export function LearningSpaceForm({
         joinUrlInputId="ls-live-session-join-url"
         value={formState.liveSession}
         onChange={(nextLiveSession) => update({ liveSession: nextLiveSession })}
+      />
+      <ClassroomMeetingFeatureSettings
+        classroomId={initialData?.ids.id}
+        value={formState.liveSession}
+        onChange={(next) => update({ liveSession: next })}
       />
 
       <FieldSeparator />

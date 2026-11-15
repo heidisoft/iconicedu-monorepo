@@ -79,3 +79,22 @@ export type LearningSpaceCreatePayload = {
   participants: LearningSpaceParticipantPayload[];
   schedules?: LearningSpaceSchedulePayload[] | null;
 };
+
+export type LearningSpaceLifecycleAction = 'archive' | 'restore' | 'delete';
+
+export type LearningSpaceLifecycleRequest = {
+  orgId: string;
+};
+
+/**
+ * Result of an admin class archive/restore/delete. `effects` carries the
+ * per-table counts reported by the database cascade (for example
+ * `dms_archived`, `participants_removed`); keys vary by action.
+ */
+export type LearningSpaceLifecycleResult = {
+  learningSpaceId: string;
+  action: LearningSpaceLifecycleAction;
+  changed: boolean;
+  restorableUntil: string | null;
+  effects: Record<string, number | boolean | string>;
+};

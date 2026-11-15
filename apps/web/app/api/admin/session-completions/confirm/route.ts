@@ -8,11 +8,14 @@ type ConfirmRequestBody = {
   orgId?: string;
   scheduleId?: string;
   occurrenceKey?: string;
+  verifiedMinutes?: number;
+  verificationNote?: string;
 };
 
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as ConfirmRequestBody | null;
-  const { orgId, scheduleId, occurrenceKey } = body ?? {};
+  const { orgId, scheduleId, occurrenceKey, verifiedMinutes, verificationNote } =
+    body ?? {};
 
   if (!orgId || !scheduleId || !occurrenceKey) {
     return NextResponse.json(
@@ -35,6 +38,8 @@ export async function POST(request: Request) {
       orgId,
       scheduleId,
       occurrenceKey,
+      verifiedMinutes,
+      verificationNote,
     });
     return NextResponse.json(result);
   } catch (error) {

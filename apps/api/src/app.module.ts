@@ -1,3 +1,4 @@
+import { WhiteboardsModule } from './modules/whiteboards/whiteboards.module';
 import { Module } from '@nestjs/common';
 import { AdminToolsModule } from '@iconicedu/api/modules/admin-tools/admin-tools.module';
 import { ConfigModule } from '@nestjs/config';
@@ -6,8 +7,14 @@ import { PrismaModule } from '@iconicedu/api/prisma/prisma.module';
 import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { UsersModule } from '@iconicedu/api/modules/users/users.module';
 import { ChannelsModule } from '@iconicedu/api/modules/channels/channels.module';
+import { LiveSessionsModule } from '@iconicedu/api/modules/live-sessions/live-sessions.module';
 import { ClassesModule } from '@iconicedu/api/modules/classes/classes.module';
 import { MessagesModule } from '@iconicedu/api/modules/messages/messages.module';
+import { AiAssistModule } from '@iconicedu/api/modules/ai-assist/ai-assist.module';
+import { OrgAiSettingsModule } from '@iconicedu/api/modules/org-ai-settings/org-ai-settings.module';
+import { MessagePinsModule } from '@iconicedu/api/modules/message-pins/message-pins.module';
+import { MessageSearchModule } from '@iconicedu/api/modules/message-search/message-search.module';
+import { ScheduledMessagesModule } from '@iconicedu/api/modules/scheduled-messages/scheduled-messages.module';
 import { RemindersModule } from '@iconicedu/api/modules/reminders/reminders.module';
 import { AnalyticsModule } from '@iconicedu/api/analytics/analytics.module';
 import { ActivityFeedModule } from '@iconicedu/api/modules/activity-feed/activity-feed.module';
@@ -34,6 +41,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
 
 @Module({
   imports: [
+    WhiteboardsModule,
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AnalyticsModule,
@@ -41,8 +49,14 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     AdminToolsModule,
     UsersModule,
     ChannelsModule,
+    LiveSessionsModule,
     ClassesModule,
     MessagesModule,
+    AiAssistModule,
+    OrgAiSettingsModule,
+    MessagePinsModule,
+    MessageSearchModule,
+    ScheduledMessagesModule,
     ActivityFeedModule,
     SessionCompletionsModule,
     RemindersModule,

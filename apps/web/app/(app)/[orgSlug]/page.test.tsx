@@ -36,6 +36,10 @@ vi.mock('@iconicedu/ui-web', () => ({
     dashboardHomeInfographicSectionMock(props),
 }));
 
+vi.mock('@iconicedu/web/lib/supabase/client', () => ({
+  createSupabaseBrowserClient: () => ({}),
+}));
+
 vi.mock('../../../lib/subjects/queries/org-subject-catalog.query', () => ({
   listActiveOrgSubjectCatalog: vi.fn(async () => ({
     data: [{ subject: 'Math' }, { subject: 'Science' }],

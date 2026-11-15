@@ -11,8 +11,14 @@ const setCurrentUserId = vi.fn();
 const setCreateTextMessage = vi.fn();
 const setSendTextMessage = vi.fn();
 const setSendFileMessage = vi.fn();
+const setEditTextMessage = vi.fn();
 const setJoinLiveSession = vi.fn();
-const setGetMessageActionState = vi.fn();
+const latestGetMessageActionState: {
+  current: ((messageId: string) => any) | null;
+} = { current: null };
+const setGetMessageActionState = vi.fn((handler: (messageId: string) => any) => {
+  latestGetMessageActionState.current = handler;
+});
 const addMessage = vi.fn();
 const updateMessage = vi.fn();
 const deleteMessage = vi.fn();
@@ -48,6 +54,7 @@ vi.mock('./context/messages-state-provider', () => ({
     setCreateTextMessage,
     setSendTextMessage,
     setSendFileMessage,
+    setEditTextMessage,
     setJoinLiveSession,
     setGetMessageActionState,
     setThreadHandlers: vi.fn(),
@@ -57,41 +64,53 @@ vi.mock('./context/messages-state-provider', () => ({
   }),
 }));
 
+const latestMessageListProps: { current: any | null } = { current: null };
+
 vi.mock('./message-list', () => ({
   MessageList: ({
     onUnreadViewed,
     onOpenThread,
     messages,
     emptyStateStarterAction,
+    ...rest
   }: {
     onUnreadViewed?: (lastReadMessageId: string) => void;
     onOpenThread?: (thread: any, parentMessage: any) => void | Promise<void>;
     messages?: any[];
     emptyStateStarterAction?: { label: string; onClick: () => void };
-  }) => (
-    <div>
-      <button type="button" onClick={() => onUnreadViewed?.('message-2')}>
-        mark-read
-      </button>
-      <button
-        type="button"
-        onClick={() => {
-          const parentMessage = messages?.[0];
-          const thread = parentMessage?.social?.thread;
-          if (thread && parentMessage) {
-            void onOpenThread?.(thread, parentMessage);
-          }
-        }}
-      >
-        open-thread
-      </button>
-      {emptyStateStarterAction ? (
-        <button type="button" onClick={() => emptyStateStarterAction.onClick()}>
-          {emptyStateStarterAction.label}
+  } & Record<string, any>) => {
+    latestMessageListProps.current = {
+      onUnreadViewed,
+      onOpenThread,
+      messages,
+      emptyStateStarterAction,
+      ...rest,
+    };
+    return (
+      <div>
+        <button type="button" onClick={() => onUnreadViewed?.('message-2')}>
+          mark-read
         </button>
-      ) : null}
-    </div>
-  ),
+        <button
+          type="button"
+          onClick={() => {
+            const parentMessage = messages?.[0];
+            const thread = parentMessage?.social?.thread;
+            if (thread && parentMessage) {
+              void onOpenThread?.(thread, parentMessage);
+            }
+          }}
+        >
+          open-thread
+        </button>
+        {emptyStateStarterAction ? (
+          <button type="button" onClick={() => emptyStateStarterAction.onClick()}>
+            {emptyStateStarterAction.label}
+          </button>
+        ) : null}
+      </div>
+    );
+  },
 }));
 
 vi.mock('./message-input', () => ({
@@ -149,6 +168,8 @@ const channel: ChannelVM = {
 describe('MessagesContainer', () => {
   beforeEach(() => {
     latestMessageInputProps.current = null;
+    latestMessageListProps.current = null;
+    latestGetMessageActionState.current = null;
     window.history.replaceState(null, '', window.location.pathname);
     vi.stubGlobal(
       'fetch',
@@ -915,6 +936,173 @@ describe('MessagesContainer', () => {
       expect(latestMessageInputProps.current?.prefillRequest?.value).toBe(
         'Hi support team, I need help with ',
       );
+    });
+  });
+
+  describe('message drafts flag plumbing', () => {
+    it('passes a draftScope and the flag through to MessageInput when enabled', async () => {
+      render(
+        <MessagesContainer
+          channel={channel}
+          currentUserId="profile-1"
+          currentUserProfile={channel.collections.participants[0]}
+          enableMessageDrafts
+        />,
+      );
+
+      await waitFor(() => {
+        expect(latestMessageInputProps.current?.enableMessageDrafts).toBe(true);
+      });
+      expect(latestMessageInputProps.current?.draftScope).toEqual({
+        accountId: 'account-profile-1',
+        profileId: 'profile-1',
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        threadId: null,
+      });
+    });
+
+    it('never builds a draftScope when the flag is off, even with a resolvable profile', async () => {
+      render(
+        <MessagesContainer
+          channel={channel}
+          currentUserId="profile-1"
+          currentUserProfile={channel.collections.participants[0]}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(latestMessageInputProps.current).not.toBeNull();
+      });
+      expect(latestMessageInputProps.current?.enableMessageDrafts).toBe(false);
+      expect(latestMessageInputProps.current?.draftScope).toBeNull();
+    });
+  });
+
+  describe('send-failure retry (enableMessageSendReliability)', () => {
+    it('keeps a failed send visible as "sendFailed" and retries with the same clientMessageId', async () => {
+      const sendTextMessage = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('network down'))
+        .mockResolvedValueOnce({
+          ids: { id: 'server-message-1', orgId: 'org-1' },
+          core: {
+            type: 'text',
+            sender: channel.collections.participants[0],
+            createdAt: new Date().toISOString(),
+            visibility: { type: 'all' },
+          },
+          social: { reactions: [] },
+          state: { isSaved: false },
+          content: { text: 'hello there' },
+        });
+      const messageWriteClient = {
+        sendTextMessage,
+        editTextMessage: vi.fn(),
+        toggleReaction: vi.fn(),
+        toggleSavedMessage: vi.fn(),
+        deleteMessage: vi.fn(),
+        toggleHiddenMessage: vi.fn(),
+      };
+
+      render(
+        <MessagesContainer
+          channel={channel}
+          currentUserId="profile-1"
+          currentUserProfile={channel.collections.participants[0]}
+          messageWriteClient={messageWriteClient as any}
+          enableMessageSendReliability
+        />,
+      );
+
+      await waitFor(() => {
+        expect(latestMessageInputProps.current?.onSend).toBeTypeOf('function');
+      });
+
+      await act(async () => {
+        try {
+          await latestMessageInputProps.current.onSend(
+            'hello there',
+            undefined,
+            null,
+            'client-msg-1',
+          );
+        } catch {
+          // handleSendMessage rethrows on failure by design — swallow here,
+          // same as MessageInput's own catch does.
+        }
+      });
+
+      const optimisticMessageId = addMessage.mock.calls[0]?.[0]?.ids?.id;
+      expect(optimisticMessageId).toBeTruthy();
+      expect(sendTextMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: 'hello there',
+          clientMessageId: 'client-msg-1',
+        }),
+      );
+      // Not deleted — kept around as a "Not sent" bubble instead.
+      expect(deleteMessage).not.toHaveBeenCalledWith(optimisticMessageId);
+      expect(latestGetMessageActionState.current?.(optimisticMessageId)?.sendFailed).toBe(
+        true,
+      );
+
+      act(() => {
+        latestMessageListProps.current.onRetrySend?.(optimisticMessageId);
+      });
+
+      // Retry reused the exact same clientMessageId — this is what makes it
+      // safe against duplicates if the first attempt actually landed server-side.
+      await waitFor(() => expect(sendTextMessage).toHaveBeenCalledTimes(2));
+      expect(sendTextMessage.mock.calls[1][0]).toEqual(
+        expect.objectContaining({ clientMessageId: 'client-msg-1' }),
+      );
+      await waitFor(() =>
+        expect(updateMessage).toHaveBeenCalledWith(
+          optimisticMessageId,
+          expect.objectContaining({ ids: { id: 'server-message-1', orgId: 'org-1' } }),
+        ),
+      );
+      await waitFor(() =>
+        expect(
+          Boolean(latestGetMessageActionState.current?.(optimisticMessageId)?.sendFailed),
+        ).toBe(false),
+      );
+    });
+
+    it('deletes the optimistic message on failure when the flag is off (unchanged legacy behavior)', async () => {
+      const messageWriteClient = {
+        sendTextMessage: vi.fn().mockRejectedValue(new Error('boom')),
+        editTextMessage: vi.fn(),
+        toggleReaction: vi.fn(),
+        toggleSavedMessage: vi.fn(),
+        deleteMessage: vi.fn(),
+        toggleHiddenMessage: vi.fn(),
+      };
+
+      render(
+        <MessagesContainer
+          channel={channel}
+          currentUserId="profile-1"
+          currentUserProfile={channel.collections.participants[0]}
+          messageWriteClient={messageWriteClient as any}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(latestMessageInputProps.current?.onSend).toBeTypeOf('function');
+      });
+
+      await act(async () => {
+        try {
+          await latestMessageInputProps.current.onSend('will fail', undefined, null);
+        } catch {
+          // expected — propagated so the composer doesn't reset on failure.
+        }
+      });
+
+      const optimisticMessageId = addMessage.mock.calls[0]?.[0]?.ids?.id;
+      expect(deleteMessage).toHaveBeenCalledWith(optimisticMessageId);
     });
   });
 });

@@ -45,6 +45,7 @@ function SheetContent({
   side = 'right',
   showCloseButton = true,
   dismissible = false,
+  overlayClassName,
   onInteractOutside,
   onPointerDownOutside,
   onEscapeKeyDown,
@@ -53,10 +54,11 @@ function SheetContent({
   side?: 'top' | 'right' | 'bottom' | 'left';
   showCloseButton?: boolean;
   dismissible?: boolean;
+  overlayClassName?: string;
 }) {
   return (
     <SheetPortal>
-      <SheetOverlay />
+      <SheetOverlay className={overlayClassName} />
       <SheetPrimitive.Content
         data-slot="sheet-content"
         data-side={side}

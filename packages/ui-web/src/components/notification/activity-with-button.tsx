@@ -1,4 +1,5 @@
 'use client';
+import { useLiveSessionJoinContext } from '../messages/live-session-join-context';
 
 import { useState } from 'react';
 import { Loader2, MessageSquare, Video } from 'lucide-react';
@@ -15,6 +16,7 @@ export function ActivityWithButton({
   activity: ActivityFeedItemVM;
   className?: string;
 }) {
+  const joinContext = useLiveSessionJoinContext();
   const actionButton = activity.content.actionButton;
   const [isJoinPending, setIsJoinPending] = useState(false);
   const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
@@ -54,61 +56,20 @@ export function ActivityWithButton({
     typeof actionButton.payload.channelId === 'string'
       ? actionButton.payload.channelId
       : null;
-  const joinOrgSlug =
-    actionButton.payload &&
-    typeof actionButton.payload === 'object' &&
-    !Array.isArray(actionButton.payload) &&
-    typeof actionButton.payload.orgSlug === 'string'
-      ? actionButton.payload.orgSlug
-      : null;
   const isLiveSessionJoinAction =
     actionButton.actionKey === 'live-session.join' && Boolean(joinChannelId);
   const isOpenClassroomChatAction = actionButton.label === 'Open classroom chat';
-
-  const resolveOrgSlugForJoin = () => {
-    if (joinOrgSlug) {
-      return joinOrgSlug;
-    }
-    if (typeof window === 'undefined') {
-      return null;
-    }
-    const [firstSegment] = window.location.pathname.split('/').filter(Boolean);
-    return firstSegment ?? null;
-  };
 
   const handleJoinAction = async () => {
     if (!joinChannelId || isJoinPending) {
       return;
     }
-    const orgSlug = resolveOrgSlugForJoin();
-    if (!orgSlug) {
-      throw new Error('orgSlug is required');
-    }
+    if (!joinContext) throw new Error('Meeting join context is required');
 
     setIsJoinPending(true);
     try {
-      const response = await window.fetch(
-        `/api/channels/${joinChannelId}/live-sessions/join`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ orgSlug }),
-        },
-      );
-      const payload = (await response.json()) as
-        | {
-            success?: boolean;
-            joinPath?: string;
-            error?: string;
-          }
-        | undefined;
-
-      if (!response.ok || !payload?.success || !payload.joinPath) {
-        throw new Error(payload?.error ?? 'Failed to join live session');
-      }
-      handleResolvedJoinHref(payload.joinPath);
+      const payload = await joinContext.joinChannel(joinChannelId);
+      handleResolvedJoinHref(payload.joinPath, payload.provider, payload.passcode);
     } finally {
       setIsJoinPending(false);
     }

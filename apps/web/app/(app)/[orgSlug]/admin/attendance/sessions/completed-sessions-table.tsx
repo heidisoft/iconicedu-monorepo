@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  AlertTriangle,
   Check,
   Clock,
   CircleAlert,
@@ -17,6 +18,7 @@ import { getCompletionParticipants } from './session-attendance-analytics';
 import type {
   AdminSessionCompletionParticipantVM,
   AdminSessionCompletionVM,
+  ClassSessionCompletionDisputeCategory,
 } from '@iconicedu/shared-types';
 import {
   AlertDialog,
@@ -35,6 +37,9 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
   Input,
   Label,
   Select,
@@ -48,6 +53,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  Textarea,
   toast,
 } from '@iconicedu/ui-web';
 import {
@@ -60,6 +66,21 @@ import type { ScheduleOptionRow } from '@iconicedu/web/lib/api/schedules';
 
 const PAGE_SIZE = 10;
 
+const DISPUTE_CATEGORIES: {
+  key: ClassSessionCompletionDisputeCategory;
+  label: string;
+}[] = [
+  { key: 'did_not_happen', label: 'Session did not happen' },
+  { key: 'teacher_absent', label: 'Teacher absent' },
+  { key: 'student_absent', label: 'Student absent' },
+  { key: 'technical_issue', label: 'Technical issue' },
+  { key: 'other', label: 'Other' },
+];
+
+const DISPUTE_CATEGORY_LABELS = new Map(
+  DISPUTE_CATEGORIES.map((option) => [option.key, option.label]),
+);
+
 // Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
 // null when either bound is unparseable or non-positive — some backfilled rows
 // carry no distinct end time, so end === start.
@@ -70,6 +91,11 @@ function getSessionDurationSeconds(row: AdminSessionCompletionVM) {
     return null;
   }
   return (end - start) / 1000;
+}
+
+function getScheduledMinutes(row: AdminSessionCompletionVM) {
+  const seconds = getSessionDurationSeconds(row);
+  return seconds != null ? Math.round(seconds / 60) : 0;
 }
 
 // Every student across the given classrooms, deduplicated by profile —
@@ -325,14 +351,278 @@ function CreateSessionDialog({
   );
 }
 
+// Lets staff confirm a session with the actual verified duration instead of
+// implicitly assuming the full scheduled length — e.g. a teacher who only ran
+// 30 of a scheduled 60 minutes. Pre-filled with the scheduled duration so the
+// common (full-length) case is still just one extra click; a note is only
+// required once staff change the minutes to something else. Also doubles as
+// dispute resolution: confirming a session a parent already reported as
+// incomplete settles the dispute too (see adminConfirm in
+// session-completions.service.ts), so this dialog is offered even when the
+// occurrence has an open dispute.
+function ConfirmSessionDialog({
+  row,
+  resolvesDispute,
+  onSubmitted,
+}: {
+  row: AdminSessionCompletionVM;
+  resolvesDispute: boolean;
+  onSubmitted: () => void;
+}) {
+  const scheduledMinutes = getScheduledMinutes(row);
+  const [open, setOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [verifiedMinutes, setVerifiedMinutes] = React.useState(String(scheduledMinutes));
+  const [note, setNote] = React.useState('');
+
+  const handleOpenChange = (next: boolean) => {
+    if (isSubmitting) return;
+    setOpen(next);
+    if (!next) {
+      setVerifiedMinutes(String(scheduledMinutes));
+      setNote('');
+    }
+  };
+
+  const parsedMinutes = Number(verifiedMinutes);
+  const isOverride = Number.isFinite(parsedMinutes) && parsedMinutes !== scheduledMinutes;
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!Number.isFinite(parsedMinutes) || parsedMinutes < 0) {
+      toast.error('Enter a valid number of minutes');
+      return;
+    }
+    if (isOverride && !note.trim()) {
+      toast.error('Add a note explaining the change in duration');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/admin/session-completions/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: row.orgId,
+          scheduleId: row.scheduleId,
+          occurrenceKey: row.occurrenceKey,
+          verifiedMinutes: parsedMinutes,
+          verificationNote: note.trim() || undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Unable to confirm session.');
+      }
+      handleOpenChange(false);
+      onSubmitted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to confirm session.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" type="button">
+          {resolvesDispute ? 'Confirm anyway' : 'Confirm'}
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="space-y-4 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Confirm this session</DialogTitle>
+          <DialogDescription>
+            {resolvesDispute
+              ? 'This session was reported as a problem. Confirming settles the dispute — record how many minutes actually ran.'
+              : 'Settles every open submission for this session as confirmed. Adjust the minutes if the session ran short.'}
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="confirm-session-minutes">Verified minutes</Label>
+            <Input
+              id="confirm-session-minutes"
+              type="number"
+              min={0}
+              value={verifiedMinutes}
+              onChange={(event) => setVerifiedMinutes(event.target.value)}
+              disabled={isSubmitting}
+            />
+            <p className="text-xs text-muted-foreground">
+              Scheduled for {scheduledMinutes} minutes.
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="confirm-session-note">
+              Note{isOverride ? ' (required)' : ' (optional)'}
+            </Label>
+            <Textarea
+              id="confirm-session-note"
+              value={note}
+              onChange={(event) => setNote(event.target.value)}
+              disabled={isSubmitting}
+              maxLength={500}
+              placeholder="Why the verified duration differs from the schedule…"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+                  Confirming…
+                </>
+              ) : (
+                'Confirm session'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// Lets staff report that a session had a problem (most commonly, neither the
+// tutor nor the student showed up) directly from the admin table, instead of
+// waiting for a participant to flag their own row. Settles every still-open
+// row for the occurrence at once, same as staff confirm — the session simply
+// won't need a participant confirm/dispute anymore once staff has acted on it.
+function DisputeSessionDialog({
+  row,
+  onSubmitted,
+}: {
+  row: AdminSessionCompletionVM;
+  onSubmitted: () => void;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [category, setCategory] =
+    React.useState<ClassSessionCompletionDisputeCategory>('did_not_happen');
+  const [reason, setReason] = React.useState('');
+
+  const handleOpenChange = (next: boolean) => {
+    if (isSubmitting) return;
+    setOpen(next);
+    if (!next) {
+      setCategory('did_not_happen');
+      setReason('');
+    }
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSubmitting(true);
+    try {
+      const response = await fetch('/api/admin/session-completions/dispute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orgId: row.orgId,
+          scheduleId: row.scheduleId,
+          occurrenceKey: row.occurrenceKey,
+          disputeCategory: category,
+          disputeReason: reason.trim() || undefined,
+        }),
+      });
+      const result = await response.json();
+      if (!result?.success) {
+        throw new Error(result?.message ?? 'Unable to report session.');
+      }
+      toast.success('Session reported');
+      handleOpenChange(false);
+      onSubmitted();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to report session.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="sm" type="button">
+          <AlertTriangle className="mr-1.5 size-3.5" />
+          Report a problem
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="space-y-4 sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Report a problem with this session</DialogTitle>
+          <DialogDescription>
+            Use this when a session has a problem nobody has flagged yet — e.g. neither
+            the tutor nor the student showed up. This settles every open submission for
+            the session as disputed.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={(event) => void handleSubmit(event)} className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="dispute-session-category">Reason</Label>
+            <Select
+              value={category}
+              onValueChange={(value) =>
+                setCategory(value as ClassSessionCompletionDisputeCategory)
+              }
+              disabled={isSubmitting}
+            >
+              <SelectTrigger id="dispute-session-category" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DISPUTE_CATEGORIES.map((option) => (
+                  <SelectItem key={option.key} value={option.key}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="dispute-session-reason">Notes (optional)</Label>
+            <Textarea
+              id="dispute-session-reason"
+              value={reason}
+              onChange={(event) => setReason(event.target.value)}
+              disabled={isSubmitting}
+              maxLength={500}
+              placeholder="Any extra context for this report…"
+            />
+          </div>
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting} variant="destructive">
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-1.5 size-4 animate-spin" aria-hidden="true" />
+                  Reporting…
+                </>
+              ) : (
+                'Report session'
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function CompletedSessionsTable({
   rows,
   schedules,
   orgId,
+  allowVerifiedDurationOverride = false,
+  showDisputeDetails = false,
 }: {
   rows: AdminSessionCompletionVM[];
   schedules: ScheduleOptionRow[];
   orgId: string;
+  /** Gated by the enableSessionCompletionVerifiedDuration flag (see flags.ts). */
+  allowVerifiedDurationOverride?: boolean;
+  /** Gated by the enableSessionCompletionDisputeDetails flag (see flags.ts). */
+  showDisputeDetails?: boolean;
 }) {
   const router = useRouter();
   const [page, setPage] = React.useState(1);
@@ -372,6 +662,30 @@ export function CompletedSessionsTable({
   // teacher/parent's own confirm prompt stops resurfacing for it too. A brief
   // "Undo" action on the success toast lets an admin reverse a mis-click before
   // that state settles elsewhere (participant ratings, notifications, etc).
+  const handleConfirmed = (row: AdminSessionCompletionVM) => {
+    router.refresh();
+    toast.success('Session confirmed', {
+      duration: UNDO_WINDOW_MS,
+      action: {
+        label: 'Undo',
+        onClick: () =>
+          toast.promise(handleUndoStaffConfirm(row), {
+            loading: 'Undoing confirmation…',
+            success: 'Confirmation undone',
+            error: (error) =>
+              error instanceof Error ? error.message : 'Unable to undo confirmation.',
+          }),
+      },
+    });
+  };
+
+  // Legacy path for when allowVerifiedDurationOverride is off: confirms with no
+  // verifiedMinutes/verificationNote (the server then defaults to the full
+  // scheduled duration), same as before ConfirmSessionDialog existed. Kept
+  // alongside the dialog so the flag can gate the new fields without disabling
+  // staff confirmation entirely. adminConfirm resolves 'disputed' rows the
+  // same way it resolves 'pending'/'auto_confirmed' ones, so this also
+  // doubles as the flag-off dispute-resolution action ("Confirm anyway").
   const handleStaffConfirm = async (row: AdminSessionCompletionVM) => {
     if (confirmingId) return;
     setConfirmingId(row.id);
@@ -389,20 +703,7 @@ export function CompletedSessionsTable({
       if (!result?.success) {
         throw new Error(result?.message ?? 'Unable to confirm session.');
       }
-      router.refresh();
-      toast.success('Session confirmed', {
-        duration: UNDO_WINDOW_MS,
-        action: {
-          label: 'Undo',
-          onClick: () =>
-            toast.promise(handleUndoStaffConfirm(row), {
-              loading: 'Undoing confirmation…',
-              success: 'Confirmation undone',
-              error: (error) =>
-                error instanceof Error ? error.message : 'Unable to undo confirmation.',
-            }),
-        },
-      });
+      handleConfirmed(row);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to confirm session.');
     } finally {
@@ -500,6 +801,15 @@ export function CompletedSessionsTable({
                     {formatAttendanceTimeOfDay(row.sessionEndAt)} (
                     {formatAttendanceDuration(getSessionDurationSeconds(row))})
                   </p>
+                  {row.verifiedMinutes != null &&
+                    row.verifiedMinutes !== getScheduledMinutes(row) && (
+                      <p
+                        className="text-xs text-warning"
+                        title={row.verificationNote ?? ''}
+                      >
+                        Verified: {row.verifiedMinutes} min
+                      </p>
+                    )}
                 </TableCell>
                 <TableCell>
                   <ul className="space-y-2">
@@ -545,6 +855,39 @@ export function CompletedSessionsTable({
                                 )}
                               </p>
                             )}
+                            {disputed && showDisputeDetails && person.disputeDetails && (
+                              <HoverCard>
+                                <HoverCardTrigger asChild>
+                                  <p className="max-w-[16rem] cursor-default truncate text-xs text-muted-foreground">
+                                    {DISPUTE_CATEGORY_LABELS.get(
+                                      person.disputeDetails.category,
+                                    ) ?? person.disputeDetails.category}
+                                    {person.disputeDetails.reason
+                                      ? `: ${person.disputeDetails.reason}`
+                                      : ''}
+                                    {person.disputeDetails.rescheduleRequested &&
+                                      ' · Reschedule requested'}
+                                  </p>
+                                </HoverCardTrigger>
+                                <HoverCardContent className="w-72 text-xs">
+                                  <p className="font-medium text-foreground">
+                                    {DISPUTE_CATEGORY_LABELS.get(
+                                      person.disputeDetails.category,
+                                    ) ?? person.disputeDetails.category}
+                                  </p>
+                                  {person.disputeDetails.reason && (
+                                    <p className="mt-1 whitespace-normal text-muted-foreground">
+                                      {person.disputeDetails.reason}
+                                    </p>
+                                  )}
+                                  {person.disputeDetails.rescheduleRequested && (
+                                    <p className="mt-1 text-muted-foreground">
+                                      Reschedule requested
+                                    </p>
+                                  )}
+                                </HoverCardContent>
+                              </HoverCard>
+                            )}
                           </div>
                           <Button
                             variant="ghost"
@@ -563,24 +906,71 @@ export function CompletedSessionsTable({
                   {participants.length === 0 && '—'}
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
-                    {hasDispute ? (
-                      <span className="text-xs text-muted-foreground">
-                        Dispute reported
-                      </span>
-                    ) : needsConfirmation ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={confirmingId === row.id}
-                        onClick={() => void handleStaffConfirm(row)}
-                      >
-                        {confirmingId === row.id ? (
-                          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                        ) : (
-                          'Confirm'
-                        )}
-                      </Button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {needsConfirmation ? (
+                      allowVerifiedDurationOverride ? (
+                        <>
+                          {hasDispute && (
+                            <span className="text-xs text-muted-foreground">
+                              Dispute reported
+                            </span>
+                          )}
+                          <ConfirmSessionDialog
+                            row={row}
+                            resolvesDispute={hasDispute}
+                            onSubmitted={() => handleConfirmed(row)}
+                          />
+                          {!hasDispute && (
+                            <DisputeSessionDialog
+                              row={row}
+                              onSubmitted={() => router.refresh()}
+                            />
+                          )}
+                        </>
+                      ) : hasDispute ? (
+                        <>
+                          <span className="text-xs text-muted-foreground">
+                            Dispute reported
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={confirmingId === row.id}
+                            onClick={() => void handleStaffConfirm(row)}
+                          >
+                            {confirmingId === row.id ? (
+                              <Loader2
+                                className="size-4 animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              'Confirm anyway'
+                            )}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={confirmingId === row.id}
+                            onClick={() => void handleStaffConfirm(row)}
+                          >
+                            {confirmingId === row.id ? (
+                              <Loader2
+                                className="size-4 animate-spin"
+                                aria-hidden="true"
+                              />
+                            ) : (
+                              'Confirm'
+                            )}
+                          </Button>
+                          <DisputeSessionDialog
+                            row={row}
+                            onSubmitted={() => router.refresh()}
+                          />
+                        </>
+                      )
                     ) : (
                       <span className="text-xs text-muted-foreground">Confirmed</span>
                     )}

@@ -91,6 +91,14 @@ export interface AdminSessionCompletionParticipantVM {
     displayName: string;
     confirmedAt: ISODateTime;
   } | null;
+  /** Set when this person's row is 'disputed' — the reason they (or staff, on
+   * their behalf) reported a problem with the session. */
+  disputeDetails?: {
+    category: ClassSessionCompletionDisputeCategory;
+    reason: string | null;
+    rescheduleRequested: boolean;
+    disputedAt: ISODateTime;
+  } | null;
 }
 
 /** One schedule occurrence within the admin reporting window, whether completed,
@@ -114,4 +122,11 @@ export interface AdminSessionCompletionVM {
   /** Optional while older API deployments are being replaced. */
   participants?: AdminSessionCompletionParticipantVM[];
   averageRating?: number | null;
+  /**
+   * Actual session length in minutes as confirmed by staff, when it differs from
+   * (or reaffirms) the scheduled sessionEndAt - occurrenceKey duration. Null until
+   * a staff adminConfirm sets it, or after an adminUndoConfirm clears it.
+   */
+  verifiedMinutes?: number | null;
+  verificationNote?: string | null;
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import type { LiveSessionJoinLinkVM } from '@iconicedu/shared-types';
+
 import {
   useCallback,
   useEffect,
@@ -8,9 +10,9 @@ import {
   useState,
   type ComponentType,
 } from 'react';
-import { useRouter } from 'next/navigation';
 import type {
   ChannelVM,
+  MessageEditTextInput,
   MessageSendFileInput,
   MessageSendFilesInput,
   MessageSendTextInput,
@@ -22,8 +24,9 @@ import type {
 } from '@iconicedu/shared-types';
 import { MessagesShell } from '@iconicedu/ui-web';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
-import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
+import { useLiveSessionNavigation } from '@iconicedu/web/components/live-sessions/use-live-session-navigation';
 
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { createSupabaseMessagesRealtimeClient } from '@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import {
@@ -142,6 +145,18 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
+  showAiRefine?: boolean;
+  showAiSuggestedReplies?: boolean;
+  enableMessagePinning?: boolean;
+  enableMessageSearch?: boolean;
+  enableScheduledSend?: boolean;
+  enableMessageMarkUnread?: boolean;
+  enableMessageReplyReference?: boolean;
+  enableNotificationConversationControls?: boolean;
+  enableMessageListFormatting?: boolean;
+  enableMessageDrafts?: boolean;
+  enableMessageEdit?: boolean;
+  enableMessageSendReliability?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -149,6 +164,7 @@ type MessagesShellClientProps = {
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
+  editTextMessage: (input: MessageEditTextInput) => Promise<MessageVM>;
   toggleReaction: (input: {
     orgId: string;
     messageId: string;
@@ -168,35 +184,43 @@ type MessagesShellClientProps = {
 };
 
 export function MessagesShellClient({
-  orgSlug,
   channel,
   currentUserId,
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
+  showAiRefine = false,
+  showAiSuggestedReplies = false,
+  enableMessagePinning = false,
+  enableMessageSearch = false,
+  enableScheduledSend = false,
+  enableMessageMarkUnread = false,
+  enableMessageReplyReference = false,
+  enableNotificationConversationControls = false,
+  enableMessageListFormatting = false,
+  enableMessageDrafts = false,
+  enableMessageEdit = false,
+  enableMessageSendReliability = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
+  editTextMessage,
   toggleReaction,
   toggleSavedMessage,
   deleteMessage,
   toggleHiddenMessage,
 }: MessagesShellClientProps) {
-  const router = useRouter();
   const [channelState, setChannelState] = useState(channel);
   const onlineProfileIdsRef = useRef(new Set<string>());
   const presenceClient = useMemo(() => createSupabaseBrowserClient(), []);
   const realtimeClient = useMemo(() => createSupabaseMessagesRealtimeClient(), []);
   const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
-    useExternalLiveSessionJoinDialog({
-      onInternalJoinHref: (joinHref) => {
-        router.push(joinHref);
-      },
-    });
+    useLiveSessionNavigation();
   const messageWriteClient = useMemo(
     () => ({
       sendTextMessage,
+      editTextMessage,
       toggleReaction,
       toggleSavedMessage,
       deleteMessage,
@@ -204,6 +228,7 @@ export function MessagesShellClient({
     }),
     [
       sendTextMessage,
+      editTextMessage,
       toggleReaction,
       toggleSavedMessage,
       deleteMessage,
@@ -404,33 +429,26 @@ export function MessagesShellClient({
   );
 
   const joinLiveSession = useCallback(async () => {
-    if (typeof window === 'undefined') {
-      return;
+    if (!currentUserId) {
+      throw new Error('Current user is required');
     }
 
-    const response = await window.fetch(
-      `/api/channels/${channelState.ids.id}/live-sessions/join`,
+    const payload = await createApiClient(presenceClient).post<LiveSessionJoinLinkVM>(
+      `/channels/${channelState.ids.id}/live-sessions/join`,
       {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ orgSlug }),
+        orgId: channelState.ids.orgId,
+        profileId: currentUserId,
       },
     );
 
-    const payload = (await response.json().catch(() => null)) as {
-      success?: boolean;
-      joinPath?: string;
-      error?: string;
-    } | null;
-
-    if (!response.ok || !payload?.success || !payload.joinPath) {
-      throw new Error(payload?.error ?? 'Failed to join live session');
-    }
-
-    handleResolvedJoinHref(payload.joinPath);
-  }, [channelState.ids.id, handleResolvedJoinHref, orgSlug]);
+    handleResolvedJoinHref(payload.joinPath, payload.provider, payload.passcode);
+  }, [
+    channelState.ids.id,
+    channelState.ids.orgId,
+    currentUserId,
+    handleResolvedJoinHref,
+    presenceClient,
+  ]);
 
   useEffect(() => {
     setChannelState(channel);
@@ -518,6 +536,18 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
+        showAiRefine={showAiRefine}
+        showAiSuggestedReplies={showAiSuggestedReplies}
+        enableMessagePinning={enableMessagePinning}
+        enableMessageSearch={enableMessageSearch}
+        enableScheduledSend={enableScheduledSend}
+        enableMessageMarkUnread={enableMessageMarkUnread}
+        enableMessageReplyReference={enableMessageReplyReference}
+        enableNotificationConversationControls={enableNotificationConversationControls}
+        enableMessageListFormatting={enableMessageListFormatting}
+        enableMessageDrafts={enableMessageDrafts}
+        enableMessageEdit={enableMessageEdit}
+        enableMessageSendReliability={enableMessageSendReliability}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

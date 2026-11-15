@@ -290,4 +290,41 @@ describe('findLatestUnreadIncomingMessageId', () => {
       }),
     ).toBe('c');
   });
+
+  it('returns null for a manually-unread channel with no new messages, when no anchor is given (the bug this session chased)', () => {
+    const msgs = [
+      makeMsg('a', 'u1', '2025-12-17T10:00:00Z'),
+      makeMsg('b', 'u2', '2025-12-17T10:05:00Z'),
+    ];
+
+    // lastReadMessageId is the very last message — a manual "mark unread"
+    // never moves it, so a plain read-position search runs past the end of
+    // the list and finds nothing.
+    expect(
+      findLatestUnreadIncomingMessageId({
+        messages: msgs,
+        currentProfileId: 'u1',
+        lastReadMessageId: 'b',
+        unreadCount: 0,
+      }),
+    ).toBeNull();
+  });
+
+  it('uses manuallyUnreadFromMessageId as the search start when lastReadMessageId points past it', () => {
+    const msgs = [
+      makeMsg('a', 'u1', '2025-12-17T10:00:00Z'),
+      makeMsg('b', 'u2', '2025-12-17T10:05:00Z'),
+      makeMsg('c', 'u2', '2025-12-17T10:07:00Z'),
+    ];
+
+    expect(
+      findLatestUnreadIncomingMessageId({
+        messages: msgs,
+        currentProfileId: 'u1',
+        lastReadMessageId: 'c',
+        unreadCount: 0,
+        manuallyUnreadFromMessageId: 'b',
+      }),
+    ).toBe('c');
+  });
 });

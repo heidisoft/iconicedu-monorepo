@@ -144,6 +144,22 @@ describe('useMarkRead', () => {
       expect(mockMarkChannelReadState).toHaveBeenCalledTimes(1);
     });
 
+    it('re-calls the API for the same lastReadMessageId after resetChannelReadGuard, so a manual mark-unread in between still clears on the next visit', async () => {
+      const { result } = renderHook(() => useMarkRead(DEFAULT_PARAMS));
+
+      await act(async () => {
+        await result.current.markChannelRead('msg-1');
+      });
+      act(() => {
+        result.current.resetChannelReadGuard();
+      });
+      await act(async () => {
+        await result.current.markChannelRead('msg-1');
+      });
+
+      expect(mockMarkChannelReadState).toHaveBeenCalledTimes(2);
+    });
+
     it('does nothing when channelId is empty', async () => {
       const { result } = renderHook(() =>
         useMarkRead({ ...DEFAULT_PARAMS, channelId: '' }),
@@ -182,6 +198,91 @@ describe('useMarkRead', () => {
       expect(mockApplyOptimisticChannelReadState).toHaveBeenCalledWith(
         expect.objectContaining({ profileKind: 'educator' }),
       );
+    });
+  });
+
+  describe('refocus while manually unread', () => {
+    it('marks read on a fresh mount that is already manually unread (reopening from the list pushes a brand-new screen instance, not a persisted one)', async () => {
+      renderHook(() =>
+        useMarkRead({
+          ...DEFAULT_PARAMS,
+          isFocused: true,
+          isManuallyUnread: true,
+          lastReadMessageId: 'msg-5',
+        }),
+      );
+
+      expect(mockMarkChannelReadState).toHaveBeenCalledWith(
+        expect.objectContaining({ lastReadMessageId: 'msg-5' }),
+      );
+    });
+
+    it('marks read on a genuine focus transition when the channel is manually unread', async () => {
+      const { rerender } = renderHook((props) => useMarkRead(props), {
+        initialProps: {
+          ...DEFAULT_PARAMS,
+          isFocused: false,
+          isManuallyUnread: true,
+          lastReadMessageId: 'msg-5',
+        },
+      });
+
+      await act(async () => {
+        rerender({
+          ...DEFAULT_PARAMS,
+          isFocused: true,
+          isManuallyUnread: true,
+          lastReadMessageId: 'msg-5',
+        });
+      });
+
+      expect(mockMarkChannelReadState).toHaveBeenCalledWith(
+        expect.objectContaining({ lastReadMessageId: 'msg-5' }),
+      );
+    });
+
+    it('does not re-mark-read merely because isManuallyUnread flips true while already focused (no self-undo of mark-unread)', async () => {
+      const { rerender } = renderHook((props) => useMarkRead(props), {
+        initialProps: {
+          ...DEFAULT_PARAMS,
+          isFocused: true,
+          isManuallyUnread: false,
+          lastReadMessageId: 'msg-5',
+        },
+      });
+
+      await act(async () => {
+        rerender({
+          ...DEFAULT_PARAMS,
+          isFocused: true,
+          isManuallyUnread: true,
+          lastReadMessageId: 'msg-5',
+        });
+      });
+
+      expect(mockMarkChannelReadState).not.toHaveBeenCalled();
+    });
+
+    it('does not mark read on refocus when the channel is not manually unread', async () => {
+      const { rerender } = renderHook((props) => useMarkRead(props), {
+        initialProps: {
+          ...DEFAULT_PARAMS,
+          isFocused: false,
+          isManuallyUnread: false,
+          lastReadMessageId: 'msg-5',
+        },
+      });
+
+      await act(async () => {
+        rerender({
+          ...DEFAULT_PARAMS,
+          isFocused: true,
+          isManuallyUnread: false,
+          lastReadMessageId: 'msg-5',
+        });
+      });
+
+      expect(mockMarkChannelReadState).not.toHaveBeenCalled();
     });
   });
 
