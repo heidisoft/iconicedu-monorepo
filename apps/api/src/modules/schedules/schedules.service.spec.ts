@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
@@ -78,8 +82,13 @@ describe('SchedulesService authorization', () => {
       exceptions?: Array<Record<string, unknown>>;
       overrides?: Array<Record<string, unknown>>;
       channel: Record<string, unknown> | null;
+      errors?: Record<string, string>;
     }) {
       const resultFor = (table: string) => {
+        const errorMessage = input.errors?.[table];
+        if (errorMessage) {
+          return { data: null, error: { message: errorMessage } };
+        }
         switch (table) {
           case 'learning_space_participants':
             return { data: input.participants, error: null };
@@ -114,7 +123,7 @@ describe('SchedulesService authorization', () => {
       };
     }
 
-    function mockActor() {
+    function mockActor(roleKey = 'staff') {
       createSupabaseSessionClientMock.mockReturnValue({
         auth: {
           getUser: jest.fn(async () => ({
@@ -130,8 +139,14 @@ describe('SchedulesService authorization', () => {
             active_profile_id: 'profile-staff',
           }) as never,
         )
-        .mockReturnValueOnce(makeSingleResult([{ role_key: 'staff' }]) as never);
+        .mockReturnValueOnce(makeSingleResult([{ role_key: roleKey }]) as never);
     }
+
+    const editContextInput = {
+      orgId: 'org-1',
+      learningSpaceId: 'space-1',
+      channelId: 'channel-1',
+    };
 
     it('returns a mapped context with correctly scoped recurrence/exception/override reads', async () => {
       mockActor();
@@ -298,6 +313,124 @@ describe('SchedulesService authorization', () => {
         client.from.mock.calls.some((call) => call[0] === 'class_schedule_recurrence'),
       ).toBe(false);
     });
+
+    it.each(['tutor', 'guardian', 'student'])(
+      'rejects %s before reading any learning-space data',
+      async (roleKey) => {
+        mockActor(roleKey);
+
+        const service = new SchedulesService();
+        await expect(
+          service.getLearningSpaceEditContext('token-1', editContextInput),
+        ).rejects.toThrow(ForbiddenException);
+        // Only the two auth lookups (accounts, user_roles) ran — no data
+        // client was ever created for the learning-space reads.
+        expect(createSupabaseServiceClientMock).toHaveBeenCalledTimes(2);
+      },
+    );
+
+    it('scopes participant, schedule, and channel reads to the org, space, and channel', async () => {
+      mockActor();
+      const client = makeEditContextClient({
+        participants: [],
+        schedules: [],
+        channel: null,
+      });
+      createSupabaseServiceClientMock.mockReturnValueOnce(client as never);
+
+      await new SchedulesService().getLearningSpaceEditContext(
+        'token-1',
+        editContextInput,
+      );
+
+      const chainFor = (table: string) => {
+        const index = client.from.mock.calls.findIndex((call) => call[0] === table);
+        return client.from.mock.results[index].value as { eq: jest.Mock; is: jest.Mock };
+      };
+      const participants = chainFor('learning_space_participants');
+      expect(participants.eq).toHaveBeenCalledWith('org_id', 'org-1');
+      expect(participants.eq).toHaveBeenCalledWith('learning_space_id', 'space-1');
+      expect(participants.is).toHaveBeenCalledWith('deleted_at', null);
+
+      const schedules = chainFor('class_schedules');
+      expect(schedules.eq).toHaveBeenCalledWith('org_id', 'org-1');
+      expect(schedules.eq).toHaveBeenCalledWith('source_learning_space_id', 'space-1');
+      expect(schedules.is).toHaveBeenCalledWith('deleted_at', null);
+
+      const channel = chainFor('channels');
+      expect(channel.eq).toHaveBeenCalledWith('org_id', 'org-1');
+      expect(channel.eq).toHaveBeenCalledWith('id', 'channel-1');
+    });
+
+    it('skips exception/override reads when schedules have no recurrence rows', async () => {
+      mockActor();
+      const client = makeEditContextClient({
+        participants: [],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: 'One-off',
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: null,
+          },
+        ],
+        recurrences: [],
+        channel: null,
+      });
+      createSupabaseServiceClientMock.mockReturnValueOnce(client as never);
+
+      const result = await new SchedulesService().getLearningSpaceEditContext(
+        'token-1',
+        editContextInput,
+      );
+
+      expect(result.schedules).toHaveLength(1);
+      expect(result.recurrences).toEqual([]);
+      const tables = client.from.mock.calls.map((call) => call[0]);
+      expect(tables).toContain('class_schedule_recurrence');
+      expect(tables).not.toContain('class_schedule_recurrence_exceptions');
+      expect(tables).not.toContain('class_schedule_recurrence_overrides');
+    });
+
+    it.each([
+      'learning_space_participants',
+      'class_schedules',
+      'channels',
+      'class_schedule_recurrence',
+      'class_schedule_recurrence_exceptions',
+      'class_schedule_recurrence_overrides',
+    ])(
+      'surfaces a %s read failure instead of returning a partial snapshot',
+      async (table) => {
+        mockActor();
+        const client = makeEditContextClient({
+          participants: [],
+          schedules: [
+            {
+              id: 'schedule-1',
+              title: 'Weekly',
+              start_at: '2026-03-14T14:00:00.000Z',
+              end_at: '2026-03-14T15:00:00.000Z',
+              timezone: null,
+            },
+          ],
+          recurrences: [
+            { id: 'recurrence-1', schedule_id: 'schedule-1', frequency: 'weekly' },
+          ],
+          channel: null,
+          errors: { [table]: `${table} unavailable` },
+        });
+        createSupabaseServiceClientMock.mockReturnValueOnce(client as never);
+
+        const promise = new SchedulesService().getLearningSpaceEditContext(
+          'token-1',
+          editContextInput,
+        );
+        await expect(promise).rejects.toThrow(InternalServerErrorException);
+        await expect(promise).rejects.toThrow(`${table} unavailable`);
+      },
+    );
   });
 
   it.each(['owner', 'admin', 'staff'])(
