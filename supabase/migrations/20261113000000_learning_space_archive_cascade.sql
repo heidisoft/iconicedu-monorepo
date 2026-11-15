@@ -223,6 +223,37 @@ $$;
 
 -- ─── Cascade cores (internal) ──────────────────────────────────────────────
 
+-- Serializes lifecycle changes of classes that share a tutor/contact pair.
+-- Without it, two transactions archiving two classes that both connect the
+-- same pair each still see the other class as active, both skip the shared
+-- DM, and it stays open after both commit. Transaction-scoped advisory locks,
+-- taken in a fixed order so concurrent callers cannot deadlock. Under READ
+-- COMMITTED the connectivity check that follows takes a fresh snapshot, so
+-- the second transaction sees the first one's committed archive.
+create or replace function public.lock_learning_space_tutor_contact_pairs(p_learning_space_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_key bigint;
+begin
+  for v_key in
+    select distinct hashtextextended(
+             'tutor-contact:' || p.org_id || ':' || p.educator_profile_id || ':' || p.contact_profile_id,
+             0)
+    from public.learning_space_tutor_contact_pairs(p_learning_space_id) p
+    order by 1
+  loop
+    perform pg_advisory_xact_lock(v_key);
+  end loop;
+end;
+$$;
+
+revoke all on function public.lock_learning_space_tutor_contact_pairs(uuid)
+  from public, anon, authenticated, service_role;
+
 create or replace function public.archive_learning_space_core(
   p_learning_space_id uuid,
   p_stamp timestamptz,
@@ -259,6 +290,7 @@ begin
      and (status <> 'archived' or archived_at is null);
 
   -- Tutor <-> learner DMs: capture pairs before memberships are removed.
+  perform public.lock_learning_space_tutor_contact_pairs(p_learning_space_id);
   for v_pair in
     select * from public.learning_space_tutor_contact_pairs(p_learning_space_id)
   loop
@@ -388,6 +420,8 @@ begin
      and archived_at is not distinct from p_stamp;
   get diagnostics v_count = row_count;
   v_result := v_result || jsonb_build_object('class_channels_restored', v_count);
+
+  perform public.lock_learning_space_tutor_contact_pairs(p_learning_space_id);
 
   -- Reopen DMs the class lifecycle archived (this class, another class, or the
   -- backfill). DMs an admin archived by hand carry an unrelated stamp and stay
@@ -797,6 +831,88 @@ $$;
 
 revoke all on function public.reconcile_archived_learning_spaces(integer) from public, anon, authenticated;
 grant execute on function public.reconcile_archived_learning_spaces(integer) to service_role;
+
+-- ─── Stale schedule reconciliation skips archived classes ──────────────────
+-- Same as 20260908140000_independent_schedule_reconciliation_worker.sql plus
+-- one predicate: schedules of an archived or soft-deleted class are not
+-- eligible. Archive canceled their jobs on purpose, so "no active jobs" is not
+-- staleness, and re-enqueueing them every run only churns (or, for a deleted
+-- class, regenerated reminders). Restore runs the reconcile explicitly.
+
+create or replace function public.enqueue_stale_schedule_reconciliation(
+  p_limit integer default 25
+)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_now timestamptz := timezone('utc', now());
+  v_limit integer := greatest(1, least(coalesce(p_limit, 25), 200));
+  v_count integer := 0;
+  v_schedule record;
+begin
+  for v_schedule in
+    with eligible as (
+      select cs.id, cs.org_id
+      from public.class_schedules cs
+      where cs.deleted_at is null
+        and cs.source_kind = 'class_session'
+        and cs.status not in ('cancelled', 'completed', 'rescheduled')
+        and not exists (
+          select 1
+          from public.learning_spaces ls
+          where ls.id = cs.source_learning_space_id
+            and public.is_learning_space_archived(ls.status, ls.archived_at, ls.deleted_at)
+        )
+    ),
+    active_jobs as (
+      select rj.source_schedule_id,
+             count(*) as active_count,
+             max(rj.run_at) filter (
+               where rj.job_type = 'session.completion_check'
+             ) as latest_completion_run_at
+      from public.reminder_jobs rj
+      where rj.deleted_at is null
+        and rj.status in ('pending', 'leased', 'failed')
+        and rj.source_schedule_id is not null
+      group by rj.source_schedule_id
+    ),
+    pending_reconcile as (
+      select distinct j.source_id
+      from public.event_pipeline_jobs j
+      where j.deleted_at is null
+        and j.job_kind = 'reminder.reconcile'
+        and j.status in ('pending', 'leased', 'failed')
+        and j.source_id is not null
+    )
+    select e.id, e.org_id
+    from eligible e
+    left join active_jobs a on a.source_schedule_id = e.id
+    where e.id not in (select source_id from pending_reconcile)
+      and (
+        coalesce(a.active_count, 0) = 0
+        or (
+          a.latest_completion_run_at is not null
+          and a.latest_completion_run_at < v_now + interval '23 days'
+        )
+      )
+    order by coalesce(a.active_count, 0) asc,
+             coalesce(a.latest_completion_run_at, v_now) asc,
+             e.id asc
+    limit v_limit
+  loop
+    perform public.enqueue_reminder_reconcile_job(v_schedule.org_id, v_schedule.id);
+    v_count := v_count + 1;
+  end loop;
+
+  return v_count;
+end;
+$$;
+
+revoke all on function public.enqueue_stale_schedule_reconciliation(integer) from public, anon, authenticated;
+grant execute on function public.enqueue_stale_schedule_reconciliation(integer) to service_role;
 
 -- ─── Retention ─────────────────────────────────────────────────────────────
 -- Ephemeral per-user state only. Messages, media, whiteboards of archived

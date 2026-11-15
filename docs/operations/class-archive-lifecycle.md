@@ -56,6 +56,15 @@ All in one transaction, stamped with the class's `archived_at`:
 
 Staff, support, and tutor ↔ tutor DMs are never touched.
 
+Archive and restore take a transaction-scoped advisory lock per tutor/contact
+pair (`lock_learning_space_tutor_contact_pairs()`), so archiving two classes
+that share a pair at the same time still closes their shared DM.
+
+Canceled reminders stay canceled. `enqueue_stale_schedule_reconciliation()`
+skips schedules of archived or deleted classes. The reminder reconcile and
+dispatch checks in `apps/api` also see soft-deleted classes, since delete
+archives the class too.
+
 Archived channels are read-only everywhere: message inserts through RLS, and
 reactions and message edits through `assertChannelWritable` in `apps/api`.
 

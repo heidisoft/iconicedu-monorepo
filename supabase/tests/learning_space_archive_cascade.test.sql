@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(59);
+select plan(64);
 -- Synthetic identities only: never depend on seed accounts or production data.
 -- O org · E tutor · C/C2/C3/C4 children · G guardian of C
 -- S1 class (E, C, C2, C3; C4 removed earlier) · S2 class (E, C2)
@@ -100,6 +100,7 @@ select ok(not has_function_privilege('anon','public.purge_archived_learning_spac
 select ok(not has_function_privilege('service_role','public.archive_learning_space_core(uuid,timestamptz,uuid)','execute'), 'cascade core is internal');
 select ok(has_function_privilege('service_role','public.archive_learning_space(uuid,uuid,uuid)','execute'), 'API can archive');
 select ok(not has_function_privilege('authenticated','public.reopen_class_lifecycle_dm(uuid,uuid,uuid)','execute'), 'frontend cannot reopen DMs directly');
+select ok(not has_function_privilege('authenticated','public.lock_learning_space_tutor_contact_pairs(uuid)','execute'), 'frontend cannot take lifecycle locks');
 select ok(has_function_privilege('service_role','public.tutor_contact_has_active_class(uuid,uuid,uuid)','execute'), 'API can check DM eligibility');
 select is((select count(*) from cron.job where jobname = 'learning-space-archive-retention' and schedule = '23 3 * * *' and active), 1::bigint, 'retention job is scheduled daily');
 
@@ -137,6 +138,10 @@ select is((select count(*) from public.messages where id in ('cc000000-0000-4000
 select ok(exists(select 1 from public.class_session_completions where id='ca000000-0000-4000-8000-000000000001' and deleted_at is null), 'session completion report is kept');
 select ok(exists(select 1 from public.channel_live_sessions where id='cb000000-0000-4000-8000-000000000001'), 'live session report is kept');
 select is(public.archive_learning_space('c1000000-0000-4000-8000-000000000001','c6000000-0000-4000-8000-000000000001',null) ->> 'already_archived', 'true', 'archive is idempotent');
+delete from public.event_pipeline_jobs where source_id = 'c9000000-0000-4000-8000-000000000001';
+select lives_ok($$select public.enqueue_stale_schedule_reconciliation(200)$$, 'stale schedule reconciliation runs after archive');
+select ok(not exists(select 1 from public.event_pipeline_jobs where source_id = 'c9000000-0000-4000-8000-000000000001' and job_kind = 'reminder.reconcile' and deleted_at is null), 'schedules of an archived class are not re-enqueued for reminders');
+
 
 -- ─── Report protection ───
 select throws_ok($$delete from public.learning_spaces where id='c6000000-0000-4000-8000-000000000001'$$, '42501', null, 'class cannot be hard-deleted');
@@ -162,6 +167,10 @@ select is((select status::text from public.channels where id='c8000000-0000-4000
 select is(public.delete_learning_space('c1000000-0000-4000-8000-000000000001','c6000000-0000-4000-8000-000000000001','c4000000-0000-4000-8000-00000000000e') ->> 'deleted', 'true', 'delete succeeds');
 select ok((select deleted_at is not null and status = 'archived' from public.learning_spaces where id='c6000000-0000-4000-8000-000000000001'), 'class is soft-deleted and archived');
 select is((select status::text from public.channels where id='c8000000-0000-4000-8000-000000000003'), 'archived', 'DM is archived once no class connects the pair');
+delete from public.event_pipeline_jobs where source_id = 'c9000000-0000-4000-8000-000000000001';
+select lives_ok($$select public.enqueue_stale_schedule_reconciliation(200)$$, 'stale schedule reconciliation runs after delete');
+select ok(not exists(select 1 from public.event_pipeline_jobs where source_id = 'c9000000-0000-4000-8000-000000000001' and job_kind = 'reminder.reconcile' and deleted_at is null), 'schedules of a deleted class are not re-enqueued for reminders');
+
 update public.learning_spaces set deleted_at = now() - interval '31 days' where id = 'c6000000-0000-4000-8000-000000000001';
 select lives_ok($$select public.purge_archived_learning_space_artifacts(100, 5)$$, 'retention purge runs');
 select ok(not exists(select 1 from public.classroom_whiteboards where channel_id='c7000000-0000-4000-8000-000000000001'), 'whiteboards of a deleted class are purged after 30 days');
