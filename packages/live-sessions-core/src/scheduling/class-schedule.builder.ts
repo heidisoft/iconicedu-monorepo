@@ -19,6 +19,7 @@ import {
   getClassScheduleRecurrenceExceptionsByRecurrenceIds,
   getClassScheduleRecurrenceOverridesByRecurrenceIds,
   getClassScheduleRecurrencesByScheduleIds,
+  getClassSchedulesByIds,
   getClassSchedulesByOrg,
 } from './class-schedule.query';
 
@@ -27,6 +28,17 @@ export async function buildClassSchedulesByOrg(
   orgId: string,
 ): Promise<ClassScheduleVM[]> {
   const schedulesResponse = await getClassSchedulesByOrg(supabase, orgId);
+  const scheduleRows = schedulesResponse.data ?? [];
+
+  return buildClassSchedulesFromRows(supabase, orgId, scheduleRows);
+}
+
+export async function buildClassSchedulesByIds(
+  supabase: SupabaseClient,
+  orgId: string,
+  scheduleIds: string[],
+): Promise<ClassScheduleVM[]> {
+  const schedulesResponse = await getClassSchedulesByIds(supabase, orgId, scheduleIds);
   const scheduleRows = schedulesResponse.data ?? [];
 
   return buildClassSchedulesFromRows(supabase, orgId, scheduleRows);

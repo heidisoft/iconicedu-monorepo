@@ -4,3 +4,7 @@ export * from './scope';
 export * from './expected-participants';
 export * from './join';
 export * from './web-app-url';
+export {
+  buildClassSchedulesByIds,
+  buildClassSchedulesByOrg,
+} from './scheduling/class-schedule.builder';

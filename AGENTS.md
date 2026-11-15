@@ -44,6 +44,8 @@ Everything else goes through `apps/api`:
 - privileged operations and service-role credentials; and
 - API endpoints required by new web or mobile features.
 
+`pnpm guard:frontend-table-access` blocks new `supabase.from(...)` reads in either frontend. Legacy reads are baselined in `scripts/frontend-table-access-baseline.json`; when you migrate one, regenerate the baseline with `pnpm guard:frontend-table-access:update`. Never add entries to it.
+
 ### API Clients
 
 - Web calls `apps/api` with `createApiClient` from `apps/web/lib/api/http-client.ts`.
