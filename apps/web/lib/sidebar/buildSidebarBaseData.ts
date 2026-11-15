@@ -1,12 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { ChannelVM, SidebarLeftDataVM } from '@iconicedu/shared-types';
+import type {
+  ChannelVM,
+  LearningSpaceVM,
+  SidebarLeftDataVM,
+} from '@iconicedu/shared-types';
 
-import { buildLearningSpacesByOrg } from '../spaces/builders/learning-space.builder';
+import { buildLearningSpacesSidebarProjection } from '../spaces/builders/learning-space.builder';
 import {
-  buildAllChannels,
-  buildDirectMessageChannelsWithMessages,
-} from '../channels/builders/channel.builder';
-import { getChannelsByOrg } from '../channels/queries/channels.query';
+  buildChannelsSidebarProjection,
+  getLatestMessagesByChannelId,
+  withLatestMessagePreview,
+} from '../channels/builders/channel-sidebar.builder';
 import { syncClassRequestUnreadCount } from './class-request-unread';
 
 type SidebarBaseData = Omit<SidebarLeftDataVM, 'user'>;
@@ -17,15 +21,28 @@ export async function buildSidebarBaseData(
   accountId: string,
   dashboardBasePath: string,
 ): Promise<SidebarBaseData> {
-  const [learningSpaces, directMessages, allChannels, supportChannelId] =
-    await Promise.all([
-      buildLearningSpacesByOrg(supabase, orgId, { accountId }),
-      buildDirectMessageChannelsWithMessages(supabase, orgId, { accountId }),
-      buildAllChannels(supabase, orgId, { accountId }),
-      resolveSupportChannelId(supabase, orgId),
-    ]);
+  // One bounded fetch of every org channel (metadata + participants + read state, no
+  // per-channel thread/message/media/file fan-out) backs every collection below —
+  // replacing what used to be three overlapping full-channel-graph rebuilds
+  // (`buildAllChannels`, `buildDirectMessageChannelsWithMessages`,
+  // `buildLearningSpacesByOrg`'s per-channel `buildChannelById` calls) plus a fourth,
+  // separate `getChannelsByOrg` call just to find the support channel id.
+  const allChannels = await buildChannelsSidebarProjection(supabase, orgId, {
+    accountId,
+  });
+  const channelsById = new Map(allChannels.map((channel) => [channel.ids.id, channel]));
+
+  const learningSpaces = await buildLearningSpacesSidebarProjection(
+    supabase,
+    orgId,
+    channelsById,
+  );
   const activeLearningSpaces = learningSpaces.filter(
     (space) => space.basics?.status !== 'archived' && !space.lifecycle?.archivedAt,
+  );
+
+  const directMessages = allChannels.filter(
+    (channel) => isDirectMessageChannel(channel) && isParticipant(channel, accountId),
   );
   const alertChannels = allChannels.filter((channel) =>
     isNonLearningSpaceAlertChannel(channel, accountId),
@@ -40,6 +57,34 @@ export async function buildSidebarBaseData(
         new Date(right.lifecycle.createdAt).getTime() -
         new Date(left.lifecycle.createdAt).getTime(),
     )[0];
+
+  // `nav-direct-messages.tsx` sorts DMs by latest-activity and falls back to the
+  // latest sender's name, and `sidebar-unread.ts` uses the latest message's sender to
+  // infer "unread" before a read-state row exists — both need a real latest message,
+  // not the empty placeholder every other sidebar consumer is fine with. Fetch it only
+  // for the channels actually exposed below (never the full org channel set above).
+  const learningSpaceChannels = activeLearningSpaces.flatMap((space) => [
+    space.channels.primaryChannel,
+    ...(space.channels.relatedChannels ?? []),
+  ]);
+  const latestMessagesByChannelId = await getLatestMessagesByChannelId(supabase, orgId, [
+    ...directMessages,
+    ...learningSpaceChannels,
+    ...alertChannels,
+    ...classRequestChannels,
+  ]);
+  const withPreview = (channel: ChannelVM) =>
+    withLatestMessagePreview(channel, latestMessagesByChannelId);
+  const withSpacePreview = (space: LearningSpaceVM): LearningSpaceVM => ({
+    ...space,
+    channels: {
+      primaryChannel: withPreview(space.channels.primaryChannel),
+      relatedChannels: space.channels.relatedChannels?.map(withPreview),
+    },
+  });
+
+  const supportChannelId =
+    allChannels.find((channel) => channel.basics.purpose === 'support')?.ids.id ?? null;
 
   const navSecondary = supportChannelId
     ? [
@@ -82,12 +127,22 @@ export async function buildSidebarBaseData(
       navSecondary,
     },
     collections: {
-      learningSpaces: activeLearningSpaces,
-      directMessages,
-      classRequestChannels,
-      alertChannels,
+      learningSpaces: activeLearningSpaces.map(withSpacePreview),
+      directMessages: directMessages.map(withPreview),
+      classRequestChannels: classRequestChannels.map(withPreview),
+      alertChannels: alertChannels.map(withPreview),
     },
   });
+}
+
+function isDirectMessageChannel(channel: ChannelVM): boolean {
+  return channel.basics.kind === 'dm' || channel.basics.kind === 'group_dm';
+}
+
+function isParticipant(channel: ChannelVM, accountId: string): boolean {
+  return channel.collections.participants.some(
+    (participant) => participant.ids.accountId === accountId,
+  );
 }
 
 function isNonLearningSpaceAlertChannel(channel: ChannelVM, accountId: string): boolean {
@@ -97,9 +152,7 @@ function isNonLearningSpaceAlertChannel(channel: ChannelVM, accountId: string): 
   if (channel.basics.visibility === 'public') {
     return true;
   }
-  return channel.collections.participants.some(
-    (participant) => participant.ids.accountId === accountId,
-  );
+  return isParticipant(channel, accountId);
 }
 
 function isClassRequestChannel(channel: ChannelVM, accountId: string): boolean {
@@ -107,19 +160,5 @@ function isClassRequestChannel(channel: ChannelVM, accountId: string): boolean {
     return false;
   }
 
-  return (
-    channel.basics.visibility === 'public' ||
-    channel.collections.participants.some(
-      (participant) => participant.ids.accountId === accountId,
-    )
-  );
-}
-
-async function resolveSupportChannelId(
-  supabase: SupabaseClient,
-  orgId: string,
-): Promise<string | null> {
-  const response = await getChannelsByOrg(supabase, orgId);
-  const channel = response.data?.find((row) => row.purpose === 'support');
-  return channel?.id ?? null;
+  return channel.basics.visibility === 'public' || isParticipant(channel, accountId);
 }

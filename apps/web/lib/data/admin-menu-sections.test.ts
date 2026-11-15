@@ -139,4 +139,21 @@ describe('buildAdminMenuSections', () => {
     expect(links).toEqual(expect.arrayContaining([...implementedAdminPaths]));
     expect(links).toHaveLength(implementedAdminPaths.size);
   });
+
+  it('only shows General settings (AI provider config) behind includeOrgAiSettings', () => {
+    const withoutFlag = buildAdminMenuSections('/iconic-academy');
+    const settingsWithoutFlag = withoutFlag.find(
+      (section) => section.title === 'Settings',
+    );
+    expect(settingsWithoutFlag?.links.map((link) => link.title)).not.toContain('General');
+
+    const withFlag = buildAdminMenuSections('/iconic-academy', {
+      includeOrgAiSettings: true,
+    });
+    const settingsWithFlag = withFlag.find((section) => section.title === 'Settings');
+    expect(settingsWithFlag?.links).toContainEqual({
+      title: 'General',
+      url: '/iconic-academy/admin/settings/general',
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { apiGet, apiPost } from '@/lib/api/http-client';
+import type { NotificationConversationMode } from '@iconicedu/shared-types';
 import { supabase } from '@/lib/supabase/client';
 import type { ChannelListItem } from '@/lib/api/types';
 
@@ -160,6 +161,34 @@ export async function fetchNotificationPreferences(orgId: string, profileId: str
   return (data ?? []).filter(
     (row) => (row as { pref_key?: string | null }).pref_key !== '__push__',
   );
+}
+
+export type ConversationNotificationMode = {
+  mode: NotificationConversationMode;
+  mutedUntil: string | null;
+};
+
+export async function fetchConversationNotificationMode(input: {
+  orgId: string;
+  profileId: string;
+  scopeKind: 'channel' | 'learning_space';
+  scopeId: string;
+}): Promise<ConversationNotificationMode> {
+  return apiGet<ConversationNotificationMode>(
+    '/notification-preferences/conversation-mode',
+    input,
+  );
+}
+
+export async function setConversationNotificationMode(input: {
+  orgId: string;
+  profileId: string;
+  scopeKind: 'channel' | 'learning_space';
+  scopeId: string;
+  mode: NotificationConversationMode;
+  mutedUntil?: string | null;
+}): Promise<void> {
+  await apiPost('/notification-preferences/conversation-mode', input);
 }
 
 export async function fetchFamilyLinks(orgId: string, guardianAccountId: string) {

@@ -1,5 +1,9 @@
-import type { ClassScheduleVM } from '@iconicedu/shared-types';
-import { expandRecurringSchedules } from '@/components/messages/space-sessions-tab';
+import type { ClassScheduleVM, SessionCompletionVM } from '@iconicedu/shared-types';
+import {
+  buildCompletionLookup,
+  expandRecurringSchedules,
+  isScheduleCompleted,
+} from '@/components/messages/space-sessions-tab';
 import {
   formatOriginalDate,
   formatOriginalTime,
@@ -339,6 +343,7 @@ export function buildHomeUpcomingSessionsMetricDisplay(input: {
 
 function buildHomeScopedSchedules(input: {
   schedules: ClassScheduleVM[];
+  completedSessions?: SessionCompletionVM[];
   profileKind?: string | null;
   primaryRole?: string | null;
   profileId?: string | null;
@@ -390,6 +395,21 @@ function buildHomeScopedSchedules(input: {
     return scheduleDayMs >= weekStartMs && scheduleDayMs <= nextWeekEndMs;
   });
 
+  // Not gated on the carousel rollout flag — see useCompletedSessions, which
+  // now fetches this list unconditionally so this fallback count can tell a
+  // confirmed/disputed occurrence apart from one that's merely past its end
+  // time with attendance still unresolved.
+  const completionLookup = buildCompletionLookup(
+    (input.completedSessions ?? [])
+      .filter((row) => row.status === 'confirmed' || row.status === 'auto_confirmed')
+      .map((row) => ({ scheduleId: row.scheduleId, occurrenceKey: row.occurrenceKey })),
+  );
+  const disputedLookup = buildCompletionLookup(
+    (input.completedSessions ?? [])
+      .filter((row) => row.status === 'disputed')
+      .map((row) => ({ scheduleId: row.scheduleId, occurrenceKey: row.occurrenceKey })),
+  );
+
   const currentMonthKey = getResolvedScheduleDisplayMonthKey(now, viewerTimezone);
   const completedClassesThisMonth = scopedSchedules.reduce((count, schedule) => {
     const monthKey = getResolvedScheduleDisplayMonthKey(
@@ -399,13 +419,7 @@ function buildHomeScopedSchedules(input: {
     if (monthKey !== currentMonthKey) {
       return count;
     }
-    if (schedule.status === 'cancelled') {
-      return count;
-    }
-    if (
-      schedule.status === 'completed' ||
-      new Date(schedule.endAt).getTime() < now.getTime()
-    ) {
+    if (isScheduleCompleted(schedule, completionLookup, disputedLookup, now.getTime())) {
       return count + 1;
     }
     return count;
@@ -512,6 +526,7 @@ export function buildHomeUpcomingSessions(input: {
 
 export function buildHomeMetricSummary(input: {
   schedules: ClassScheduleVM[];
+  completedSessions?: SessionCompletionVM[];
   learningSpaces: LearningSpaceSummary[];
   profileKind?: string | null;
   primaryRole?: string | null;

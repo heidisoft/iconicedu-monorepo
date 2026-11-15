@@ -298,4 +298,17 @@ describe('getCompletionDurationHours', () => {
       ),
     ).toBe(0);
   });
+
+  it('prefers the staff-verified duration over the scheduled span when set', () => {
+    expect(
+      getCompletionDurationHours(
+        completion({
+          occurrenceKey: '2026-03-10T14:00:00.000Z',
+          sessionEndAt: '2026-03-10T15:00:00.000Z',
+          verifiedMinutes: 30,
+        }),
+      ),
+    ).toBe(0.5);
+    expect(getCompletionDurationHours(completion({ verifiedMinutes: 0 }))).toBe(0);
+  });
 });

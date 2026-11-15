@@ -37,7 +37,7 @@ function currentMonthRange(now = new Date()): {
   };
 }
 
-export function useCompletedSessions(enabled = true): {
+export function useCompletedSessions(): {
   sessions: SessionCompletionVM[];
   summary: { completed: number; pending: number };
   isOrgAdminView: boolean;
@@ -89,10 +89,15 @@ export function useCompletedSessions(enabled = true): {
     retry: 1,
   });
 
+  // Fetched unconditionally (not gated behind the carousel rollout flag) — the
+  // raw rows double as the completion/dispute lookup the "Completed Classes"
+  // elapsed-time fallback (home-metrics.ts) needs to tell a confirmed/disputed
+  // occurrence apart from one that's merely past its end time with attendance
+  // still unresolved, independent of whether the carousel itself is shown.
   const query = useQuery({
     queryKey: queryKeys.sessionCompletions(orgId, profileId),
     queryFn: () => listSessionCompletions({ orgId, profileId, limit: 50 }),
-    enabled: Boolean(enabled && orgId && profileId && !isOrgAdminView),
+    enabled: Boolean(orgId && profileId && !isOrgAdminView),
     staleTime: 60_000,
     retry: 1,
   });

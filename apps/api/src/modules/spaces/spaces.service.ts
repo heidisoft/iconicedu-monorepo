@@ -90,7 +90,7 @@ export class SpacesService {
       ? await Promise.all([
           supabase
             .from('channel_read_state')
-            .select('channel_id, unread_count')
+            .select('channel_id, unread_count, manually_marked_unread')
             .eq('account_id', accountId)
             .in('channel_id', channelIds)
             .is('thread_id', null)
@@ -114,6 +114,12 @@ export class SpacesService {
       (readStateRows ?? []).map((row) => [
         row.channel_id as string,
         row.unread_count ?? 0,
+      ]),
+    );
+    const manuallyUnreadByChannelId = new Map(
+      (readStateRows ?? []).map((row) => [
+        row.channel_id as string,
+        row.manually_marked_unread === true,
       ]),
     );
     const threadUnreadByChannelId = new Map<string, number>();
@@ -222,6 +228,7 @@ export class SpacesService {
           updated_at: channel.updated_at,
           unread_count: Math.max(0, readStateByChannelId.get(channel.id) ?? 0),
           thread_unread_count: Math.max(0, threadUnreadByChannelId.get(channel.id) ?? 0),
+          is_manually_unread: manuallyUnreadByChannelId.get(channel.id) ?? false,
           last_message_text: null,
           last_message_at: null,
           last_message_sender: null,

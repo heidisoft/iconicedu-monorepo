@@ -11,6 +11,7 @@ export type ClassSessionCompletionDisputeCategory =
   | 'teacher_absent'
   | 'student_absent'
   | 'technical_issue'
+  | 'did_not_happen'
   | 'other';
 
 export interface ClassSessionCompletionRow {
@@ -24,6 +25,11 @@ export interface ClassSessionCompletionRow {
   dispute_category?: ClassSessionCompletionDisputeCategory | null;
   dispute_reason?: string | null;
   reschedule_requested: boolean;
+  // Actual session length in minutes as confirmed by staff, when it differs from
+  // (or simply reaffirms) the scheduled session_end_at - occurrence_key duration —
+  // null until a staff adminConfirm sets it. See AdminConfirmSessionCompletionInput.
+  verified_minutes?: number | null;
+  verification_note?: string | null;
   rating?: number | null;
   rating_comment?: string | null;
   channel_id?: UUID | null;

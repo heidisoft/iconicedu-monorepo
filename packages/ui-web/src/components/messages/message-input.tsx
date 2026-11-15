@@ -1,8 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import type { MessageMentionVM, UserProfileVM } from '@iconicedu/shared-types';
+import { toast } from 'sonner';
+import type {
+  AiRefineDraftResult,
+  AiRefineInstruction,
+  MessageMentionVM,
+  UserProfileVM,
+} from '@iconicedu/shared-types';
 import { AvatarWithStatus } from '@iconicedu/ui-web/components/shared/avatar-with-status';
+import { Badge } from '@iconicedu/ui-web/ui/badge';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import {
   Dialog,
@@ -12,6 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@iconicedu/ui-web/ui/dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,10 +49,13 @@ import {
   type MentionState,
 } from './message-input.utils';
 import { extractMentionsFromMessageText } from './message-mentions.utils';
-import { applyInlineFormat } from './message-input-formatting.utils';
+import { applyInlineFormat, applyListFormat } from './message-input-formatting.utils';
 import {
   Bold,
   Italic,
+  List,
+  ListOrdered,
+  CornerUpLeft,
   AtSign,
   Smile,
   Paperclip,
@@ -60,6 +71,9 @@ import {
   Plus,
   BookOpen,
   ClipboardCheck,
+  Sparkles,
+  Lightbulb,
+  Clock,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -84,9 +98,74 @@ import {
 } from './message-input-link-preview.utils';
 import { LinkPreviewCard } from './link-preview-card';
 import { getComposerSubmitLabel } from './message-loading-state.utils';
+import {
+  buildScheduleSendAt,
+  getDefaultScheduleDraft,
+  isScheduleDraftInFuture,
+  resolveBrowserTimezone,
+  type ScheduleDraft,
+} from './message-schedule-send.utils';
+import { useMessageDraft } from './use-message-draft';
+import type { MessageDraftScope } from './message-draft-store';
+import { generateClientMessageId } from './client-message-id';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
+
+// The "Refine with AI" trigger only appears once the draft has enough content to be
+// worth rewriting. 15 characters sits in the middle of the 10-20 char range considered
+// for this threshold — short enough to catch a typical one-line message, long enough to
+// avoid popping up while the user has barely started typing.
+const AI_REFINE_MIN_CONTENT_LENGTH = 15;
+
+// Mirrors the API's MAX_CUSTOM_INSTRUCTION_LENGTH (apps/api ai-assist module). That
+// constant isn't exported for client use, so it's duplicated here as a client-side cap;
+// the server independently enforces its own limit regardless of what's sent.
+const AI_REFINE_MAX_CUSTOM_INSTRUCTION_LENGTH = 500;
+
+type AiRefineDialogStep = 'translate' | 'custom' | 'loading' | 'preview';
+
+const AI_REFINE_INSTRUCTIONS: Array<{
+  value: AiRefineInstruction;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: 'proofread',
+    label: 'Proofread',
+    description: 'Fix grammar, spelling, and punctuation.',
+  },
+  {
+    value: 'clearer',
+    label: 'Make clearer',
+    description: 'Simplify wording for easier reading.',
+  },
+  {
+    value: 'shorter',
+    label: 'Make shorter',
+    description: 'Tighten the message to the essentials.',
+  },
+  {
+    value: 'warmer',
+    label: 'Warmer tone',
+    description: 'Add a friendlier, warmer tone.',
+  },
+  {
+    value: 'professional',
+    label: 'More professional',
+    description: 'Polish the tone for a professional audience.',
+  },
+  {
+    value: 'translate',
+    label: 'Translate',
+    description: 'Translate this draft into another language.',
+  },
+  {
+    value: 'custom',
+    label: 'Custom instruction',
+    description: 'Describe exactly how you want it rewritten.',
+  },
+];
 
 interface MessageInputProps {
   onSend: (
@@ -99,10 +178,17 @@ interface MessageInputProps {
       dueAt: string;
       subject?: string;
     } | null,
+    /**
+     * Client-generated id for idempotent retries. Only populated when
+     * `enableMessageSendReliability` is on — see MESSAGE_SEND_RELIABILITY
+     * notes near `handleSend` below.
+     */
+    clientMessageId?: string,
   ) => void;
   onAttachFiles?: (
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
+    clientMessageId?: string,
   ) => Promise<void> | void;
   placeholder?: string;
   sticky?: boolean;
@@ -114,10 +200,33 @@ interface MessageInputProps {
   onFocus?: () => void;
   onInputKeyDown?: () => void;
   showCreateMessageTypeButton?: boolean;
+  /** The channel this composer is writing into — required to invoke either AI-assist call. */
+  channelId?: string;
+  /** Shows the "Refine with AI" composer affordance (issue #264, Experimental). Default false. */
+  showAiRefine?: boolean;
+  /** Shows the AI-generated suggested-reply chips above the composer (issue #264, Experimental). Default false. */
+  showAiSuggestedReplies?: boolean;
   prefillRequest?: {
     value: string;
     nonce: number;
   } | null;
+  enableScheduledSend?: boolean;
+  onScheduleSend?: (input: {
+    content: string;
+    mentions?: MessageMentionVM[];
+    sendAt: string;
+    timezone: string;
+  }) => Promise<void> | void;
+  enableMessageReplyReference?: boolean;
+  enableMessageListFormatting?: boolean;
+  replyTarget?: { senderName: string; snippet: string } | null;
+  onClearReply?: () => void;
+  /** Gates draft autosave/restore. When false (default) this component never touches localStorage. */
+  enableMessageDrafts?: boolean;
+  /** Identity + location used to scope a draft. Null/incomplete disables drafts even if the flag is on. */
+  draftScope?: MessageDraftScope | null;
+  /** Gates clientMessageId-based idempotent retry of failed sends. */
+  enableMessageSendReliability?: boolean;
 }
 
 type PendingAttachment = {
@@ -233,10 +342,46 @@ export function MessageInput({
   onFocus,
   onInputKeyDown,
   showCreateMessageTypeButton = true,
+  channelId,
+  showAiRefine = false,
+  showAiSuggestedReplies = false,
   prefillRequest = null,
+  enableScheduledSend = false,
+  onScheduleSend,
+  enableMessageReplyReference = false,
+  enableMessageListFormatting = false,
+  replyTarget = null,
+  onClearReply,
+  enableMessageDrafts = false,
+  draftScope = null,
+  enableMessageSendReliability = false,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
+  const pendingAttachmentsClientMessageIdRef = React.useRef<{
+    key: string;
+    id: string;
+  } | null>(null);
+  const pendingTextClientMessageIdRef = React.useRef<{
+    key: string;
+    id: string;
+  } | null>(null);
+  const resolvedDraftScope = enableMessageDrafts ? draftScope : null;
+  const {
+    restoredDraft,
+    notifyContentChange,
+    clearDraft,
+    status: draftStatus,
+  } = useMessageDraft({
+    enabled: enableMessageDrafts,
+    scope: resolvedDraftScope,
+  });
   const [isSendingText, setIsSendingText] = React.useState(false);
+  const [isScheduleOpen, setIsScheduleOpen] = React.useState(false);
+  const [isScheduling, setIsScheduling] = React.useState(false);
+  const [scheduleDraft, setScheduleDraft] = React.useState<ScheduleDraft>(() =>
+    getDefaultScheduleDraft(),
+  );
+  const [scheduleError, setScheduleError] = React.useState<string | null>(null);
   const [isAttachingFile, setIsAttachingFile] = React.useState(false);
   const [pendingAttachments, setPendingAttachments] = React.useState<PendingAttachment[]>(
     [],
@@ -258,6 +403,23 @@ export function MessageInput({
   const [assignmentDraft, setAssignmentDraft] = React.useState<AssignmentComposerDraft>(
     buildAssignmentDraftFromContent('homework', ''),
   );
+  const [isAiRefineMenuOpen, setIsAiRefineMenuOpen] = React.useState(false);
+  const [isAiRefineDialogOpen, setIsAiRefineDialogOpen] = React.useState(false);
+  const [isAiRefineLoading, setIsAiRefineLoading] = React.useState(false);
+  const [aiRefineStep, setAiRefineStep] = React.useState<AiRefineDialogStep>('loading');
+  const [aiRefineInstruction, setAiRefineInstruction] =
+    React.useState<AiRefineInstruction | null>(null);
+  const [aiRefineTargetLanguage, setAiRefineTargetLanguage] = React.useState('');
+  const [aiRefineCustomInstruction, setAiRefineCustomInstruction] = React.useState('');
+  const [aiRefineSelection, setAiRefineSelection] = React.useState<{
+    start: number;
+    end: number;
+  } | null>(null);
+  const [aiRefineResult, setAiRefineResult] = React.useState<AiRefineDraftResult | null>(
+    null,
+  );
+  const [suggestedReplies, setSuggestedReplies] = React.useState<string[] | null>(null);
+  const [isSuggestedRepliesLoading, setIsSuggestedRepliesLoading] = React.useState(false);
   const [mentionPopupPosition, setMentionPopupPosition] =
     React.useState<MentionPopupPosition | null>(null);
   const [activeMentionIndex, setActiveMentionIndex] = React.useState(0);
@@ -514,6 +676,32 @@ export function MessageInput({
     [content, handleTyping, hasActiveRecording, isBusy, readOnly, syncMentionState],
   );
 
+  const applyListFormatAtSelection = React.useCallback(
+    (kind: 'bullet' | 'numbered') => {
+      const textarea = textareaRef.current;
+      if (!textarea || readOnly || isBusy || hasActiveRecording) {
+        return;
+      }
+
+      const result = applyListFormat(
+        content,
+        textarea.selectionStart,
+        textarea.selectionEnd,
+        kind,
+      );
+
+      setContent(result.nextValue);
+      handleTyping(result.nextValue);
+
+      window.setTimeout(() => {
+        textarea.focus();
+        textarea.setSelectionRange(result.selectionStart, result.selectionEnd);
+        syncMentionState(result.nextValue, result.selectionEnd);
+      }, 0);
+    },
+    [content, handleTyping, hasActiveRecording, isBusy, readOnly, syncMentionState],
+  );
+
   const handleMentionSelect = React.useCallback(
     (candidate: MentionCandidate) => {
       const textarea = textareaRef.current;
@@ -549,8 +737,11 @@ export function MessageInput({
     setActiveMentionIndex(0);
     clearTypingTimeout();
     notifyTypingStop();
+    clearDraft();
+    pendingAttachmentsClientMessageIdRef.current = null;
+    pendingTextClientMessageIdRef.current = null;
     textareaRef.current?.focus();
-  }, [clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
+  }, [clearDraft, clearPendingAttachments, clearTypingTimeout, notifyTypingStop]);
 
   const handleSend = React.useCallback(() => {
     if (readOnly || isBusy || hasActiveRecording) {
@@ -562,9 +753,26 @@ export function MessageInput({
     }
 
     if (pendingAttachments.length > 0 && onAttachFiles) {
+      // Reuse the same clientMessageId across repeated Send clicks for the
+      // same pending attachment batch so a retry after a failed send is
+      // idempotent on the server; a new/changed batch gets a fresh id.
+      const attachmentBatchKey = pendingAttachments.map((a) => a.id).join('|');
+      let attachmentClientMessageId: string | undefined;
+      if (enableMessageSendReliability) {
+        const cached = pendingAttachmentsClientMessageIdRef.current;
+        attachmentClientMessageId =
+          cached && cached.key === attachmentBatchKey
+            ? cached.id
+            : generateClientMessageId();
+        pendingAttachmentsClientMessageIdRef.current = {
+          key: attachmentBatchKey,
+          id: attachmentClientMessageId,
+        };
+      }
       const sendAttachment = async () => {
         try {
           setIsAttachingFile(true);
+          setAttachmentError(null);
           await onAttachFiles(
             await Promise.all(
               pendingAttachments.map(async (pendingAttachment) => ({
@@ -579,8 +787,18 @@ export function MessageInput({
               })),
             ),
             trimmedContent || undefined,
+            attachmentClientMessageId,
           );
           resetComposer();
+        } catch {
+          // Keep the attachments + content in the composer so nothing is
+          // lost; the user can inspect/retry (Send reuses the same
+          // clientMessageId above) or remove attachments to start over.
+          setAttachmentError(
+            enableMessageSendReliability
+              ? 'Could not send. Your files are still attached — tap Send to retry.'
+              : 'Could not send attachment(s). Please try again.',
+          );
         } finally {
           setIsAttachingFile(false);
         }
@@ -595,11 +813,30 @@ export function MessageInput({
         participants,
         currentUserId,
       );
+      // Reuse the same clientMessageId across repeated Send clicks for the
+      // same draft text so a retry after an ambiguous failure is idempotent
+      // on the server; changed content gets a fresh id.
+      let clientMessageId: string | undefined;
+      if (enableMessageSendReliability) {
+        const cached = pendingTextClientMessageIdRef.current;
+        clientMessageId =
+          cached && cached.key === trimmedContent ? cached.id : generateClientMessageId();
+        pendingTextClientMessageIdRef.current = {
+          key: trimmedContent,
+          id: clientMessageId,
+        };
+      }
       const sendText = async () => {
         try {
           setIsSendingText(true);
-          await Promise.resolve(onSend(trimmedContent, mentions, null));
+          await Promise.resolve(onSend(trimmedContent, mentions, null, clientMessageId));
           resetComposer();
+        } catch {
+          // Leave the composer content intact on failure so the draft (if
+          // enabled) survives and the user doesn't lose what they typed.
+          // The failed send itself is surfaced as a "Not sent" state on the
+          // message bubble (see messages-container's failed-send handling).
+          // Send reuses the same clientMessageId above on retry.
         } finally {
           setIsSendingText(false);
         }
@@ -609,6 +846,7 @@ export function MessageInput({
   }, [
     content,
     currentUserId,
+    enableMessageSendReliability,
     hasActiveRecording,
     isBusy,
     onAttachFiles,
@@ -617,6 +855,65 @@ export function MessageInput({
     participants,
     readOnly,
     resetComposer,
+  ]);
+
+  const handleScheduleSubmit = React.useCallback(() => {
+    if (readOnly || isBusy || hasActiveRecording || !onScheduleSend) {
+      return;
+    }
+    const trimmedContent = content.trim();
+    if (!trimmedContent) {
+      setScheduleError('Write a message before scheduling it.');
+      return;
+    }
+    const sendAt = buildScheduleSendAt(scheduleDraft);
+    if (!sendAt) {
+      setScheduleError('Choose a date and time to schedule this message.');
+      return;
+    }
+    if (!isScheduleDraftInFuture(scheduleDraft)) {
+      setScheduleError('Pick a time in the future.');
+      return;
+    }
+
+    const mentions = extractMentionsFromMessageText(
+      trimmedContent,
+      participants,
+      currentUserId,
+    );
+    const scheduleMessage = async () => {
+      try {
+        setIsScheduling(true);
+        setScheduleError(null);
+        await Promise.resolve(
+          onScheduleSend({
+            content: trimmedContent,
+            mentions,
+            sendAt,
+            timezone: resolveBrowserTimezone(),
+          }),
+        );
+        setIsScheduleOpen(false);
+        resetComposer();
+      } catch (error) {
+        setScheduleError(
+          error instanceof Error ? error.message : 'Unable to schedule message.',
+        );
+      } finally {
+        setIsScheduling(false);
+      }
+    };
+    void scheduleMessage();
+  }, [
+    content,
+    currentUserId,
+    hasActiveRecording,
+    isBusy,
+    onScheduleSend,
+    participants,
+    readOnly,
+    resetComposer,
+    scheduleDraft,
   ]);
 
   const openAssignmentComposer = React.useCallback(
@@ -749,6 +1046,27 @@ export function MessageInput({
       textarea.setSelectionRange(nextCaret, nextCaret);
     }, 0);
   }, [handleTyping, prefillRequest]);
+
+  // Restore a saved draft once it's found (mount, or when the scope changes —
+  // e.g. switching channels/threads). Never clobbers a starter-action prefill
+  // or text the user has already started typing in this mount.
+  const hasRestoredDraftRef = React.useRef(false);
+  React.useEffect(() => {
+    hasRestoredDraftRef.current = false;
+  }, [draftScope?.channelId, draftScope?.threadId]);
+  React.useEffect(() => {
+    if (!restoredDraft || hasRestoredDraftRef.current) {
+      return;
+    }
+    hasRestoredDraftRef.current = true;
+    setContent((current) => (current ? current : restoredDraft.content));
+  }, [restoredDraft]);
+
+  // Debounce-autosave the composer text as a draft. No-ops entirely when
+  // drafts are disabled or the scope is unresolved (see useMessageDraft).
+  React.useEffect(() => {
+    notifyContentChange(content);
+  }, [content, notifyContentChange]);
 
   React.useEffect(() => {
     return () => {
@@ -1051,6 +1369,180 @@ export function MessageInput({
     recorder.stop();
   }, [resetRecordingState, stopRecordingStream]);
 
+  const captureTextareaSelection = React.useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return null;
+    const start = textarea.selectionStart ?? 0;
+    const end = textarea.selectionEnd ?? 0;
+    return start !== end ? { start, end } : null;
+  }, []);
+
+  const runAiRefine = React.useCallback(
+    async (
+      instruction: AiRefineInstruction,
+      extra?: { customInstruction?: string; targetLanguage?: string },
+    ) => {
+      setAiRefineInstruction(instruction);
+      setIsAiRefineDialogOpen(true);
+      setAiRefineStep('loading');
+      setIsAiRefineLoading(true);
+      try {
+        const response = await fetch('/api/ai-assist/refine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            channelId,
+            content,
+            selectionStart: aiRefineSelection?.start,
+            selectionEnd: aiRefineSelection?.end,
+            instruction,
+            customInstruction: extra?.customInstruction,
+            targetLanguage: extra?.targetLanguage,
+          }),
+        });
+        const payload = (await response.json().catch(() => null)) as
+          | ({ success: true } & AiRefineDraftResult)
+          | { success: false; message: string }
+          | null;
+        if (!payload?.success) {
+          setIsAiRefineDialogOpen(false);
+          toast.error(payload?.message ?? 'Unable to refine draft');
+          return;
+        }
+        setAiRefineResult({
+          refinedText: payload.refinedText,
+          factsPreserved: payload.factsPreserved,
+          flaggedNotes: payload.flaggedNotes,
+        });
+        setAiRefineStep('preview');
+      } catch {
+        setIsAiRefineDialogOpen(false);
+        toast.error('Unable to refine draft');
+      } finally {
+        setIsAiRefineLoading(false);
+      }
+    },
+    [channelId, content, aiRefineSelection],
+  );
+
+  const handleSelectAiRefineInstruction = React.useCallback(
+    (instruction: AiRefineInstruction) => {
+      setIsAiRefineMenuOpen(false);
+      if (instruction === 'translate') {
+        setAiRefineInstruction('translate');
+        setAiRefineTargetLanguage('');
+        setAiRefineStep('translate');
+        setIsAiRefineDialogOpen(true);
+        return;
+      }
+      if (instruction === 'custom') {
+        setAiRefineInstruction('custom');
+        setAiRefineCustomInstruction('');
+        setAiRefineStep('custom');
+        setIsAiRefineDialogOpen(true);
+        return;
+      }
+      void runAiRefine(instruction);
+    },
+    [runAiRefine],
+  );
+
+  const handleConfirmAiTranslate = React.useCallback(() => {
+    const targetLanguage = aiRefineTargetLanguage.trim();
+    if (!targetLanguage) return;
+    void runAiRefine('translate', { targetLanguage });
+  }, [aiRefineTargetLanguage, runAiRefine]);
+
+  const handleConfirmAiCustom = React.useCallback(() => {
+    const customInstruction = aiRefineCustomInstruction.trim();
+    if (!customInstruction) return;
+    void runAiRefine('custom', { customInstruction });
+  }, [aiRefineCustomInstruction, runAiRefine]);
+
+  const handleAiRefineTryAgain = React.useCallback(() => {
+    if (!aiRefineInstruction) return;
+    const extra =
+      aiRefineInstruction === 'translate'
+        ? { targetLanguage: aiRefineTargetLanguage.trim() }
+        : aiRefineInstruction === 'custom'
+          ? { customInstruction: aiRefineCustomInstruction.trim() }
+          : undefined;
+    void runAiRefine(aiRefineInstruction, extra);
+  }, [
+    aiRefineInstruction,
+    aiRefineTargetLanguage,
+    aiRefineCustomInstruction,
+    runAiRefine,
+  ]);
+
+  const handleAiRefineReplace = React.useCallback(() => {
+    if (!aiRefineResult) return;
+    const previousContent = content;
+    const nextContent = aiRefineSelection
+      ? content.slice(0, aiRefineSelection.start) +
+        aiRefineResult.refinedText +
+        content.slice(aiRefineSelection.end)
+      : aiRefineResult.refinedText;
+    setContent(nextContent);
+    handleTyping(nextContent);
+    setIsAiRefineDialogOpen(false);
+    toast.success('Draft updated with the AI-refined text.', {
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          setContent(previousContent);
+          handleTyping(previousContent);
+        },
+      },
+    });
+  }, [aiRefineResult, aiRefineSelection, content, handleTyping]);
+
+  const handleAiRefineKeepOriginal = React.useCallback(() => {
+    setIsAiRefineDialogOpen(false);
+  }, []);
+
+  const handleFetchSuggestedReplies = React.useCallback(async () => {
+    if (isSuggestedRepliesLoading) return;
+    setIsSuggestedRepliesLoading(true);
+    try {
+      const response = await fetch('/api/ai-assist/suggested-replies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channelId }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { success: true; suggestions: string[] }
+        | { success: false; message: string }
+        | null;
+      if (!payload?.success) {
+        toast.error(payload?.message ?? 'Unable to load suggested replies');
+        return;
+      }
+      setSuggestedReplies(payload.suggestions);
+    } catch {
+      toast.error('Unable to load suggested replies');
+    } finally {
+      setIsSuggestedRepliesLoading(false);
+    }
+  }, [channelId, isSuggestedRepliesLoading]);
+
+  const handleSelectSuggestedReply = React.useCallback(
+    (suggestion: string) => {
+      if (readOnly) return;
+      setContent(suggestion);
+      handleTyping(suggestion);
+      setSuggestedReplies(null);
+      window.setTimeout(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.focus();
+        const nextCaret = suggestion.length;
+        textarea.setSelectionRange(nextCaret, nextCaret);
+      }, 0);
+    },
+    [handleTyping, readOnly],
+  );
+
   return (
     <div
       className={
@@ -1060,6 +1552,61 @@ export function MessageInput({
       }
     >
       <div className="mx-auto w-full max-w-[960px]">
+        {showAiSuggestedReplies &&
+        (isSuggestedRepliesLoading || suggestedReplies !== null) ? (
+          <div className="mb-2 rounded-xl border border-border bg-muted/20 p-3">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5" />
+              AI suggestions
+            </div>
+            {isSuggestedRepliesLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Finding suggestions...
+              </div>
+            ) : suggestedReplies && suggestedReplies.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {suggestedReplies.map((suggestion, index) => (
+                  <Button
+                    key={`${index}-${suggestion.slice(0, 16)}`}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-auto max-w-full whitespace-normal text-left"
+                    onClick={() => handleSelectSuggestedReply(suggestion)}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">No suggestions right now.</p>
+            )}
+          </div>
+        ) : null}
+        {enableMessageReplyReference && replyTarget ? (
+          <div className="mb-1.5 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs">
+            <CornerUpLeft
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-medium text-foreground">
+                Replying to {replyTarget.senderName}
+              </span>
+              <span className="text-muted-foreground"> — {replyTarget.snippet}</span>
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-xs"
+              aria-label="Cancel reply"
+              onClick={onClearReply}
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        ) : null}
         <div
           ref={wrapperRef}
           className={cn(
@@ -1371,6 +1918,11 @@ export function MessageInput({
               Drop file or image to attach
             </div>
           ) : null}
+          {enableMessageDrafts && draftStatus !== 'idle' ? (
+            <div role="status" className="px-3 pt-2 text-[11px] text-muted-foreground/80">
+              {draftStatus === 'restored' ? 'Draft restored' : 'Draft saved'}
+            </div>
+          ) : null}
           <Textarea
             ref={textareaRef}
             rows={1}
@@ -1463,6 +2015,20 @@ export function MessageInput({
                     onClick={btn.onClick}
                   />
                 ))}
+                {enableMessageListFormatting ? (
+                  <>
+                    <FormatButton
+                      icon={List}
+                      label="Bulleted list"
+                      onClick={() => applyListFormatAtSelection('bullet')}
+                    />
+                    <FormatButton
+                      icon={ListOrdered}
+                      label="Numbered list"
+                      onClick={() => applyListFormatAtSelection('numbered')}
+                    />
+                  </>
+                ) : null}
                 <div className="mx-1 h-4 w-px bg-border" />
                 <FormatButton
                   icon={AtSign}
@@ -1593,30 +2159,199 @@ export function MessageInput({
                 ) : null}
               </div>
             </TooltipProvider>
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleSend}
-              disabled={
-                readOnly ||
-                isBusy ||
-                hasActiveRecording ||
-                (!content.trim() && pendingAttachments.length === 0)
-              }
-              className="h-8 gap-1.5"
-            >
-              {isBusy ? (
-                <>
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  {getComposerSubmitLabel({ isSendingText, isAttachingFile })}
-                </>
-              ) : (
-                <>
-                  <Send className="h-3.5 w-3.5" />
-                  Send
-                </>
-              )}
-            </Button>
+            <div className="flex items-center gap-1.5">
+              {showAiSuggestedReplies ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      aria-label="Suggested replies"
+                      title="Suggested replies"
+                      disabled={isSuggestedRepliesLoading}
+                      onClick={() => void handleFetchSuggestedReplies()}
+                    >
+                      {isSuggestedRepliesLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Lightbulb className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Suggested replies</TooltipContent>
+                </Tooltip>
+              ) : null}
+              {showAiRefine && content.trim().length >= AI_REFINE_MIN_CONTENT_LENGTH ? (
+                <DropdownMenu
+                  open={isAiRefineMenuOpen}
+                  onOpenChange={(open) => {
+                    if (open) {
+                      setAiRefineSelection(captureTextareaSelection());
+                    }
+                    setIsAiRefineMenuOpen(open);
+                  }}
+                >
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                      aria-label="Refine with AI"
+                      title="Refine with AI"
+                      disabled={isAiRefineLoading}
+                    >
+                      {isAiRefineLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel>Refine with AI</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {AI_REFINE_INSTRUCTIONS.map((item) => (
+                      <DropdownMenuItem
+                        key={item.value}
+                        onSelect={() => handleSelectAiRefineInstruction(item.value)}
+                      >
+                        <div className="flex min-w-0 flex-col">
+                          <span className="truncate font-medium">{item.label}</span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {item.description}
+                          </span>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+              {enableScheduledSend && onScheduleSend ? (
+                <Popover
+                  open={isScheduleOpen}
+                  onOpenChange={(open) => {
+                    setIsScheduleOpen(open);
+                    if (open) {
+                      setScheduleError(null);
+                      setScheduleDraft(getDefaultScheduleDraft());
+                    }
+                  }}
+                >
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <PopoverTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          aria-label="Schedule send"
+                          title="Schedule send"
+                          disabled={
+                            readOnly ||
+                            isBusy ||
+                            hasActiveRecording ||
+                            !content.trim() ||
+                            pendingAttachments.length > 0
+                          }
+                        >
+                          <Clock className="h-4 w-4" />
+                        </Button>
+                      </PopoverTrigger>
+                    </TooltipTrigger>
+                    <TooltipContent>Schedule send</TooltipContent>
+                  </Tooltip>
+                  <PopoverContent align="end" className="w-72">
+                    <div className="space-y-3">
+                      <div className="text-sm font-medium text-foreground">
+                        Schedule this message
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor="schedule-send-date" className="text-xs">
+                            Date
+                          </Label>
+                          <Input
+                            id="schedule-send-date"
+                            type="date"
+                            value={scheduleDraft.date}
+                            onChange={(event) =>
+                              setScheduleDraft((current) => ({
+                                ...current,
+                                date: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor="schedule-send-time" className="text-xs">
+                            Time
+                          </Label>
+                          <Input
+                            id="schedule-send-time"
+                            type="time"
+                            value={scheduleDraft.time}
+                            onChange={(event) =>
+                              setScheduleDraft((current) => ({
+                                ...current,
+                                time: event.target.value,
+                              }))
+                            }
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Sends in your local timezone ({resolveBrowserTimezone()}).
+                      </p>
+                      {scheduleError ? (
+                        <p className="text-xs text-destructive">{scheduleError}</p>
+                      ) : null}
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full gap-1.5"
+                        onClick={handleScheduleSubmit}
+                        disabled={isScheduling}
+                      >
+                        {isScheduling ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Clock className="h-3.5 w-3.5" />
+                        )}
+                        Schedule message
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={handleSend}
+                disabled={
+                  readOnly ||
+                  isBusy ||
+                  hasActiveRecording ||
+                  (!content.trim() && pendingAttachments.length === 0)
+                }
+                className="h-8 gap-1.5"
+              >
+                {isBusy ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {getComposerSubmitLabel({ isSendingText, isAttachingFile })}
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    Send
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -1748,6 +2483,168 @@ export function MessageInput({
               </Button>
             </DialogFooter>
           </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={isAiRefineDialogOpen}
+        onOpenChange={(open) => {
+          setIsAiRefineDialogOpen(open);
+          if (!open) {
+            setAiRefineResult(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-[32rem]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              Refine with AI
+              <Badge variant="secondary" className="h-4 px-1 text-[10px]">
+                AI
+              </Badge>
+            </DialogTitle>
+            <DialogDescription>
+              {aiRefineStep === 'translate'
+                ? 'Choose a target language to translate this draft.'
+                : aiRefineStep === 'custom'
+                  ? 'Describe how you want this draft rewritten.'
+                  : 'Review the AI-refined text before it replaces anything in your draft.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {aiRefineStep === 'translate' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-refine-target-language">Target language</Label>
+                <Input
+                  id="ai-refine-target-language"
+                  value={aiRefineTargetLanguage}
+                  onChange={(event) => setAiRefineTargetLanguage(event.target.value)}
+                  placeholder="e.g. Spanish"
+                  autoFocus
+                />
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAiRefineDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmAiTranslate}
+                  disabled={!aiRefineTargetLanguage.trim()}
+                >
+                  Refine
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+
+          {aiRefineStep === 'custom' ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-refine-custom-instruction">Instruction</Label>
+                <Textarea
+                  id="ai-refine-custom-instruction"
+                  rows={3}
+                  value={aiRefineCustomInstruction}
+                  onChange={(event) =>
+                    setAiRefineCustomInstruction(
+                      event.target.value.slice(
+                        0,
+                        AI_REFINE_MAX_CUSTOM_INSTRUCTION_LENGTH,
+                      ),
+                    )
+                  }
+                  placeholder="e.g. Make it sound more encouraging for a 3rd grader"
+                  autoFocus
+                />
+                <p className="text-right text-xs text-muted-foreground">
+                  {aiRefineCustomInstruction.length}/
+                  {AI_REFINE_MAX_CUSTOM_INSTRUCTION_LENGTH}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAiRefineDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleConfirmAiCustom}
+                  disabled={!aiRefineCustomInstruction.trim()}
+                >
+                  Refine
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : null}
+
+          {aiRefineStep === 'loading' ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Refining your draft...
+            </div>
+          ) : null}
+
+          {aiRefineStep === 'preview' && aiRefineResult ? (
+            <div className="space-y-3">
+              {aiRefineResult.factsPreserved === false ? (
+                <div className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
+                  <p className="font-medium">This may have changed:</p>
+                  <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                    {(aiRefineResult.flaggedNotes ?? []).map((note, index) => (
+                      <li key={index}>{note}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Original</p>
+                <p className="whitespace-pre-wrap rounded-lg bg-muted/40 p-2 text-sm text-muted-foreground">
+                  {aiRefineSelection
+                    ? content.slice(aiRefineSelection.start, aiRefineSelection.end)
+                    : content}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                  <Sparkles className="h-3 w-3" />
+                  AI-refined
+                </p>
+                <p className="whitespace-pre-wrap rounded-lg border border-primary/30 bg-primary/5 p-2 text-sm text-foreground">
+                  {aiRefineResult.refinedText}
+                </p>
+              </div>
+              <DialogFooter className="flex-wrap gap-2 sm:justify-between">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleAiRefineKeepOriginal}
+                >
+                  Keep original
+                </Button>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleAiRefineTryAgain}
+                  >
+                    Try again
+                  </Button>
+                  <Button type="button" onClick={handleAiRefineReplace}>
+                    Replace
+                  </Button>
+                </div>
+              </DialogFooter>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

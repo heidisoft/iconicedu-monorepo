@@ -1,19 +1,17 @@
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
-import { notFound, redirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import { SidebarProvider } from '@iconicedu/ui-web';
 
 import { SidebarShell } from '@iconicedu/web/app/(app)/[orgSlug]/sidebar-shell';
-import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { buildAdminMenuSections } from '@iconicedu/web/lib/data/admin-menu-sections';
-import { requireAuthedUser } from '@iconicedu/web/lib/auth/requireAuthedUser';
-import { getOrCreateAccount } from '@iconicedu/web/lib/accounts/getOrCreateAccount';
+import {
+  getDashboardAccountContext,
+  getDashboardFamilyViewResolution,
+} from '@iconicedu/web/app/(app)/[orgSlug]/_shared/dashboard-auth';
 import { loadSidebarContext } from '@iconicedu/web/lib/sidebar/loadSidebarContext';
 import { buildSidebarBaseData } from '@iconicedu/web/lib/sidebar/buildSidebarBaseData';
-import { resolveEffectiveProfileForAccountInOrg } from '@iconicedu/web/lib/family-view/effective-profile';
-import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
-import { resolveOrgDashboardPath } from '@iconicedu/web/lib/org/resolve-dashboard-path';
 import {
   shouldRedirectToAuthResume,
   WEB_INCOMPLETE_ONBOARDING_LOGIN_REASON,
@@ -23,7 +21,11 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { enableAssessments } from '@iconicedu/web/flags';
+import {
+  enableAssessments,
+  enableMessageDrafts,
+  enableOrgAiProviderSettings,
+} from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -46,25 +48,9 @@ export default async function Layout({
   params: Promise<{ orgSlug: string }>;
 }) {
   const { orgSlug } = await params;
-  const supabase = await createSupabaseServerClient();
-  const authUser = await requireAuthedUser(supabase);
   const cookieStore = await cookies();
-  const requestedOrg = await buildOrgBySlug(supabase, orgSlug);
-
-  if (!requestedOrg) {
-    notFound();
-  }
-
-  const { account, invite } = await getOrCreateAccount(supabase, {
-    orgId: requestedOrg.id,
-    authUserId: authUser.id,
-    authEmail: authUser.email ?? null,
-  });
-
-  if (account.org_id !== requestedOrg.id) {
-    const destination = await resolveOrgDashboardPath(supabase, account.org_id);
-    redirect(destination);
-  }
+  const { supabase, authUser, account, invite } =
+    await getDashboardAccountContext(orgSlug);
 
   if (
     shouldRedirectToAuthResume({
@@ -80,10 +66,13 @@ export default async function Layout({
     redirect(`/${orgSlug}/login/pending-access`);
   }
 
-  const familyViewResolution = await resolveEffectiveProfileForAccountInOrg(supabase, {
-    account,
-    authUserId: authUser.id,
-  });
+  const familyViewResolution = await getDashboardFamilyViewResolution(
+    supabase,
+    account.id,
+  );
+  if (!familyViewResolution) {
+    redirect(`/${orgSlug}/login`);
+  }
 
   const baseSidebarData = await buildSidebarBaseData(
     supabase,
@@ -112,6 +101,12 @@ export default async function Layout({
   const assessmentsEnabled = await enableAssessments.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
+  const messageDraftsEnabled = await enableMessageDrafts.run({
+    identify: { profileId: familyViewResolution.effectiveProfile.id },
+  });
+  const orgAiSettingsEnabled = await enableOrgAiProviderSettings.run({
+    identify: { profileId: familyViewResolution.effectiveProfile.id },
+  });
   const includeReports = false;
 
   return (
@@ -124,8 +119,10 @@ export default async function Layout({
         adminSections={buildAdminMenuSections(`/${orgSlug}`, {
           includeReports,
           includeAssessments: assessmentsEnabled,
+          includeOrgAiSettings: orgAiSettingsEnabled,
         })}
         subjectOptions={subjectOptions}
+        enableMessageDrafts={messageDraftsEnabled}
       >
         {children}
       </SidebarShell>

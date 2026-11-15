@@ -379,3 +379,117 @@ describe('resolveChannelWriteAccessForMessage', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
+
+type ResolveReplyReferenceService = {
+  resolveReplyReference: (input: {
+    serviceSupabase: unknown;
+    orgId: string;
+    channelId: string;
+    replyToMessageId: string;
+    currentProfileId: string;
+  }) => Promise<{
+    messageId: string;
+    senderId: string;
+    senderName: string;
+    snippet: string;
+    type: string;
+  } | null>;
+};
+
+describe('MessagesService.resolveReplyReference', () => {
+  function callResolveReplyReference(
+    serviceSupabase: unknown,
+    overrides?: Partial<{
+      orgId: string;
+      channelId: string;
+      replyToMessageId: string;
+      currentProfileId: string;
+    }>,
+  ) {
+    return (
+      new MessagesService() as unknown as ResolveReplyReferenceService
+    ).resolveReplyReference({
+      serviceSupabase,
+      orgId: 'org-1',
+      channelId: 'channel-1',
+      replyToMessageId: 'target-message-1',
+      currentProfileId: 'reader-profile-1',
+      ...overrides,
+    });
+  }
+
+  function makeServiceSupabase(messageRow: unknown) {
+    const messageChain = makeChain({ data: messageRow, error: null });
+    const payloadChain = makeChain({
+      data: { payload: { text: 'Target text' } },
+      error: null,
+    });
+    const profileChain = makeChain({
+      data: { display_name: 'Target Sender', first_name: null, last_name: null },
+      error: null,
+    });
+    return {
+      from: jest.fn((table: string) => {
+        if (table === 'messages') return messageChain;
+        if (table === 'message_text') return payloadChain;
+        if (table === 'profiles') return profileChain;
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+  }
+
+  it('returns the snapshot for a visibility_type "all" target', async () => {
+    const serviceSupabase = makeServiceSupabase({
+      id: 'target-message-1',
+      sender_profile_id: 'sender-1',
+      type: 'text',
+      deleted_at: null,
+      visibility_type: 'all',
+      visibility_user_ids: null,
+    });
+
+    const result = await callResolveReplyReference(serviceSupabase);
+
+    expect(result).toEqual({
+      messageId: 'target-message-1',
+      senderId: 'sender-1',
+      senderName: 'Target Sender',
+      snippet: 'Target text',
+      type: 'text',
+    });
+  });
+
+  it('returns null when the reader is not in the specific-users visibility audience', async () => {
+    const serviceSupabase = makeServiceSupabase({
+      id: 'target-message-1',
+      sender_profile_id: 'sender-1',
+      type: 'text',
+      deleted_at: null,
+      visibility_type: 'specific-users',
+      visibility_user_ids: ['someone-else-profile', 'staff-profile-1'],
+    });
+
+    const result = await callResolveReplyReference(serviceSupabase, {
+      currentProfileId: 'reader-profile-1',
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it('returns the snapshot when the reader is in the specific-users visibility audience', async () => {
+    const serviceSupabase = makeServiceSupabase({
+      id: 'target-message-1',
+      sender_profile_id: 'sender-1',
+      type: 'text',
+      deleted_at: null,
+      visibility_type: 'specific-users',
+      visibility_user_ids: ['reader-profile-1', 'staff-profile-1'],
+    });
+
+    const result = await callResolveReplyReference(serviceSupabase, {
+      currentProfileId: 'reader-profile-1',
+    });
+
+    expect(result?.messageId).toBe('target-message-1');
+  });
+});

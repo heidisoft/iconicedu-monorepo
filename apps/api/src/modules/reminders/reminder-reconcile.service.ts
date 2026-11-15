@@ -234,7 +234,9 @@ export class ReminderReconcileService {
       throw new InternalServerErrorException(scheduleError.message);
     }
 
-    // Attach learning space metadata if present
+    // Attach learning space metadata if present. Soft-deleted classes are
+    // included on purpose: delete also archives the class, so its schedules
+    // must cancel their jobs instead of regenerating them.
     let enrichedRow = row;
     if (row?.source_learning_space_id) {
       const { data: spaceRow } = await supabase
@@ -242,7 +244,6 @@ export class ReminderReconcileService {
         .select('id,status,archived_at')
         .eq('org_id', input.orgId)
         .eq('id', row.source_learning_space_id)
-        .is('deleted_at', null)
         .maybeSingle<{
           id: string;
           status?: string | null;

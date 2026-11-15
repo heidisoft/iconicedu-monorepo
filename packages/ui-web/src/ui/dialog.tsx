@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { Dialog as DialogPrimitive } from 'radix-ui';
 
+import { usePortalContainer } from './portal-container';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 import { XIcon } from 'lucide-react';
@@ -18,7 +19,14 @@ function DialogTrigger({
 }
 
 function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
+  const portalContainer = usePortalContainer();
+  return (
+    <DialogPrimitive.Portal
+      container={portalContainer}
+      data-slot="dialog-portal"
+      {...props}
+    />
+  );
 }
 
 function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {

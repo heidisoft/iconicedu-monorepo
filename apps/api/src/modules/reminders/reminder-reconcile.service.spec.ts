@@ -517,6 +517,49 @@ describe('ReminderReconcileService', () => {
       expect(updateChain.is).toHaveBeenCalledWith('deleted_at', null);
     },
   );
+
+  it('cancels active reminders when the class was soft-deleted', async () => {
+    const scheduleChain = makeMaybeSingleChain({ data: buildScheduleRow(), error: null });
+    // Delete also archives the class; the lookup must not filter it out.
+    const learningSpaceChain = makeMaybeSingleChain({
+      data: {
+        id: 'space-1',
+        status: 'archived',
+        archived_at: '2030-03-01T00:00:00.000Z',
+      },
+      error: null,
+    });
+    const updateChain = makeUpdateChain({ error: null });
+    const reminderJobsUpdate = jest.fn((payload: Record<string, unknown>) => {
+      updateChain.update(payload);
+      return updateChain;
+    });
+
+    createSupabaseServiceClientMock.mockReturnValue({
+      from: jest.fn((table: string) => {
+        if (table === 'class_schedules') return { select: jest.fn(() => scheduleChain) };
+        if (table === 'learning_spaces') {
+          return { select: jest.fn(() => learningSpaceChain) };
+        }
+        if (table === 'reminder_jobs') return { update: reminderJobsUpdate };
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    } as never);
+
+    const result =
+      await new ReminderReconcileService().reconcileNextReminderJobForSchedule({
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+        now: new Date('2030-03-06T09:00:00.000Z'),
+      });
+
+    expect(result).toEqual({ action: 'canceled_only' });
+    expect(learningSpaceChain.is).not.toHaveBeenCalledWith('deleted_at', null);
+    expect(reminderJobsUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'canceled' }),
+    );
+  });
+
   it('materializes recurring completion checks without waiting for the first occurrence to dispatch', async () => {
     const scheduleChain = makeMaybeSingleChain({
       data: {

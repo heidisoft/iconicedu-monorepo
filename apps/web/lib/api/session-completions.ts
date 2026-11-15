@@ -2,6 +2,7 @@ import type {
   AdminConfirmSessionCompletionInput,
   AdminCreateSessionCompletionInput,
   AdminDeleteSessionCompletionInput,
+  AdminDisputeSessionCompletionInput,
   AdminOrgProfileOptionVM,
   AdminSessionCompletionVM,
   AdminUndoSessionCompletionInput,
@@ -63,6 +64,16 @@ export function undoSessionCompletionAsAdmin(
 ) {
   return createApiClient(supabase).post<{ success: boolean; undoneCount: number }>(
     '/session-completions/admin/undo-occurrence',
+    input,
+  );
+}
+
+export function disputeSessionCompletionAsAdmin(
+  supabase: SupabaseClient,
+  input: AdminDisputeSessionCompletionInput,
+) {
+  return createApiClient(supabase).post<{ success: boolean; disputedCount: number }>(
+    '/session-completions/admin/dispute-occurrence',
     input,
   );
 }

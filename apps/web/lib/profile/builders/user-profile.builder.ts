@@ -163,13 +163,15 @@ async function loadNotificationScopedDefaults(
   }
 
   return data.map((item) => ({
-    scopeKind: item.scope_kind,
-    scopeId: item.scope_id,
-    prefKey: item.pref_key,
+    scopeKind: item.scopeKind,
+    scopeId: item.scopeId,
+    prefKey: item.prefKey,
     channels: Array.isArray(item.channels)
       ? (item.channels.filter(Boolean) as NotificationPreferenceVM['channels'])
       : [],
     muted: item.muted ?? null,
+    mode: item.mode ?? 'normal',
+    mutedUntil: item.mutedUntil ?? null,
   }));
 }
 

@@ -1,4 +1,5 @@
 'use client';
+import { LiveSessionJoinProvider } from '@iconicedu/web/components/live-sessions/live-session-join-provider';
 
 import * as React from 'react';
 import type { ReactNode } from 'react';
@@ -80,6 +81,7 @@ import {
 } from '@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate';
 import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 import { signOutCurrentSession } from '@iconicedu/web/lib/auth/sign-out';
+import { clearAllMessageDraftsForProfile } from '@iconicedu/ui-web/components/messages/message-draft-store';
 import {
   AnalyticsEvent,
   INCOMPLETE_ONBOARDING_REAUTH_AFTER_MS,
@@ -164,6 +166,7 @@ export function SidebarShell({
   isPersonaAddEnabled,
   adminSections,
   subjectOptions,
+  enableMessageDrafts,
 }: {
   children: ReactNode;
   data: SidebarLeftDataVM;
@@ -172,6 +175,7 @@ export function SidebarShell({
   isPersonaAddEnabled?: boolean;
   adminSections?: AdminMenuSectionVM[] | null;
   subjectOptions?: string[];
+  enableMessageDrafts?: boolean;
 }) {
   const pathname = usePathname();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -211,9 +215,17 @@ export function SidebarShell({
   }, [initialOnboardingStatus]);
 
   const handleLogout = React.useCallback(async () => {
+    // Drafts are already isolated per accountId+profileId (see
+    // message-draft-store), so this isn't required to prevent cross-user
+    // leakage on this device — it's just hygiene so a signed-out browser
+    // doesn't keep holding onto this profile's unsent text.
+    clearAllMessageDraftsForProfile({
+      accountId: data.user.profile.ids.accountId,
+      profileId: data.user.profile.ids.id,
+    });
     await signOutCurrentSession(supabase);
     window.location.assign('/');
-  }, [supabase]);
+  }, [data.user.profile.ids.accountId, data.user.profile.ids.id, supabase]);
 
   const dashboardBasePath = React.useMemo(() => {
     const firstSegment = pathname?.split('/').filter(Boolean)[0];
@@ -2617,9 +2629,17 @@ export function SidebarShell({
         onPersonaAdd={handlePersonaAdd}
         isPersonaSwitchEnabled={Boolean(isPersonaSwitchEnabled)}
         isPersonaAddEnabled={Boolean(isPersonaAddEnabled)}
+        enableMessageDrafts={Boolean(enableMessageDrafts)}
         adminSections={adminSections ?? undefined}
       />
-      <SidebarInset>{children}</SidebarInset>
+      <SidebarInset>
+        <LiveSessionJoinProvider
+          orgId={sidebarData.user.profile.ids.orgId}
+          profileId={sidebarData.user.profile.ids.id}
+        >
+          {children}
+        </LiveSessionJoinProvider>
+      </SidebarInset>
     </>
   );
 }

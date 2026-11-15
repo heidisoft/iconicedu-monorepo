@@ -8,6 +8,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   teacher_absent: 'Teacher absent',
   student_absent: 'Student absent',
   technical_issue: 'Technical issue',
+  did_not_happen: 'Session did not happen',
   other: 'Other',
 };
 

@@ -1404,12 +1404,13 @@ export class RemindersService {
     const learningSpaceId = payload.learningSpaceId ?? job.source_learning_space_id;
     if (!learningSpaceId) return false;
 
+    // Soft-deleted classes are included: delete also archives the class, so a
+    // job for one must be skipped rather than fail open.
     const response = await supabase
       .from('learning_spaces')
       .select('status, archived_at')
       .eq('org_id', job.org_id)
       .eq('id', learningSpaceId)
-      .is('deleted_at', null)
       .maybeSingle<{ status: string | null; archived_at: string | null }>();
 
     if (response.error) {

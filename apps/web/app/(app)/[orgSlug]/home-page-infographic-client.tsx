@@ -1,61 +1,55 @@
 'use client';
 
-import { useCallback, type ComponentProps } from 'react';
-import { useRouter } from 'next/navigation';
+import type { LiveSessionJoinLinkVM } from '@iconicedu/shared-types';
+
+import { useCallback, useMemo, type ComponentProps } from 'react';
 import { DashboardHomeInfographicSection } from '@iconicedu/ui-web';
 import type { DashboardUpcomingSessionListItem } from '@iconicedu/ui-web/components/dashboard/dashboard-home-infographic-section';
 import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/external-live-session-join-dialog';
-import { useExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/messages/use-external-live-session-join-dialog';
+import { useLiveSessionNavigation } from '@iconicedu/web/components/live-sessions/use-live-session-navigation';
+
+import { createApiClient } from '@iconicedu/web/lib/api/http-client';
+import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 
 type HomePageInfographicClientProps = ComponentProps<
   typeof DashboardHomeInfographicSection
->;
+> & {
+  orgId: string;
+  currentUserId?: string;
+};
 
-export function HomePageInfographicClient(props: HomePageInfographicClientProps) {
-  const router = useRouter();
+export function HomePageInfographicClient({
+  orgId,
+  currentUserId,
+  ...props
+}: HomePageInfographicClientProps) {
+  const supabase = useMemo(() => createSupabaseBrowserClient(), []);
   const { externalJoinTarget, closeExternalJoinDialog, handleResolvedJoinHref } =
-    useExternalLiveSessionJoinDialog({
-      onInternalJoinHref: (joinHref) => {
-        router.push(joinHref);
-      },
-    });
+    useLiveSessionNavigation();
 
   const handleJoinSession = useCallback(
     async (item: DashboardUpcomingSessionListItem) => {
-      if (typeof window === 'undefined') {
-        return;
-      }
-
       if (!item.channelId) {
         handleResolvedJoinHref(item.joinHref);
 
         return;
       }
 
-      const response = await window.fetch(
-        `/api/channels/${item.channelId}/live-sessions/join`,
+      if (!currentUserId) {
+        throw new Error('Current user is required');
+      }
+
+      const payload = await createApiClient(supabase).post<LiveSessionJoinLinkVM>(
+        `/channels/${item.channelId}/live-sessions/join`,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ orgSlug: props.orgSlug }),
+          orgId,
+          profileId: currentUserId,
         },
       );
 
-      const payload = (await response.json().catch(() => null)) as {
-        success?: boolean;
-        joinPath?: string;
-        error?: string;
-      } | null;
-
-      if (!response.ok || !payload?.success || !payload.joinPath) {
-        throw new Error(payload?.error ?? 'Failed to join live session');
-      }
-
-      handleResolvedJoinHref(payload.joinPath);
+      handleResolvedJoinHref(payload.joinPath, payload.provider, payload.passcode);
     },
-    [handleResolvedJoinHref, props.orgSlug],
+    [currentUserId, handleResolvedJoinHref, orgId, supabase],
   );
 
   return (

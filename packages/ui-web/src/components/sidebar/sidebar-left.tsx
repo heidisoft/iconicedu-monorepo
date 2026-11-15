@@ -87,6 +87,7 @@ import {
   getLearningSpaceItemUnreadCountForUser,
   getLearningSpaceUnreadCount,
 } from '@iconicedu/ui-web/components/sidebar/sidebar-unread';
+import { useDraftChannelIds } from '@iconicedu/ui-web/components/sidebar/use-draft-channel-ids';
 
 const ICONS = {
   home: Home,
@@ -270,11 +271,14 @@ export function SidebarLeft({
   isPersonaSwitchEnabled,
   isPersonaAddEnabled,
   adminSections,
+  enableMessageDrafts = false,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   data: SidebarLeftDataVM;
   subjectOptions?: string[];
   activePath?: string | null;
+  /** Gates the "Draft" label on DM/classroom rows with a saved composer draft. Default off. */
+  enableMessageDrafts?: boolean;
   onLogout?: () => Promise<void> | void;
   onboardingStatus?: UserOnboardingStatusVM | null;
   onProfileSave?: (input: ProfileSaveInput) => Promise<void> | void;
@@ -505,6 +509,22 @@ export function SidebarLeft({
           ),
         )
       : data.collections.directMessages;
+  const draftIndicatorChannels = React.useMemo(
+    () => [
+      ...ownDirectMessages.map((dm) => ({ id: dm.ids.id, orgId: dm.ids.orgId })),
+      ...visibleLearningSpaces.map((space) => ({
+        id: space.channels.primaryChannel.ids.id,
+        orgId: space.channels.primaryChannel.ids.orgId,
+      })),
+    ],
+    [ownDirectMessages, visibleLearningSpaces],
+  );
+  const draftChannelIds = useDraftChannelIds({
+    enabled: enableMessageDrafts,
+    accountId: userProfile.ids.accountId,
+    profileId: userProfile.ids.id,
+    channels: draftIndicatorChannels,
+  });
   const supervisedDirectMessagesByChild = React.useMemo(
     () =>
       userProfile.kind === 'guardian'
@@ -1001,6 +1021,7 @@ export function SidebarLeft({
                       isMobile={isMobile}
                       currentUser={currentUserRef}
                       dashboardBasePath={dashboardBasePath}
+                      draftChannelIds={draftChannelIds}
                       classRequestAction={{
                         orgSlug,
                         fallbackHref: `${dashboardBasePath}/s`,
@@ -1054,10 +1075,19 @@ export function SidebarLeft({
                                 {subtitle}
                               </div>
                             </div>
-                            {unreadCount > 0 ? (
-                              <Badge className="ml-auto h-5 px-1.5 text-[10px]">
-                                {unreadCount}
-                              </Badge>
+                            {unreadCount > 0 || draftChannelIds.has(channel.ids.id) ? (
+                              <span className="ml-auto flex items-center gap-1.5">
+                                {draftChannelIds.has(channel.ids.id) ? (
+                                  <span className="text-[10px] font-medium text-muted-foreground">
+                                    Draft
+                                  </span>
+                                ) : null}
+                                {unreadCount > 0 ? (
+                                  <Badge className="h-5 px-1.5 text-[10px]">
+                                    {unreadCount}
+                                  </Badge>
+                                ) : null}
+                              </span>
                             ) : null}
                           </a>
                         </SidebarMenuButton>
@@ -1077,6 +1107,7 @@ export function SidebarLeft({
               currentUserId={data.user.profile.ids.accountId}
               activeChannelId={activeDirectMessageId ?? null}
               dashboardBasePath={dashboardBasePath}
+              draftChannelIds={draftChannelIds}
             />
           </>
         ) : null}

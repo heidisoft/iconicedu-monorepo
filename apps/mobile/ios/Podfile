@@ -71,5 +71,20 @@ target 'ICONICAcademy' do
         config.build_settings['EXCLUDED_SOURCE_FILE_NAMES'] = '$(inherited) vendor/libwebp/**/*'
       end
     end
+
+    # react_native_post_install doesn't touch resource-bundle/privacy-manifest
+    # sub-targets (e.g. RNCAsyncStorage-RNCAsyncStorage_resources), which keep
+    # whatever ancient IPHONEOS_DEPLOYMENT_TARGET their podspec declared (as low
+    # as 9.0). Newer Xcode/SDK toolchains reject anything below their supported
+    # floor, so force every remaining target up to the app's own target too.
+    min_deployment_target = Gem::Version.new(podfile_properties['ios.deploymentTarget'] || '15.1')
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if current && Gem::Version.new(current) < min_deployment_target
+          config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_deployment_target.to_s
+        end
+      end
+    end
   end
 end

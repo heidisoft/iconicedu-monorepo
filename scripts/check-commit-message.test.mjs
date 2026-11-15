@@ -9,6 +9,8 @@ test('accepts repository Conventional Commit headers', () => {
     'fix: prevent duplicate messages',
     'docs(workflow): explain local setup',
     'feat(api)!: remove legacy endpoint',
+    'feat(web): Add guardian dashboard filters',
+    'feat(messaging): Experimental AI-assisted communication (refine + suggested replies)',
   ]) {
     assert.equal(validateCommitMessage(message).valid, true, message);
   }
@@ -26,7 +28,6 @@ test('rejects missing types, unsupported types, and malformed subjects', () => {
   for (const message of [
     'Add guardian dashboard filters',
     'feature(web): add guardian dashboard filters',
-    'feat(web): Add guardian dashboard filters',
     'feat(web): add guardian dashboard filters.',
   ]) {
     assert.equal(validateCommitMessage(message).valid, false, message);

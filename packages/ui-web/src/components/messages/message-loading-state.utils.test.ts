@@ -24,6 +24,7 @@ describe('message-loading-state.utils', () => {
       isDeleting: false,
       isAddingReaction: true,
       pendingReactionEmojis: ['👍', '🔥'],
+      sendFailed: false,
     });
   });
 
@@ -37,6 +38,26 @@ describe('message-loading-state.utils', () => {
         reactionEmojiKeys: {},
       }),
     ).toBeUndefined();
+  });
+
+  it('reports sendFailed for a message pending retry', () => {
+    expect(
+      buildMessageActionState('message-1', {
+        savingMessageIds: {},
+        hidingMessageIds: {},
+        deletingMessageIds: {},
+        reactionPickerMessageIds: {},
+        reactionEmojiKeys: {},
+        failedSendMessageIds: { 'message-1': true },
+      }),
+    ).toEqual({
+      isSaving: false,
+      isHiding: false,
+      isDeleting: false,
+      isAddingReaction: false,
+      pendingReactionEmojis: [],
+      sendFailed: true,
+    });
   });
 
   it('returns context-appropriate composer submit labels', () => {

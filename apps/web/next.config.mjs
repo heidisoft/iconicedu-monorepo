@@ -6,7 +6,11 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   // Transpile shared UI package from source instead of relying on a prebuilt bundle.
-  transpilePackages: ['@iconicedu/ui-web', '@iconicedu/utils'],
+  transpilePackages: [
+    '@iconicedu/ui-web',
+    '@iconicedu/utils',
+    '@iconicedu/live-sessions-core',
+  ],
   env: {
     NEXT_PUBLIC_POSTHOG_KEY:
       process.env.POSTHOG_KEY ?? process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '',

@@ -2,30 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
   createSupabaseServerClientMock,
-  createSupabaseServiceClientMock,
   requireAdminAuthContextMock,
   getAccountByAuthUserIdMock,
   getProfileByAccountIdMock,
   publishActivityEventMock,
   apiPostMock,
-  ensureSystemProfileIdMock,
+  getLearningSpaceEditContextMock,
 } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
-  createSupabaseServiceClientMock: vi.fn(),
   requireAdminAuthContextMock: vi.fn(),
   getAccountByAuthUserIdMock: vi.fn(),
   getProfileByAccountIdMock: vi.fn(),
   publishActivityEventMock: vi.fn(),
   apiPostMock: vi.fn(),
-  ensureSystemProfileIdMock: vi.fn(),
+  getLearningSpaceEditContextMock: vi.fn(),
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: createSupabaseServerClientMock,
-}));
-
-vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: createSupabaseServiceClientMock,
 }));
 
 vi.mock('@iconicedu/web/lib/admin/_auth-context', () => ({
@@ -48,8 +42,8 @@ vi.mock('@iconicedu/web/lib/api/http-client', () => ({
   createApiClient: vi.fn(() => ({ post: apiPostMock })),
 }));
 
-vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
-  ensureSystemProfileId: ensureSystemProfileIdMock,
+vi.mock('@iconicedu/web/lib/api/schedules', () => ({
+  getLearningSpaceEditContext: getLearningSpaceEditContextMock,
 }));
 
 import type { LearningSpaceCreatePayload } from '@iconicedu/shared-types';
@@ -79,38 +73,6 @@ function createSelectSingleChain<T>(result: {
   };
 }
 
-function createSelectManyChain<T>(result: {
-  data: T;
-  error: { message: string } | null;
-}) {
-  const chain = {
-    error: null as { message: string } | null,
-    eq: vi.fn(() => chain),
-    in: vi.fn(() => chain),
-    is: vi.fn(() => chain),
-    returns: vi.fn(async () => result),
-  };
-  const mutationChain = {
-    error: null as { message: string } | null,
-    eq: vi.fn(() => mutationChain),
-    is: vi.fn(() => mutationChain),
-  };
-  const insertChain = {
-    select: vi.fn(async () => ({
-      data: [{ id: 'mock-row-id' }],
-      error: null as { message: string } | null,
-    })),
-  };
-
-  return {
-    select: vi.fn(() => chain),
-    delete: vi.fn(() => mutationChain),
-    update: vi.fn(() => mutationChain),
-    insert: vi.fn(() => insertChain),
-    upsert: vi.fn(() => insertChain),
-  };
-}
-
 function createMutationTable() {
   const chain = {
     error: null as { message: string } | null,
@@ -123,6 +85,82 @@ function createMutationTable() {
     update: vi.fn(() => chain),
     insert: vi.fn(async () => ({ error: null })),
     upsert: vi.fn(async () => ({ error: null })),
+  };
+}
+
+/** Converts the same raw snake_case row shapes these tests already build for
+ * the (now-removed) service-role client reads into the camelCase VM
+ * getLearningSpaceEditContext returns, so each test's fixture data below is
+ * unchanged — only the delivery mechanism differs. */
+function buildEditContextFixture(input: {
+  participantIds: string[];
+  schedules: Array<{
+    id: string;
+    title: string;
+    start_at: string;
+    end_at: string;
+    timezone?: string | null;
+  }>;
+  recurrences?: Array<Record<string, unknown>>;
+  exceptions?: Array<Record<string, unknown>>;
+  overrides?: Array<Record<string, unknown>>;
+  channel: {
+    topic?: string | null;
+    description?: string | null;
+    icon_key?: string | null;
+    ui_theme_key?: string | null;
+    ui_defaults?: unknown;
+    live_session_config?: unknown;
+  } | null;
+}) {
+  return {
+    participantProfileIds: input.participantIds,
+    schedules: input.schedules.map((schedule) => ({
+      id: schedule.id,
+      title: schedule.title,
+      startAt: schedule.start_at,
+      endAt: schedule.end_at,
+      timezone: schedule.timezone ?? null,
+    })),
+    recurrences: (input.recurrences ?? []).map((row) => ({
+      id: row.id as string,
+      scheduleId: row.schedule_id as string,
+      frequency: (row.frequency as string) ?? 'weekly',
+      interval: (row.interval as number | null) ?? null,
+      count: (row.count as number | null) ?? null,
+      until: (row.until as string | null) ?? null,
+      timezone: (row.timezone as string | null) ?? null,
+      bySecond: (row.bysecond as number[] | null) ?? null,
+      byMinute: (row.byminute as number[] | null) ?? null,
+      byHour: (row.byhour as number[] | null) ?? null,
+      byDay: (row.byday as string[] | null) ?? null,
+      byMonthDay: (row.bymonthday as number[] | null) ?? null,
+      byYearDay: (row.byyearday as number[] | null) ?? null,
+      byWeekNo: (row.byweekno as number[] | null) ?? null,
+      byMonth: (row.bymonth as number[] | null) ?? null,
+      bySetPos: (row.bysetpos as number[] | null) ?? null,
+      wkst: (row.wkst as string | null) ?? null,
+    })),
+    exceptions: (input.exceptions ?? []).map((row) => ({
+      recurrenceId: row.recurrence_id as string,
+      occurrenceKey: row.occurrence_key as string,
+      reason: (row.reason as string | null) ?? null,
+    })),
+    overrides: (input.overrides ?? []).map((row) => ({
+      recurrenceId: row.recurrence_id as string,
+      occurrenceKey: row.occurrence_key as string,
+      patch: (row.patch as Record<string, unknown> | null) ?? null,
+    })),
+    channel: input.channel
+      ? {
+          topic: input.channel.topic ?? null,
+          description: input.channel.description ?? null,
+          iconKey: input.channel.icon_key ?? null,
+          themeKey: input.channel.ui_theme_key ?? null,
+          uiDefaults: input.channel.ui_defaults ?? null,
+          liveSessionConfig: input.channel.live_session_config ?? null,
+        }
+      : null,
   };
 }
 
@@ -223,34 +261,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: payload.basics.title,
-          start_at: '2026-03-14T14:00:00.000Z',
-          end_at: '2026-03-14T15:00:00.000Z',
-          timezone: 'UTC',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
     const channelsTable = createSelectSingleChain({
       data: {
         topic: payload.basics.title,
@@ -262,47 +272,31 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
       error: null,
     });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Alex Educator',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
 
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: payload.basics.title,
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+        recurrences: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+        channel: {
+          topic: payload.basics.title,
+          description: payload.basics.description,
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: {
         id: 'account-1',
@@ -315,7 +309,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     expect(publishActivityEventMock).not.toHaveBeenCalled();
     expect(apiPostMock).not.toHaveBeenCalled();
-    expect(ensureSystemProfileIdMock).not.toHaveBeenCalled();
   });
 
   it('emits class.updated only for info-only edits with unchanged schedule semantics', async () => {
@@ -395,34 +388,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: payload.basics.title,
-          start_at: '2026-03-14T14:00:00.000Z',
-          end_at: '2026-03-14T15:00:00.000Z',
-          timezone: 'UTC',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
     const channelsTable = createSelectSingleChain({
       data: {
         topic: payload.basics.title,
@@ -434,47 +399,31 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
       error: null,
     });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Alex Educator',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
 
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: payload.basics.title,
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+        recurrences: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+        channel: {
+          topic: payload.basics.title,
+          description: 'Weekly math fundamentals',
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: {
         id: 'account-1',
@@ -482,7 +431,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
     });
     getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
     publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
 
     await updateLearningSpaceFromPayload('space-1', payload);
@@ -578,34 +526,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: payload.basics.title,
-          start_at: '2026-03-14T14:00:00.000Z',
-          end_at: '2026-03-14T15:00:00.000Z',
-          timezone: 'UTC',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
     const channelsTable = createSelectSingleChain({
       data: {
         topic: payload.basics.title,
@@ -617,47 +537,31 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
       error: null,
     });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Alex Educator',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
 
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: payload.basics.title,
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+        recurrences: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+        channel: {
+          topic: payload.basics.title,
+          description: payload.basics.description,
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: {
         id: 'account-1',
@@ -665,7 +569,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
     });
     getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
     publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
 
     await updateLearningSpaceFromPayload('space-1', payload);
@@ -768,75 +671,30 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: 'Math Foundations',
-          start_at: '2026-03-14T14:00:00.000Z',
-          end_at: '2026-03-14T15:00:00.000Z',
-          timezone: 'UTC',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Alex Educator',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
-
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: 'Math Foundations',
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+        recurrences: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+        channel: {
+          topic: 'Math Foundations',
+          description: payload.basics.description,
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
 
     await updateLearningSpaceFromPayload('space-1', payload, undefined, {
       sendActivityNotifications: false,
@@ -922,34 +780,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: payload.basics.title,
-          start_at: '2026-03-14T14:00:00.000Z',
-          end_at: '2026-03-14T15:00:00.000Z',
-          timezone: 'UTC',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
     const channelsTable = createSelectSingleChain({
       data: {
         topic: payload.basics.title,
@@ -961,47 +791,31 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
       error: null,
     });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Alex Educator',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
 
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: payload.basics.title,
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+        recurrences: [{ id: 'recurrence-1', schedule_id: 'schedule-1' }],
+        channel: {
+          topic: payload.basics.title,
+          description: payload.basics.description,
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: {
         id: 'account-1',
@@ -1009,7 +823,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
     });
     getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
     publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
 
     await updateLearningSpaceFromPayload('space-1', payload);
@@ -1107,44 +920,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: payload.basics.title,
-          start_at: '2026-03-14T14:00:00.000Z',
-          end_at: '2026-03-14T15:00:00.000Z',
-          timezone: 'UTC',
-        },
-        {
-          id: 'schedule-2',
-          title: payload.basics.title,
-          start_at: '2026-03-14T16:00:00.000Z',
-          end_at: '2026-03-14T17:00:00.000Z',
-          timezone: 'UTC',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [
-        { id: 'recurrence-1', schedule_id: 'schedule-1' },
-        { id: 'recurrence-2', schedule_id: 'schedule-2' },
-      ],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
     const channelsTable = createSelectSingleChain({
       data: {
         topic: payload.basics.title,
@@ -1156,47 +931,41 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
       error: null,
     });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Alex Educator',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
 
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: payload.basics.title,
+            start_at: '2026-03-14T14:00:00.000Z',
+            end_at: '2026-03-14T15:00:00.000Z',
+            timezone: 'UTC',
+          },
+          {
+            id: 'schedule-2',
+            title: payload.basics.title,
+            start_at: '2026-03-14T16:00:00.000Z',
+            end_at: '2026-03-14T17:00:00.000Z',
+            timezone: 'UTC',
+          },
+        ],
+        recurrences: [
+          { id: 'recurrence-1', schedule_id: 'schedule-1' },
+          { id: 'recurrence-2', schedule_id: 'schedule-2' },
+        ],
+        channel: {
+          topic: payload.basics.title,
+          description: payload.basics.description,
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: {
         id: 'account-1',
@@ -1204,7 +973,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
     });
     getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-actor-1' } });
-    ensureSystemProfileIdMock.mockResolvedValue('system-profile-1');
     publishActivityEventMock.mockResolvedValue({ id: 'activity-1' });
 
     await updateLearningSpaceFromPayload('space-1', payload);
@@ -1300,75 +1068,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: payload.basics.title,
-          start_at: '2026-03-10T21:02:00.000Z',
-          end_at: '2026-03-10T22:02:00.000Z',
-          timezone: 'America/New_York',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'recurrence-1',
-          schedule_id: 'schedule-1',
-          frequency: 'weekly',
-          interval: 1,
-          count: null,
-          until: null,
-          timezone: 'America/New_York',
-          bysecond: null,
-          byminute: [2],
-          byhour: [17],
-          byday: ['TU'],
-          bymonthday: null,
-          byyearday: null,
-          byweekno: null,
-          bymonth: null,
-          bysetpos: null,
-          wkst: 'MO',
-        },
-      ],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [
-        {
-          recurrence_id: 'recurrence-1',
-          occurrence_key: '2026-03-17T21:02:00.000Z',
-          reason: 'Holiday',
-        },
-        {
-          recurrence_id: 'recurrence-1',
-          occurrence_key: '2026-03-31T21:02:00.000Z',
-          reason: 'Break',
-        },
-      ],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [
-        {
-          recurrence_id: 'recurrence-1',
-          occurrence_key: '2026-03-24T21:02:00.000Z',
-          patch: {
-            startAt: '2026-03-25T22:15:00.000Z',
-            endAt: '2026-03-25T23:15:00.000Z',
-            reason: 'Rescheduled',
-          },
-        },
-      ],
-      error: null,
-    });
     const channelsTable = createSelectSingleChain({
       data: {
         topic: payload.basics.title,
@@ -1380,47 +1079,74 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
       error: null,
     });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Ms Charmain',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
 
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: payload.basics.title,
+            start_at: '2026-03-10T21:02:00.000Z',
+            end_at: '2026-03-10T22:02:00.000Z',
+            timezone: 'America/New_York',
+          },
+        ],
+        recurrences: [
+          {
+            id: 'recurrence-1',
+            schedule_id: 'schedule-1',
+            frequency: 'weekly',
+            interval: 1,
+            count: null,
+            until: null,
+            timezone: 'America/New_York',
+            bysecond: null,
+            byminute: [2],
+            byhour: [17],
+            byday: ['TU'],
+            bymonthday: null,
+            byyearday: null,
+            byweekno: null,
+            bymonth: null,
+            bysetpos: null,
+            wkst: 'MO',
+          },
+        ],
+        exceptions: [
+          {
+            recurrence_id: 'recurrence-1',
+            occurrence_key: '2026-03-17T21:02:00.000Z',
+            reason: 'Holiday',
+          },
+          {
+            recurrence_id: 'recurrence-1',
+            occurrence_key: '2026-03-31T21:02:00.000Z',
+            reason: 'Break',
+          },
+        ],
+        overrides: [
+          {
+            recurrence_id: 'recurrence-1',
+            occurrence_key: '2026-03-24T21:02:00.000Z',
+            patch: {
+              startAt: '2026-03-25T22:15:00.000Z',
+              endAt: '2026-03-25T23:15:00.000Z',
+              reason: 'Rescheduled',
+            },
+          },
+        ],
+        channel: {
+          topic: payload.basics.title,
+          description: payload.basics.description,
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: {
         id: 'account-1',
@@ -1433,7 +1159,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     expect(publishActivityEventMock).not.toHaveBeenCalled();
     expect(apiPostMock).not.toHaveBeenCalled();
-    expect(ensureSystemProfileIdMock).not.toHaveBeenCalled();
   });
 
   it('does not emit schedule activity for unchanged overrides saved with legacy patch keys', async () => {
@@ -1521,70 +1246,6 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       }),
     };
 
-    const participantsTable = createSelectManyChain({
-      data: [{ profile_id: 'profile-1' }],
-      error: null,
-    });
-    const schedulesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'schedule-1',
-          title: payload.basics.title,
-          start_at: '2026-03-10T21:02:00.000Z',
-          end_at: '2026-03-10T22:02:00.000Z',
-          timezone: 'America/New_York',
-        },
-      ],
-      error: null,
-    });
-    const recurrencesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'recurrence-1',
-          schedule_id: 'schedule-1',
-          frequency: 'weekly',
-          interval: 1,
-          count: null,
-          until: null,
-          timezone: 'America/New_York',
-          bysecond: null,
-          byminute: [2],
-          byhour: [17],
-          byday: ['TU'],
-          bymonthday: null,
-          byyearday: null,
-          byweekno: null,
-          bymonth: null,
-          bysetpos: null,
-          wkst: 'MO',
-        },
-      ],
-      error: null,
-    });
-    const recurrenceExceptionsTable = createSelectManyChain({
-      data: [
-        {
-          recurrence_id: 'recurrence-1',
-          occurrence_key: '2026-03-17T21:02:00.000Z',
-          reason: 'Holiday',
-        },
-      ],
-      error: null,
-    });
-    const recurrenceOverridesTable = createSelectManyChain({
-      data: [
-        {
-          recurrence_id: 'recurrence-1',
-          occurrence_key: '2026-03-24T21:02:00.000Z',
-          patch: {
-            start_at: '2026-03-25T22:15:00.000Z',
-            end_at: '2026-03-25T23:15:00.000Z',
-            description: 'Rescheduled',
-          },
-        },
-      ],
-      error: null,
-    });
     const channelsTable = createSelectSingleChain({
       data: {
         topic: payload.basics.title,
@@ -1596,47 +1257,69 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
       },
       error: null,
     });
-    const profilesTable = createSelectManyChain({
-      data: [
-        {
-          id: 'profile-1',
-          display_name: 'Ms Charmain',
-          avatar_url: null,
-          ui_theme_key: null,
-        },
-      ],
-      error: null,
-    });
-
-    const serviceMutationTable = createSelectManyChain({
-      data: [],
-      error: null,
-    });
-    const serviceClient = {
-      from: vi.fn((table: string) => {
-        switch (table) {
-          case 'learning_space_participants':
-            return participantsTable;
-          case 'class_schedules':
-            return schedulesTable;
-          case 'class_schedule_recurrence':
-            return recurrencesTable;
-          case 'class_schedule_recurrence_exceptions':
-            return recurrenceExceptionsTable;
-          case 'class_schedule_recurrence_overrides':
-            return recurrenceOverridesTable;
-          case 'channels':
-            return channelsTable;
-          case 'profiles':
-            return profilesTable;
-          default:
-            return serviceMutationTable;
-        }
-      }),
-    };
 
     createSupabaseServerClientMock.mockResolvedValue(serverClient);
-    createSupabaseServiceClientMock.mockReturnValue(serviceClient);
+    getLearningSpaceEditContextMock.mockResolvedValue(
+      buildEditContextFixture({
+        participantIds: ['profile-1'],
+        schedules: [
+          {
+            id: 'schedule-1',
+            title: payload.basics.title,
+            start_at: '2026-03-10T21:02:00.000Z',
+            end_at: '2026-03-10T22:02:00.000Z',
+            timezone: 'America/New_York',
+          },
+        ],
+        recurrences: [
+          {
+            id: 'recurrence-1',
+            schedule_id: 'schedule-1',
+            frequency: 'weekly',
+            interval: 1,
+            count: null,
+            until: null,
+            timezone: 'America/New_York',
+            bysecond: null,
+            byminute: [2],
+            byhour: [17],
+            byday: ['TU'],
+            bymonthday: null,
+            byyearday: null,
+            byweekno: null,
+            bymonth: null,
+            bysetpos: null,
+            wkst: 'MO',
+          },
+        ],
+        exceptions: [
+          {
+            recurrence_id: 'recurrence-1',
+            occurrence_key: '2026-03-17T21:02:00.000Z',
+            reason: 'Holiday',
+          },
+        ],
+        overrides: [
+          {
+            recurrence_id: 'recurrence-1',
+            occurrence_key: '2026-03-24T21:02:00.000Z',
+            patch: {
+              start_at: '2026-03-25T22:15:00.000Z',
+              end_at: '2026-03-25T23:15:00.000Z',
+              description: 'Rescheduled',
+            },
+          },
+        ],
+        channel: {
+          topic: payload.basics.title,
+          description: payload.basics.description,
+          icon_key: payload.basics.iconKey,
+          ui_theme_key: payload.settings?.themeKey,
+          ui_defaults: payload.settings?.uiDefaults ?? null,
+          live_session_config: null,
+        },
+      }),
+    );
     getAccountByAuthUserIdMock.mockResolvedValue({
       data: {
         id: 'account-1',
@@ -1649,6 +1332,5 @@ describe('updateLearningSpaceFromPayload no-op behavior', () => {
 
     expect(publishActivityEventMock).not.toHaveBeenCalled();
     expect(apiPostMock).not.toHaveBeenCalled();
-    expect(ensureSystemProfileIdMock).not.toHaveBeenCalled();
   });
 });

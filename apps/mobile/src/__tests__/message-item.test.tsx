@@ -5,6 +5,10 @@ import { MessageItem } from '@/components/messages/message-item';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { lightColors as LIGHT } from '@/lib/theme';
 
+const mockOpenLiveSession = jest.fn();
+jest.mock('@/lib/messages/open-live-session', () => ({
+  openLiveSession: (...args: unknown[]) => mockOpenLiveSession(...args),
+}));
 const mockOpenBrowserAsync = jest.fn();
 const mockFetchThreadMessages = jest.fn();
 const mockMarkThreadReadState = jest.fn();
@@ -172,6 +176,36 @@ const pdfFileMessage: MessageVM = {
 } as unknown as MessageVM;
 
 describe('MessageItem', () => {
+  it.each(['event-reminder', 'session-booking', 'live-session-started'])(
+    'uses the personal browser opener for %s joins',
+    (type) => {
+      const href = '/live/aaaa-bbbb-cccc';
+      const message = {
+        ...baseMessage,
+        core: { ...baseMessage.core, type },
+        event: { title: 'Class', startAt: '2025-01-15T10:30:00Z', meetingLink: href },
+        session: {
+          title: 'Class',
+          startAt: '2025-01-15T10:30:00Z',
+          status: 'confirmed',
+          meetingLink: href,
+        },
+        liveSession: {
+          title: 'Class',
+          startedByDisplayName: 'Teacher',
+          status: 'live',
+          joinUrl: href,
+        },
+      } as unknown as MessageVM;
+      render(
+        <MessageItem message={message} isOwn={false} isGroupStart colors={colors} />,
+      );
+      fireEvent.press(
+        screen.getByText(type === 'live-session-started' ? 'Join' : 'Join Meeting'),
+      );
+      expect(mockOpenLiveSession).toHaveBeenCalledWith(href);
+    },
+  );
   beforeEach(() => {
     jest.clearAllMocks();
     mockFetchThreadMessages.mockResolvedValue([
@@ -192,6 +226,37 @@ describe('MessageItem', () => {
       <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
     );
     expect(screen.getByText('Hello world')).toBeTruthy();
+  });
+
+  it('does not render an edited indicator for an unedited message', () => {
+    render(
+      <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+    expect(screen.queryByText('(edited)')).toBeNull();
+  });
+
+  it('renders an "(edited)" indicator when the message state marks it edited', () => {
+    const editedMessage: MessageVM = {
+      ...baseMessage,
+      state: { isEdited: true, editedAt: '2025-01-15T10:40:00Z' },
+    } as unknown as MessageVM;
+
+    render(
+      <MessageItem message={editedMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+    expect(screen.getByText('(edited)')).toBeTruthy();
+  });
+
+  it('does not render an edited indicator on a non-text message even if state.isEdited is set', () => {
+    const editedFile: MessageVM = {
+      ...pdfFileMessage,
+      state: { isEdited: true },
+    } as unknown as MessageVM;
+
+    render(
+      <MessageItem message={editedFile} isOwn={false} isGroupStart colors={colors} />,
+    );
+    expect(screen.queryByText('(edited)')).toBeNull();
   });
 
   it('gives long text messages a definite bubble width so they wrap on mobile', () => {
@@ -405,6 +470,43 @@ describe('MessageItem', () => {
     expect(screen.getByLabelText('Visible to specific users')).toBeTruthy();
   });
 
+  it('shows the pinned indicator when isPinned is true (issue #264 P2)', () => {
+    render(
+      <MessageItem
+        message={baseMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+        isPinned
+      />,
+    );
+
+    expect(screen.getByTestId('message-pinned-indicator')).toBeTruthy();
+  });
+
+  it('hides the pinned indicator when isPinned is false or omitted', () => {
+    render(
+      <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
+    );
+
+    expect(screen.queryByTestId('message-pinned-indicator')).toBeNull();
+  });
+
+  it('tints the row background when isHighlighted is true (search jump-to-message)', () => {
+    render(
+      <MessageItem
+        message={baseMessage}
+        isOwn={false}
+        isGroupStart
+        colors={colors}
+        isHighlighted
+      />,
+    );
+
+    const row = screen.getByText('Hello world');
+    expect(row).toBeTruthy();
+  });
+
   it('opens PDF attachments in the in-app PDF viewer instead of the generic browser flow', () => {
     render(
       <MessageItem message={pdfFileMessage} isOwn={false} isGroupStart colors={colors} />,
@@ -414,5 +516,142 @@ describe('MessageItem', () => {
 
     expect(screen.getByText('PDF viewer:Worksheet.pdf')).toBeTruthy();
     expect(mockOpenBrowserAsync).not.toHaveBeenCalled();
+  });
+
+  describe('reply reference (quote reply)', () => {
+    const replyMessage = {
+      ...baseMessage,
+      ids: { id: 'msg-2', orgId: 'org-1' },
+      content: { text: 'Yes, that works for me' },
+      social: {
+        reactions: [],
+        replyTo: {
+          messageId: 'msg-1',
+          senderId: 'user-1',
+          senderName: 'John Doe',
+          snippet: 'Hello world',
+          type: 'text',
+        },
+      },
+    } as unknown as MessageVM;
+
+    it('renders the quoted original above the message body', () => {
+      render(
+        <MessageItem message={replyMessage} isOwn={false} isGroupStart colors={colors} />,
+      );
+
+      expect(screen.getByTestId('reply-reference-block')).toBeTruthy();
+      expect(screen.getByText('Hello world')).toBeTruthy();
+      expect(screen.getByText('Yes, that works for me')).toBeTruthy();
+    });
+
+    it('asks the list to scroll to the original when the quote is tapped', () => {
+      const onReplyReferencePress = jest.fn();
+      render(
+        <MessageItem
+          message={replyMessage}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+          onReplyReferencePress={onReplyReferencePress}
+        />,
+      );
+
+      fireEvent.press(screen.getByTestId('reply-reference-block'));
+      expect(onReplyReferencePress).toHaveBeenCalledWith('msg-1');
+    });
+
+    it('degrades gracefully when the original is unavailable', () => {
+      const onReplyReferencePress = jest.fn();
+      const unavailableReply = {
+        ...replyMessage,
+        social: {
+          reactions: [],
+          replyTo: {
+            ...(replyMessage.social as { replyTo: Record<string, unknown> }).replyTo,
+            isUnavailable: true,
+          },
+        },
+      } as unknown as MessageVM;
+
+      render(
+        <MessageItem
+          message={unavailableReply}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+          onReplyReferencePress={onReplyReferencePress}
+        />,
+      );
+
+      expect(screen.getByText('Original message unavailable')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('reply-reference-block'));
+      expect(onReplyReferencePress).not.toHaveBeenCalled();
+    });
+
+    it('renders no quote block for messages that are not replies', () => {
+      render(
+        <MessageItem message={baseMessage} isOwn={false} isGroupStart colors={colors} />,
+      );
+      expect(screen.queryByTestId('reply-reference-block')).toBeNull();
+    });
+  });
+
+  describe('list formatting rendering', () => {
+    function makeTextMessage(text: string): MessageVM {
+      return {
+        ...baseMessage,
+        ids: { id: `msg-${text.length}`, orgId: 'org-1' },
+        content: { text },
+      } as unknown as MessageVM;
+    }
+
+    it('renders bullet lines with a bullet glyph and the marker stripped', () => {
+      render(
+        <MessageItem
+          message={makeTextMessage('Shopping:\n- milk\n- eggs')}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+        />,
+      );
+
+      expect(screen.getByText('Shopping:')).toBeTruthy();
+      expect(screen.getAllByText('•')).toHaveLength(2);
+      expect(screen.getByText('milk')).toBeTruthy();
+      expect(screen.getByText('eggs')).toBeTruthy();
+      // The raw "- " markers are not rendered as literal text
+      expect(screen.queryByText('- milk')).toBeNull();
+    });
+
+    it('renders numbered lines with their numbers', () => {
+      render(
+        <MessageItem
+          message={makeTextMessage('1. first\n2. second')}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+        />,
+      );
+
+      expect(screen.getByText('1.')).toBeTruthy();
+      expect(screen.getByText('2.')).toBeTruthy();
+      expect(screen.getByText('first')).toBeTruthy();
+      expect(screen.getByText('second')).toBeTruthy();
+    });
+
+    it('leaves plain text messages on the original single-text render path', () => {
+      render(
+        <MessageItem
+          message={makeTextMessage('no lists here')}
+          isOwn={false}
+          isGroupStart
+          colors={colors}
+        />,
+      );
+
+      expect(screen.getByTestId('message-text-content')).toBeTruthy();
+      expect(screen.queryByText('•')).toBeNull();
+    });
   });
 });

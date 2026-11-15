@@ -62,6 +62,13 @@ export {
 
 export { buildSenderProfile, mapRowToMessageVM } from './message-mappers';
 
+export {
+  type LinkPreviewMetadata,
+  extractFirstUrl,
+  fetchLinkPreviewMetadata,
+  isSafeLinkPreviewUrl,
+} from './link-preview';
+
 export function groupBy<T, K extends string>(
   rows: T[],
   getKey: (row: T) => K,
@@ -84,3 +91,6 @@ export function createEnumNormalizer<T extends string>(allowedValues: readonly T
     return null;
   };
 }
+export * from './annotations/coordinates';
+export * from './annotations/state';
+export * from './annotations/participant-color';

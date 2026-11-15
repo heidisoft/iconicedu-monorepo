@@ -107,7 +107,7 @@ function completionKeyForSchedule(schedule: DisplaySchedule): string | null {
   return `${baseId}|${epochMs}`;
 }
 
-function buildCompletionLookup(
+export function buildCompletionLookup(
   completions: ChannelSessionCompletionVM[] | undefined,
 ): Set<string> {
   const lookup = new Set<string>();
@@ -136,7 +136,7 @@ function isScheduleDisputed(
  * A session counts as complete when a party confirmed it, or when it has simply
  * elapsed without a dispute. Mirrors the web tab's isDisplayScheduleCompleted.
  */
-function isScheduleCompleted(
+export function isScheduleCompleted(
   schedule: DisplaySchedule,
   completionLookup: Set<string>,
   disputedLookup: Set<string>,

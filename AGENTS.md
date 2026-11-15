@@ -44,6 +44,8 @@ Everything else goes through `apps/api`:
 - privileged operations and service-role credentials; and
 - API endpoints required by new web or mobile features.
 
+`pnpm guard:frontend-table-access` blocks new `supabase.from(...)` reads in either frontend. Legacy reads are baselined in `scripts/frontend-table-access-baseline.json`; when you migrate one, regenerate the baseline with `pnpm guard:frontend-table-access:update`. Never add entries to it.
+
 ### API Clients
 
 - Web calls `apps/api` with `createApiClient` from `apps/web/lib/api/http-client.ts`.
@@ -65,6 +67,7 @@ Everything else goes through `apps/api`:
 - Treat Supabase migrations as the schema source of truth and keep the Prisma schema aligned when the API needs the change.
 - Never expose production secrets, service-role credentials, tokens, or real user data in code, tests, logs, documentation, or PRs.
 - Keep new user-facing web behavior behind a catalogued feature flag that defaults off unless a documented maintenance exemption applies.
+- Wire every new required environment variable into all of its consumers in the same change (local `.env.example`, `ops/env/production.env.json`, both PR-preview steps in `.github/workflows/ci.yml`, and the reference table) — see [docs/operations/deployment.md](docs/operations/deployment.md) "Adding A New Required Environment Variable". A variable that reaches production but not PR previews (or vice versa) fails silently in exactly the environment nobody just tested.
 - Preserve unrelated user changes and keep each change focused on the requested outcome.
 - Add or update tests for changed behavior. Run focused checks while iterating and the appropriate CI command before handoff.
 

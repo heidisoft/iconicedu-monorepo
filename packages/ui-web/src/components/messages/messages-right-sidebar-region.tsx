@@ -28,6 +28,12 @@ const getSidebarMeta = (intent: MessagesRightPanelIntent | null) => {
       return { title: 'Profile', subtitle: undefined };
     case 'thread':
       return { title: 'Thread', subtitle: undefined };
+    case 'pinned':
+      return { title: 'Pinned Messages', subtitle: undefined };
+    case 'search':
+      return { title: 'Search Messages', subtitle: undefined };
+    case 'scheduled':
+      return { title: 'Scheduled Messages', subtitle: undefined };
     default:
       return { title: '', subtitle: undefined };
   }

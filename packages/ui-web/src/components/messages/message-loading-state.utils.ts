@@ -8,6 +8,7 @@ export function buildMessageActionState(
     deletingMessageIds: Record<string, true>;
     reactionPickerMessageIds: Record<string, true>;
     reactionEmojiKeys: Record<string, true>;
+    failedSendMessageIds?: Record<string, true>;
   },
 ): MessageActionState | undefined {
   const pendingReactionEmojis = Object.keys(pending.reactionEmojiKeys)
@@ -20,6 +21,7 @@ export function buildMessageActionState(
     isDeleting: Boolean(pending.deletingMessageIds[messageId]),
     isAddingReaction: Boolean(pending.reactionPickerMessageIds[messageId]),
     pendingReactionEmojis,
+    sendFailed: Boolean(pending.failedSendMessageIds?.[messageId]),
   };
 
   if (
@@ -27,6 +29,7 @@ export function buildMessageActionState(
     !state.isHiding &&
     !state.isDeleting &&
     !state.isAddingReaction &&
+    !state.sendFailed &&
     pendingReactionEmojis.length === 0
   ) {
     return undefined;

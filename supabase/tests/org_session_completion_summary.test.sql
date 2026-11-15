@@ -38,7 +38,9 @@ values
   ('00000000-0000-4000-8000-0000000c5c01', '00000000-0000-4000-8000-0000000c5111',
    '2030-02-25T10:00:00Z', '00000000-0000-4000-8000-0000000c5202', 'guardian',
    'pending', '2030-02-25T11:00:00Z', '2030-02-28T11:00:00Z'),
-  -- Occurrence D: only pending rows -> pending, regardless of month.
+  -- Occurrence D: only pending rows, ended in January -> counts toward pending only
+  -- for a window that covers January (e.g. unbounded); a March-bounded call excludes
+  -- it, same as completed excludes out-of-window rows.
   ('00000000-0000-4000-8000-0000000c5c01', '00000000-0000-4000-8000-0000000c5112',
    '2030-01-05T10:00:00Z', '00000000-0000-4000-8000-0000000c5202', 'guardian',
    'pending', '2030-01-05T11:00:00Z', '2030-01-08T11:00:00Z'),
@@ -72,7 +74,7 @@ select is(
   (select pending from public.get_org_session_completion_summary(
      '00000000-0000-4000-8000-0000000c5c01',
      '2030-03-01T00:00:00Z', '2030-04-01T00:00:00Z')),
-  1, 'pending counts only the fully unresolved occurrence D');
+  0, 'pending excludes occurrence D, whose session ended in January, outside the March window');
 
 -- Unbounded window: completed also picks up February; pending is unchanged.
 select is(

@@ -23,6 +23,8 @@
       "@iconicedu/ui-web/*": ["packages/ui-web/src/*"],
       "@iconicedu/ui-web": ["packages/ui-web/src"],
       "@iconicedu/ui-native/*": ["packages/ui-native/src/*"],
+      "@iconicedu/live-sessions-core": ["packages/live-sessions-core/src"],
+      "@iconicedu/live-sessions-core/*": ["packages/live-sessions-core/src/*"],
       "@iconicedu/shared-types/*": ["packages/shared-types/src/*"],
       "@iconicedu/shared-types": ["packages/shared-types/src"],
       "@iconicedu/utils": ["packages/utils/src"],

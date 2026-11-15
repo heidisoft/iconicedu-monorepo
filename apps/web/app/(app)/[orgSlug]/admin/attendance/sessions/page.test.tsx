@@ -1,11 +1,17 @@
 import { render, screen } from '@testing-library/react';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './page';
-import { enableAdminSessionAttendanceAnalytics } from '@iconicedu/web/flags';
+import {
+  enableAdminSessionAttendanceAnalytics,
+  enableSessionCompletionDisputeDetails,
+  enableSessionCompletionVerifiedDuration,
+} from '@iconicedu/web/flags';
 import { listAdminSessionCompletions } from '@iconicedu/web/lib/api/session-completions';
 
 vi.mock('@iconicedu/web/flags', () => ({
   enableAdminSessionAttendanceAnalytics: { run: vi.fn() },
+  enableSessionCompletionVerifiedDuration: { run: vi.fn() },
+  enableSessionCompletionDisputeDetails: { run: vi.fn() },
 }));
 vi.mock('@iconicedu/web/lib/api/session-completions', () => ({
   listAdminSessionCompletions: vi.fn(async () => []),
@@ -49,6 +55,8 @@ describe('completed sessions date selection', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-09-07T12:00:00Z'));
     vi.mocked(enableAdminSessionAttendanceAnalytics.run).mockResolvedValue(true);
+    vi.mocked(enableSessionCompletionVerifiedDuration.run).mockResolvedValue(false);
+    vi.mocked(enableSessionCompletionDisputeDetails.run).mockResolvedValue(false);
     vi.clearAllMocks();
   });
   afterEach(() => vi.useRealTimers());

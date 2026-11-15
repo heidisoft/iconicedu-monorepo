@@ -1,3 +1,9 @@
+import { useMeetingDialogLaunch } from '@/hooks/use-meeting-dialog-launch';
+import {
+  openLiveSession,
+  getLiveSessionShareUrl,
+} from '@/lib/messages/open-live-session';
+import { MeetingPasscode } from '@iconicedu/ui-native/components/MeetingPasscode';
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -29,6 +35,9 @@ import {
   Share2,
   Video,
   X,
+  Pin,
+  Search,
+  CalendarClock,
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
@@ -42,6 +51,11 @@ import { ChannelTopicIconBadge } from '@/lib/learning-space-icons';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
+import { useJoinLiveSession } from '@/hooks/use-join-live-session';
+import {
+  isExternalJoinHref,
+  resolveExternalJoinProviderLabel,
+} from '@/lib/messages/live-session-join';
 import {
   ensureDirectMessageChannelForProfiles,
   fetchChannelMembers,
@@ -49,6 +63,9 @@ import {
 } from '@/lib/api/queries';
 import { profileAvatarColors, profileAvatarBg } from '@/lib/profile-avatar-colors';
 import { BottomSheet } from '@iconicedu/ui-native';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { NotificationModeSection } from '@/components/messages/notification-mode-section';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -67,28 +84,6 @@ function getInitials(name: string): string {
   const words = name.trim().split(/\s+/);
   if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
   return name[0]?.toUpperCase() ?? '?';
-}
-
-function isExternalJoinHref(joinHref?: string | null): boolean {
-  return Boolean(joinHref && /^https?:\/\//i.test(joinHref));
-}
-
-function resolveExternalJoinProviderLabel(joinHref?: string | null) {
-  if (!joinHref || !isExternalJoinHref(joinHref)) {
-    return null;
-  }
-
-  try {
-    const hostname = new URL(joinHref).hostname.toLowerCase();
-    if (hostname.includes('zoom')) return 'Zoom';
-    if (hostname.includes('jitsi')) return 'Jitsi';
-    if (hostname.includes('meet.google')) return 'Google Meet';
-    if (hostname.includes('teams.microsoft')) return 'Microsoft Teams';
-  } catch {
-    return null;
-  }
-
-  return null;
 }
 
 function themeAvatarColor(
@@ -320,9 +315,20 @@ export type ChannelInfoSheetProps = {
   }> | null;
   messages?: MessageVM[];
   liveJoinUrl?: string | null;
+  /** True when this channel has live sessions configured, even with no static `liveJoinUrl` yet. */
+  liveSessionEnabled?: boolean;
   onJoinPress?: () => void;
   onClose: () => void;
   onProfilePress?: (user: UserProfileVM) => void;
+  /** Gated by `enableMessagePinning` — shows a "Pinned messages" quick-action entry. */
+  enablePinning?: boolean;
+  onOpenPinned?: () => void;
+  /** Gated by `enableMessageSearch` — shows a "Search messages" quick-action entry. */
+  enableSearch?: boolean;
+  onOpenSearch?: () => void;
+  /** Gated by `enableScheduledSend` — shows a "Scheduled messages" quick-action entry. */
+  enableScheduledSend?: boolean;
+  onOpenScheduled?: () => void;
 };
 
 // ─── Tab definitions ───────────────────────────────────────────────────────────
@@ -363,7 +369,97 @@ export function getVisibleChannelInfoTabs(input?: ParsedMobileChannelUiDefaults 
   return TABS.filter((tab) => !disabledTabs.has(tab.key));
 }
 
+/** Learning spaces are scoped separately from plain channels/DMs. */
+export function resolveNotificationScopeKind(
+  kind: ChannelInfoSheetProps['kind'],
+): 'channel' | 'learning_space' {
+  return kind === 'space' ? 'learning_space' : 'channel';
+}
+
+/** The notification controls need the flag plus a full identity to query with. */
+export function resolveNotificationControlsVisibility(input: {
+  enabled: boolean;
+  channelId?: string | null;
+  orgId?: string | null;
+  profileId?: string | null;
+}): boolean {
+  return Boolean(input.enabled && input.channelId && input.orgId && input.profileId);
+}
+
 // ─── Tab icon renderer ─────────────────────────────────────────────────────────
+
+// ─── Quick actions: Pinned / Search / Scheduled (issue #264 P2) ───────────────
+
+function QuickActions({
+  enablePinning,
+  onOpenPinned,
+  enableSearch,
+  onOpenSearch,
+  enableScheduledSend,
+  onOpenScheduled,
+  colors,
+  s,
+}: {
+  enablePinning: boolean;
+  onOpenPinned?: () => void;
+  enableSearch: boolean;
+  onOpenSearch?: () => void;
+  enableScheduledSend: boolean;
+  onOpenScheduled?: () => void;
+  colors: AppColors;
+  s: ReturnType<typeof makeStyles>;
+}) {
+  const items: Array<{
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    onPress?: () => void;
+  }> = [];
+  if (enablePinning && onOpenPinned) {
+    items.push({
+      key: 'pinned',
+      label: 'Pinned',
+      icon: <Pin size={20} color={colors.text} />,
+      onPress: onOpenPinned,
+    });
+  }
+  if (enableSearch && onOpenSearch) {
+    items.push({
+      key: 'search',
+      label: 'Search',
+      icon: <Search size={20} color={colors.text} />,
+      onPress: onOpenSearch,
+    });
+  }
+  if (enableScheduledSend && onOpenScheduled) {
+    items.push({
+      key: 'scheduled',
+      label: 'Scheduled',
+      icon: <CalendarClock size={20} color={colors.text} />,
+      onPress: onOpenScheduled,
+    });
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <View style={s.quickActionsRow}>
+      {items.map((item) => (
+        <TouchableOpacity
+          key={item.key}
+          style={s.quickActionBtn}
+          onPress={item.onPress}
+          activeOpacity={0.75}
+          accessibilityRole="button"
+          accessibilityLabel={item.label}
+        >
+          <View style={s.quickActionIconBox}>{item.icon}</View>
+          <Text style={s.quickActionLabel}>{item.label}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
 
 function TabIcon({ tabKey, color }: { tabKey: ChannelTab; color: string }) {
   const size = 16;
@@ -881,6 +977,37 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.inputBg,
     },
 
+    // ── Quick actions (pin / search / scheduled — issue #264 P2) ──────────────
+    quickActionsRow: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      flexWrap: 'wrap',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingBottom: 16,
+    },
+    quickActionBtn: {
+      alignItems: 'center',
+      gap: 4,
+      width: 84,
+    },
+    quickActionIconBox: {
+      width: 48,
+      height: 48,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: C.inputBg,
+      borderWidth: hairline,
+      borderColor: C.border,
+    },
+    quickActionLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textMuted,
+      textAlign: 'center',
+    },
+
     // ── Info rows (DM only) ───────────────────────────────────────────────────
     section: {
       marginHorizontal: 16,
@@ -1140,15 +1267,23 @@ export function ChannelInfoSheet({
   members,
   messages = [],
   liveJoinUrl,
+  liveSessionEnabled = false,
   onJoinPress,
   onClose,
   onProfilePress,
+  enablePinning = false,
+  onOpenPinned,
+  enableSearch = false,
+  onOpenSearch,
+  enableScheduledSend = false,
+  onOpenScheduled,
 }: ChannelInfoSheetProps) {
   const { colors } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
+  const joinLiveSession = useJoinLiveSession();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const insets = useSafeAreaInsets();
   const orgId = account?.org_id ?? '';
@@ -1161,12 +1296,24 @@ export function ChannelInfoSheet({
   const [externalJoinTarget, setExternalJoinTarget] = useState<{
     joinHref: string;
     providerLabel: string | null;
+    passcode?: string | null;
   } | null>(null);
   const joinTransitionTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
     null,
   );
 
+  const enableNotificationConversationControls = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableNotificationConversationControls,
+  );
+
   const isDm = kind === 'dm';
+  const notificationScopeKind = resolveNotificationScopeKind(kind);
+  const showNotificationControls = resolveNotificationControlsVisibility({
+    enabled: enableNotificationConversationControls,
+    channelId,
+    orgId,
+    profileId: currentProfileId,
+  });
   const seed = avatarSeed ?? title;
   const heroAvatarColors = profileAvatarColors({ seed, themeKey: avatarThemeKey });
   const typeLabel = isDm ? 'Direct Message' : kind === 'space' ? 'Class' : 'Channel';
@@ -1188,21 +1335,41 @@ export function ChannelInfoSheet({
 
   const handleJoinPress = useCallback(
     (closeSheet?: () => void) => {
-      if (!liveJoinUrl) return;
+      if (!liveJoinUrl && !(liveSessionEnabled && channelId)) return;
       onJoinPress?.();
 
       if (joinTransitionTimeoutRef.current) {
         clearTimeout(joinTransitionTimeoutRef.current);
       }
-      const openJoinTarget = () => {
-        if (isExternalJoinHref(liveJoinUrl)) {
+      const openJoinTarget = async () => {
+        // Precedence matches web's header pill: prefer the server join
+        // handler (creates/reuses the live session and records attendance)
+        // over the static channel-level link, used only as a fallback.
+        let joinHref: string | null = null;
+        let providerHint: string | null = null;
+        let passcode: string | null | undefined;
+        if (liveSessionEnabled && channelId) {
+          try {
+            const result = await joinLiveSession.mutateAsync(channelId);
+            joinHref = result.joinPath;
+            providerHint = result.provider;
+            passcode = result.passcode;
+          } catch {
+            joinHref = null;
+          }
+        }
+        joinHref ??= liveJoinUrl ?? null;
+        if (!joinHref) return;
+
+        if (isExternalJoinHref(joinHref)) {
           setExternalJoinTarget({
-            joinHref: liveJoinUrl,
-            providerLabel: resolveExternalJoinProviderLabel(liveJoinUrl),
+            joinHref,
+            passcode,
+            providerLabel: resolveExternalJoinProviderLabel(joinHref, providerHint),
           });
           return;
         }
-        Linking.openURL(liveJoinUrl).catch(() => null);
+        void openLiveSession(joinHref);
       };
 
       closeSheet?.();
@@ -1211,23 +1378,26 @@ export function ChannelInfoSheet({
       }
       joinTransitionTimeoutRef.current = setTimeout(() => {
         joinTransitionTimeoutRef.current = null;
-        openJoinTarget();
+        void openJoinTarget();
       }, JOIN_AFTER_CLOSE_DELAY_MS);
     },
-    [liveJoinUrl, onClose, onJoinPress],
+    [channelId, joinLiveSession, liveJoinUrl, liveSessionEnabled, onClose, onJoinPress],
   );
+  const meetingDialogLaunch = useMeetingDialogLaunch(Boolean(externalJoinTarget));
+
   const handleOpenJoinHref = useCallback((joinHref: string) => {
-    Linking.openURL(joinHref).catch(() => null);
+    void openLiveSession(joinHref);
   }, []);
   const handleShareJoinHref = useCallback(async () => {
     if (!externalJoinTarget?.joinHref) return;
     try {
+      const shareUrl = await getLiveSessionShareUrl(externalJoinTarget.joinHref);
       await Share.share({
-        message: externalJoinTarget.joinHref,
-        url: externalJoinTarget.joinHref,
+        message: shareUrl,
+        url: shareUrl,
       });
     } catch {
-      // best effort share
+      Alert.alert('Unable to share meeting', 'Please try again.');
     }
   }, [externalJoinTarget?.joinHref]);
 
@@ -1477,6 +1647,17 @@ export function ChannelInfoSheet({
                 {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
               </View>
 
+              <QuickActions
+                enablePinning={enablePinning}
+                onOpenPinned={onOpenPinned}
+                enableSearch={enableSearch}
+                onOpenSearch={onOpenSearch}
+                enableScheduledSend={enableScheduledSend}
+                onOpenScheduled={onOpenScheduled}
+                colors={colors}
+                s={s}
+              />
+
               {/* Info rows */}
               <View style={s.section}>
                 <View style={s.row}>
@@ -1507,6 +1688,16 @@ export function ChannelInfoSheet({
                   </>
                 )}
               </View>
+
+              {/* Per-conversation notification controls */}
+              {showNotificationControls && (
+                <NotificationModeSection
+                  orgId={orgId}
+                  profileId={currentProfileId}
+                  scopeKind={notificationScopeKind}
+                  scopeId={channelId!}
+                />
+              )}
             </ScrollView>
           ) : (
             /* ── Channel / Space: compact hero + fixed tabs + scrollable content ── */
@@ -1523,7 +1714,7 @@ export function ChannelInfoSheet({
                 />
                 <Text style={s.heroNameCompact}>{title}</Text>
                 {!!subtitle && <Text style={s.heroSub}>{subtitle}</Text>}
-                {!!liveJoinUrl && (
+                {(!!liveJoinUrl || (liveSessionEnabled && !!channelId)) && (
                   <TouchableOpacity
                     style={s.heroJoinButton}
                     onPress={() => handleJoinPress(close)}
@@ -1536,6 +1727,29 @@ export function ChannelInfoSheet({
                   </TouchableOpacity>
                 )}
               </View>
+
+              <QuickActions
+                enablePinning={enablePinning}
+                onOpenPinned={onOpenPinned}
+                enableSearch={enableSearch}
+                onOpenSearch={onOpenSearch}
+                enableScheduledSend={enableScheduledSend}
+                onOpenScheduled={onOpenScheduled}
+                colors={colors}
+                s={s}
+              />
+
+              {/* Per-conversation notification controls */}
+              {showNotificationControls && (
+                <View style={{ paddingTop: 12 }}>
+                  <NotificationModeSection
+                    orgId={orgId}
+                    profileId={currentProfileId}
+                    scopeKind={notificationScopeKind}
+                    scopeId={channelId!}
+                  />
+                </View>
+              )}
 
               {/* Fixed tab bar */}
               {visibleTabs.length > 1 ? (
@@ -1597,6 +1811,7 @@ export function ChannelInfoSheet({
         animationType="fade"
         transparent={true}
         visible={Boolean(externalJoinTarget)}
+        onDismiss={meetingDialogLaunch.onDismiss}
         onRequestClose={() => setExternalJoinTarget(null)}
       >
         <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
@@ -1612,6 +1827,11 @@ export function ChannelInfoSheet({
               <Text style={s.modalLinkLabel}>Join link</Text>
               <Text style={s.modalLinkValue}>{externalJoinTarget?.joinHref}</Text>
             </View>
+            <MeetingPasscode
+              passcode={externalJoinTarget?.passcode}
+              color={colors.text}
+              mutedColor={colors.textMuted}
+            />
             <View style={s.modalFooter}>
               <TouchableOpacity
                 style={[s.modalButton, s.modalButtonSecondary]}
@@ -1626,7 +1846,7 @@ export function ChannelInfoSheet({
                 style={[s.modalButton, s.modalButtonPrimary]}
                 onPress={() => {
                   if (externalJoinTarget?.joinHref) {
-                    handleOpenJoinHref(externalJoinTarget.joinHref);
+                    meetingDialogLaunch.queueLaunch(externalJoinTarget.joinHref);
                   }
                   setExternalJoinTarget(null);
                 }}
@@ -1663,4 +1883,6 @@ export function ChannelInfoSheet({
 export const __test__ = {
   getVisibleChannelInfoTabs,
   parseChannelUiDefaults,
+  resolveNotificationControlsVisibility,
+  resolveNotificationScopeKind,
 };

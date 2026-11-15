@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { AlertDialog as AlertDialogPrimitive } from 'radix-ui';
 
+import { usePortalContainer } from './portal-container';
 import { cn } from '@iconicedu/ui-web/lib/utils';
 import { Button } from '@iconicedu/ui-web/ui/button';
 
@@ -21,7 +22,14 @@ function AlertDialogTrigger({
 function AlertDialogPortal({
   ...props
 }: React.ComponentProps<typeof AlertDialogPrimitive.Portal>) {
-  return <AlertDialogPrimitive.Portal data-slot="alert-dialog-portal" {...props} />;
+  const portalContainer = usePortalContainer();
+  return (
+    <AlertDialogPrimitive.Portal
+      container={portalContainer}
+      data-slot="alert-dialog-portal"
+      {...props}
+    />
+  );
 }
 
 function AlertDialogOverlay({

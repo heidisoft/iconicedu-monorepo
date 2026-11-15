@@ -1,0 +1,220 @@
+import { getTimezoneDisplayLabel } from '@iconicedu/utils';
+
+export const DEFAULT_SCHEDULE_DISPLAY_TIMEZONE = 'UTC';
+
+export interface ScheduleDisplayTimeZoneOptions {
+  viewerTimezone?: string | null;
+  scheduleTimezone?: string | null;
+  allowBrowserFallback?: boolean;
+}
+
+export type ScheduleDisplayTimeZoneInput =
+  | string
+  | null
+  | undefined
+  | ScheduleDisplayTimeZoneOptions;
+
+function normalizeTimeZone(timezone?: string | null) {
+  const value = timezone?.trim();
+  return value ? value : null;
+}
+
+function isScheduleDisplayTimeZoneOptions(
+  value: ScheduleDisplayTimeZoneInput,
+): value is ScheduleDisplayTimeZoneOptions {
+  return typeof value === 'object' && value !== null;
+}
+
+function normalizeScheduleDisplayTimeZoneInput(input?: ScheduleDisplayTimeZoneInput) {
+  if (isScheduleDisplayTimeZoneOptions(input)) {
+    return {
+      viewerTimezone: normalizeTimeZone(input.viewerTimezone),
+      scheduleTimezone: normalizeTimeZone(input.scheduleTimezone),
+      allowBrowserFallback: input.allowBrowserFallback ?? true,
+    };
+  }
+
+  return {
+    viewerTimezone: normalizeTimeZone(input),
+    scheduleTimezone: null,
+    allowBrowserFallback: true,
+  };
+}
+
+export function isValidScheduleDisplayTimeZone(timezone?: string | null): boolean {
+  const candidate = normalizeTimeZone(timezone);
+  if (!candidate) {
+    return false;
+  }
+
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: candidate }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function getBrowserScheduleDisplayTimeZone(): string | null {
+  try {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return isValidScheduleDisplayTimeZone(timezone) ? timezone : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolveScheduleDisplayTimeZone(
+  input?: ScheduleDisplayTimeZoneInput,
+): string {
+  const normalized = normalizeScheduleDisplayTimeZoneInput(input);
+
+  if (isValidScheduleDisplayTimeZone(normalized.viewerTimezone)) {
+    return normalized.viewerTimezone!;
+  }
+
+  if (isValidScheduleDisplayTimeZone(normalized.scheduleTimezone)) {
+    return normalized.scheduleTimezone!;
+  }
+
+  const browserTimeZone =
+    normalized.allowBrowserFallback && 'window' in globalThis
+      ? getBrowserScheduleDisplayTimeZone()
+      : null;
+  if (browserTimeZone) {
+    return browserTimeZone;
+  }
+
+  return DEFAULT_SCHEDULE_DISPLAY_TIMEZONE;
+}
+
+function toDate(input: Date | string) {
+  const date = input instanceof Date ? input : new Date(input);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function buildFormatter(
+  timezone: ScheduleDisplayTimeZoneInput,
+  options: Intl.DateTimeFormatOptions,
+) {
+  return new Intl.DateTimeFormat('en-US', {
+    timeZone: resolveScheduleDisplayTimeZone(timezone),
+    ...options,
+  });
+}
+
+export function formatScheduleDisplayValue(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+  options: Intl.DateTimeFormatOptions,
+) {
+  const date = toDate(input);
+  if (!date) {
+    return null;
+  }
+
+  return buildFormatter(timezone, options).format(date);
+}
+
+export function getScheduleDisplayDateParts(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  const date = toDate(input);
+  if (!date) {
+    return null;
+  }
+
+  // `hour12: false` resolves to the h24 cycle in en-US, which reports local
+  // midnight as hour 24. Feeding that into `new Date` rolls the calendar day
+  // forward, so pin the h23 cycle and normalize any residual 24 below.
+  const formatter = buildFormatter(timezone, {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+    weekday: 'short',
+  });
+
+  const parts = formatter.formatToParts(date);
+  const lookup = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? null;
+
+  const year = Number(lookup('year'));
+  const month = Number(lookup('month'));
+  const day = Number(lookup('day'));
+  const rawHour = Number(lookup('hour'));
+  const hour = rawHour === 24 ? 0 : rawHour;
+  const minute = Number(lookup('minute'));
+  const weekdayShort = lookup('weekday');
+
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    !Number.isFinite(hour) ||
+    !Number.isFinite(minute)
+  ) {
+    return null;
+  }
+
+  return {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    weekdayShort: weekdayShort ?? undefined,
+  };
+}
+
+export function toScheduleDisplayDate(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  const parts = getScheduleDisplayDateParts(input, timezone);
+  if (!parts) {
+    return null;
+  }
+
+  return new Date(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+}
+
+export function getScheduleDisplayDayKey(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  const parts = getScheduleDisplayDateParts(input, timezone);
+  if (!parts) {
+    return null;
+  }
+
+  return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+}
+
+export function getScheduleDisplayMinutes(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  const parts = getScheduleDisplayDateParts(input, timezone);
+  if (!parts) {
+    return 0;
+  }
+
+  return parts.hour * 60 + parts.minute;
+}
+
+export function getScheduleDisplayTimeZoneAbbreviation(
+  input: Date | string,
+  timezone: ScheduleDisplayTimeZoneInput,
+) {
+  const date = toDate(input);
+  if (!date) {
+    return null;
+  }
+
+  const resolvedTimezone = resolveScheduleDisplayTimeZone(timezone);
+  return getTimezoneDisplayLabel(resolvedTimezone);
+}

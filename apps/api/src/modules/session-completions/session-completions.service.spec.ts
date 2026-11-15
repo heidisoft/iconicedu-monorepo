@@ -696,7 +696,12 @@ describe('SessionCompletionsService', () => {
         select: jest.fn(() => updateChain),
         returns: jest.fn(async () => ({
           data: input.rows
-            .filter((row) => row.status === 'pending' || row.status === 'auto_confirmed')
+            .filter(
+              (row) =>
+                row.status === 'pending' ||
+                row.status === 'auto_confirmed' ||
+                row.status === 'disputed',
+            )
             .map((row) => ({ id: row.id as string })),
           error: null,
         })),
@@ -780,8 +785,23 @@ describe('SessionCompletionsService', () => {
       expect(result).toEqual({ success: true, alreadyResolved: true, confirmedCount: 0 });
     });
 
-    it('rejects when any participant row is disputed', async () => {
-      const rows = [baseCompletionRow({ status: 'disputed' })];
+    it('defaults verifiedMinutes to the scheduled duration when omitted', async () => {
+      const rows = [baseCompletionRow({ status: 'pending' })];
+      const { updateChain } = setup({ rows });
+
+      await new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        scheduleId: SCHEDULE_ID,
+        occurrenceKey: OCCURRENCE_KEY,
+      });
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ verified_minutes: 60, verification_note: null }),
+      );
+    });
+
+    it('rejects a verifiedMinutes override without a note', async () => {
+      const rows = [baseCompletionRow({ status: 'pending' })];
       setup({ rows });
 
       await expect(
@@ -789,8 +809,55 @@ describe('SessionCompletionsService', () => {
           orgId: ORG_ID,
           scheduleId: SCHEDULE_ID,
           occurrenceKey: OCCURRENCE_KEY,
+          verifiedMinutes: 30,
         }),
-      ).rejects.toThrow(ConflictException);
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('accepts a verifiedMinutes override with a note', async () => {
+      const rows = [baseCompletionRow({ status: 'pending' })];
+      const { updateChain } = setup({ rows });
+
+      const result = await new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        scheduleId: SCHEDULE_ID,
+        occurrenceKey: OCCURRENCE_KEY,
+        verifiedMinutes: 30,
+        verificationNote: 'Teacher had an emergency partway through.',
+      });
+
+      expect(result).toEqual({ success: true, confirmedCount: 1 });
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          verified_minutes: 30,
+          verification_note: 'Teacher had an emergency partway through.',
+        }),
+      );
+    });
+
+    it('resolves an open dispute by confirming it with a verified partial duration', async () => {
+      const rows = [
+        baseCompletionRow({
+          status: 'disputed',
+          dispute_category: 'other',
+          dispute_reason: 'Not completed full 1h',
+        }),
+      ];
+      const { updateChain } = setup({ rows });
+
+      const result = await new SessionCompletionsService().adminConfirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        scheduleId: SCHEDULE_ID,
+        occurrenceKey: OCCURRENCE_KEY,
+        verifiedMinutes: 30,
+        verificationNote: 'Student had an emergency partway through.',
+      });
+
+      expect(result).toEqual({ success: true, confirmedCount: 1 });
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'confirmed', verified_minutes: 30 }),
+      );
+      expect(updateChain.in).toHaveBeenCalledWith('id', [COMPLETION_ID]);
     });
 
     it('rejects a non-admin caller', async () => {
@@ -860,26 +927,42 @@ describe('SessionCompletionsService', () => {
       const staffId =
         (input.staffProfileRow === undefined ? PROFILE_ID : input.staffProfileRow?.id) ??
         ACCOUNT_ID;
-      const undoableIds = input.rows
-        .filter((row) => {
-          if (row.status !== 'confirmed') return false;
-          if (row.updated_by !== staffId || row.profile_id === staffId) return false;
-          if (row.rating !== null && row.rating !== undefined) return false;
-          const resolvedAtMs = row.resolved_at
-            ? new Date(row.resolved_at as string).getTime()
-            : NaN;
-          return Number.isFinite(resolvedAtMs) && Date.now() - resolvedAtMs <= 60_000;
-        })
+      const undoableRows = input.rows.filter((row) => {
+        if (row.status !== 'confirmed') return false;
+        if (row.updated_by !== staffId || row.profile_id === staffId) return false;
+        if (row.rating !== null && row.rating !== undefined) return false;
+        const resolvedAtMs = row.resolved_at
+          ? new Date(row.resolved_at as string).getTime()
+          : NaN;
+        return Number.isFinite(resolvedAtMs) && Date.now() - resolvedAtMs <= 60_000;
+      });
+      const pendingUndoableIds = undoableRows
+        .filter((row) => !row.dispute_category)
         .map((row) => row.id as string);
+      const disputedUndoableIds = undoableRows
+        .filter((row) => row.dispute_category)
+        .map((row) => row.id as string);
+      // adminUndoConfirm issues one bulk update for pending-restore rows and one
+      // per-row update per disputed-restore row (see its own resolved_at). Each
+      // disputed-branch call is distinguished from the pending one by its
+      // `status: 'disputed'` payload, and consumes the next id from
+      // disputedUndoableIds in call order (matching Promise.all's map order).
+      let disputedReturnIndex = 0;
       const updateChain: Record<string, jest.Mock> = {
         update: jest.fn(() => updateChain),
         in: jest.fn(() => updateChain),
         eq: jest.fn(() => updateChain),
         select: jest.fn(() => updateChain),
-        returns: jest.fn(async () => ({
-          data: undoableIds.map((id) => ({ id })),
-          error: null,
-        })),
+        returns: jest.fn(async () => {
+          const calls = updateChain.update.mock.calls;
+          const payload = calls[calls.length - 1]?.[0] as { status?: string } | undefined;
+          if (payload?.status === 'disputed') {
+            const id = disputedUndoableIds[disputedReturnIndex];
+            disputedReturnIndex += 1;
+            return { data: id ? [{ id }] : [], error: null };
+          }
+          return { data: pendingUndoableIds.map((id) => ({ id })), error: null };
+        }),
       };
       const profileChain = makeChain({
         data:
@@ -931,9 +1014,50 @@ describe('SessionCompletionsService', () => {
 
       expect(result).toEqual({ success: true, undoneCount: 1 });
       expect(updateChain.update).toHaveBeenCalledWith(
-        expect.objectContaining({ status: 'pending', updated_by: PROFILE_ID }),
+        expect.objectContaining({
+          status: 'pending',
+          updated_by: PROFILE_ID,
+          verified_minutes: null,
+          verification_note: null,
+        }),
       );
       expect(updateChain.in).toHaveBeenCalledWith('id', [COMPLETION_ID]);
+    });
+
+    it('restores a dispute-resolution confirm back to disputed, not pending', async () => {
+      const rows = [
+        baseCompletionRow({
+          id: COMPLETION_ID,
+          profile_id: OTHER_PROFILE_ID,
+          role: 'educator',
+          status: 'confirmed',
+          updated_by: PROFILE_ID,
+          resolved_at: '2026-05-31T12:00:30.000Z',
+          dispute_category: 'other',
+          dispute_reason: 'Not completed full 1h',
+          disputed_at: '2026-05-31T11:00:00.000Z',
+        }),
+      ];
+      const { updateChain } = setup({ rows });
+
+      const result = await new SessionCompletionsService().adminUndoConfirm(
+        AUTH_USER_ID,
+        {
+          orgId: ORG_ID,
+          scheduleId: SCHEDULE_ID,
+          occurrenceKey: OCCURRENCE_KEY,
+        },
+      );
+
+      expect(result).toEqual({ success: true, undoneCount: 1 });
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'disputed',
+          resolved_at: '2026-05-31T11:00:00.000Z',
+          verified_minutes: null,
+          verification_note: null,
+        }),
+      );
     });
 
     it('rejects once the undo window has expired', async () => {
