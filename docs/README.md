@@ -46,6 +46,7 @@ Internal engineers, operators, and AI assistants.
 
 - [Deployment](operations/deployment.md)
 - [Reminders Runbook](operations/reminders.md)
+- [Class Archive Lifecycle](operations/class-archive-lifecycle.md)
 - [Local Event Pipeline Testing](operations/local-event-pipeline-testing.md)
 
 ### AI Agent
@@ -79,6 +80,7 @@ Internal engineers, operators, and AI assistants.
 
 - [Deployment](operations/deployment.md)
 - [Reminders Runbook](operations/reminders.md)
+- [Class Archive Lifecycle](operations/class-archive-lifecycle.md)
 - [Local Event Pipeline Testing](operations/local-event-pipeline-testing.md)
 - [Push Notifications](operations/push-notifications.md)
 - [Push Notification Catalog](operations/push-notification-catalog.md)

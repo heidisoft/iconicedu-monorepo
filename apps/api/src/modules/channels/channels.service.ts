@@ -51,6 +51,8 @@ type ChannelListItem = {
   supervised_child_name?: string | null;
   is_learning_space?: boolean;
   is_support?: boolean;
+  /** Archived DM: readable history, no new messages, edits, or reactions. */
+  is_archived?: boolean;
   student_profiles?: Array<{ name: string; themeKey?: string | null }>;
   participant_profiles?: Array<{
     name: string;
@@ -58,6 +60,11 @@ type ChannelListItem = {
     themeKey?: string | null;
   }>;
 };
+
+/** DM lists show active DMs; a detail lookup also opens archived history. */
+function dmStatusesFor(channelId: string | undefined): string[] {
+  return channelId ? ['active', 'archived'] : ['active'];
+}
 
 type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
 
@@ -141,6 +148,26 @@ function resolveMessageUiThemeKey(uiDefaults: unknown): 'classic' | 'feed' | nul
   }
   const value = (uiDefaults as { messageUiThemeKey?: unknown }).messageUiThemeKey;
   return value === 'classic' || value === 'feed' ? value : null;
+}
+
+const TUTOR_CONTACT_KINDS = new Set(['child', 'guardian']);
+
+/**
+ * Educator <-> child/guardian DMs are only allowed while an active class
+ * connects the pair (public.tutor_contact_has_active_class). Other pairs
+ * (staff, tutor <-> tutor, family) are not class-scoped.
+ */
+export function resolveTutorContactPair(
+  a: { id: string; kind?: string | null },
+  b: { id: string; kind?: string | null },
+): { educatorProfileId: string; contactProfileId: string } | null {
+  if (a.kind === 'educator' && TUTOR_CONTACT_KINDS.has(b.kind ?? '')) {
+    return { educatorProfileId: a.id, contactProfileId: b.id };
+  }
+  if (b.kind === 'educator' && TUTOR_CONTACT_KINDS.has(a.kind ?? '')) {
+    return { educatorProfileId: b.id, contactProfileId: a.id };
+  }
+  return null;
 }
 
 function isDmChannelUniqueConflict(error: { code?: string; message?: string }) {
@@ -396,7 +423,13 @@ export class ChannelsService {
 
   async getDirectMessages(
     accessToken: string,
-    input: { orgId: string; profileId: string; accountId: string },
+    input: {
+      orgId: string;
+      profileId: string;
+      accountId: string;
+      /** Detail lookup: only this DM, archived ones included (read-only history). */
+      channelId?: string;
+    },
   ): Promise<ChannelListItem[]> {
     if (!input.orgId || !input.profileId || !input.accountId) return [];
     const supabase = createSupabaseSessionClient(accessToken);
@@ -410,16 +443,17 @@ export class ChannelsService {
     if (myError) throw new InternalServerErrorException(myError.message);
     if (!myMemberships?.length) return [];
 
-    const userChannelIds = myMemberships.map(
-      (membership) => membership.channel_id as string,
-    );
+    const userChannelIds = myMemberships
+      .map((membership) => membership.channel_id as string)
+      .filter((channelId) => !input.channelId || channelId === input.channelId);
+    if (!userChannelIds.length) return [];
     const { data: chRows, error: chError } = await supabase
       .from('channels')
-      .select('id, org_id, topic, description, kind, updated_at, ui_defaults')
+      .select('id, org_id, topic, description, kind, status, updated_at, ui_defaults')
       .in('id', userChannelIds)
       .eq('org_id', input.orgId)
       .eq('kind', 'dm')
-      .eq('status', 'active')
+      .in('status', dmStatusesFor(input.channelId))
       .is('deleted_at', null)
       .order('updated_at', { ascending: false });
     if (chError) throw new InternalServerErrorException(chError.message);
@@ -507,13 +541,20 @@ export class ChannelsService {
         last_message_sender: last?.sender ?? null,
         participants: participantMap.get(channel.id) ?? [],
         messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'classic',
+        is_archived: channel.status === 'archived',
       };
     });
   }
 
   async getSupervisedDirectMessages(
     accessToken: string,
-    input: { orgId: string; guardianAccountId: string; guardianProfileId: string },
+    input: {
+      orgId: string;
+      guardianAccountId: string;
+      guardianProfileId: string;
+      /** Detail lookup: only this DM, archived ones included (read-only history). */
+      channelId?: string;
+    },
   ): Promise<ChannelListItem[]> {
     if (!input.orgId || !input.guardianAccountId || !input.guardianProfileId) return [];
     const supabase = createSupabaseSessionClient(accessToken);
@@ -567,16 +608,17 @@ export class ChannelsService {
 
       const childOnlyChannelIds = (childMemberships ?? [])
         .map((membership) => membership.channel_id as string)
-        .filter((id) => !guardianChannelIds.has(id));
+        .filter((id) => !guardianChannelIds.has(id))
+        .filter((id) => !input.channelId || id === input.channelId);
       if (!childOnlyChannelIds.length) continue;
 
       const { data: chRows, error: channelsError } = await supabase
         .from('channels')
-        .select('id, org_id, topic, description, kind, updated_at, ui_defaults')
+        .select('id, org_id, topic, description, kind, status, updated_at, ui_defaults')
         .in('id', childOnlyChannelIds)
         .eq('org_id', input.orgId)
         .eq('kind', 'dm')
-        .eq('status', 'active')
+        .in('status', dmStatusesFor(input.channelId))
         .is('deleted_at', null)
         .order('updated_at', { ascending: false });
       if (channelsError) throw new InternalServerErrorException(channelsError.message);
@@ -665,6 +707,7 @@ export class ChannelsService {
           is_supervised: true,
           supervised_child_name: childName,
           messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'classic',
+          is_archived: channel.status === 'archived',
         });
       }
     }
@@ -780,11 +823,11 @@ export class ChannelsService {
     ] = await Promise.all([
       writeSupabase
         .from('profiles')
-        .select('id, org_id, account_id')
+        .select('id, org_id, account_id, kind')
         .eq('id', input.profileId)
         .eq('org_id', input.orgId)
         .is('deleted_at', null)
-        .maybeSingle<ProfileActorRow>(),
+        .maybeSingle<ProfileActorRow & { kind?: string | null }>(),
       writeSupabase
         .from('profiles')
         .select(
@@ -826,6 +869,22 @@ export class ChannelsService {
     });
     if (!canActAsCurrentProfile) return null;
 
+    const tutorContactPair = resolveTutorContactPair(currentProfile, targetProfile);
+    if (tutorContactPair) {
+      const { data: connected, error: connectedError } = await writeSupabase.rpc(
+        'tutor_contact_has_active_class',
+        {
+          p_org_id: input.orgId,
+          p_educator_profile_id: tutorContactPair.educatorProfileId,
+          p_contact_profile_id: tutorContactPair.contactProfileId,
+        },
+      );
+      if (connectedError) {
+        throw new InternalServerErrorException(connectedError.message);
+      }
+      if (connected !== true) return null;
+    }
+
     const [
       { data: currentMemberships, error: currentMembershipsError },
       { data: targetMemberships, error: targetMembershipsError },
@@ -857,22 +916,45 @@ export class ChannelsService {
       .map((row) => row.channel_id as string)
       .filter((channelId) => currentChannelIds.has(channelId));
     if (sharedChannelIds.length) {
+      // A tutor DM archived when its class ended is reopened (history intact)
+      // once an active class connects the pair again.
       const { data: existingChannels, error: existingChannelsError } = await writeSupabase
         .from('channels')
-        .select('id, updated_at')
+        .select('id, status, updated_at')
         .eq('org_id', input.orgId)
         .eq('kind', 'dm')
-        .eq('status', 'active')
+        .in('status', tutorContactPair ? ['active', 'archived'] : ['active'])
         .in('id', sharedChannelIds)
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
-        .limit(1);
+        .limit(10);
       if (existingChannelsError) {
         throw new InternalServerErrorException(existingChannelsError.message);
       }
-      const existingChannel = existingChannels?.[0];
-      if (existingChannel) {
-        return buildDirectMessageChannelResult(existingChannel.id, targetProfile);
+      const channels = (existingChannels ?? []) as Array<{ id: string; status?: string }>;
+      const activeChannel = channels.find((channel) => channel.status !== 'archived');
+      if (activeChannel) {
+        return buildDirectMessageChannelResult(activeChannel.id, targetProfile);
+      }
+      // Only a DM the class lifecycle archived is reopened. A DM an admin
+      // archived by hand stays archived and opens as read-only history; the
+      // dm_key is unique, so a second DM is never created beside it.
+      for (const archivedChannel of channels) {
+        const { data: reopened, error: reopenError } = await writeSupabase.rpc(
+          'reopen_class_lifecycle_dm',
+          {
+            p_org_id: input.orgId,
+            p_channel_id: archivedChannel.id,
+            p_actor_profile_id: input.profileId,
+          },
+        );
+        if (reopenError) throw new InternalServerErrorException(reopenError.message);
+        if (reopened === true) {
+          return buildDirectMessageChannelResult(archivedChannel.id, targetProfile);
+        }
+      }
+      if (channels[0]) {
+        return buildDirectMessageChannelResult(channels[0].id, targetProfile);
       }
     }
 
@@ -956,6 +1038,7 @@ export class ChannelsService {
       orgId: input.orgId,
       profileId: input.profileId,
       accountId: input.accountId,
+      channelId: input.channelId,
     });
     const directMatch = directMessages.find((channel) => channel.id === input.channelId);
     if (directMatch) {
@@ -966,6 +1049,7 @@ export class ChannelsService {
       orgId: input.orgId,
       guardianAccountId: input.accountId,
       guardianProfileId: input.profileId,
+      channelId: input.channelId,
     });
     return supervisedMessages.find((channel) => channel.id === input.channelId) ?? null;
   }
