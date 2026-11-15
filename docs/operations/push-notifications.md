@@ -6,7 +6,7 @@ End-to-end reference for Expo push notifications: how tokens are managed on devi
 
 ## Last Updated
 
-2026-09-16
+2026-11-15
 
 ## Related Docs
 
@@ -195,9 +195,9 @@ Notes:
 
 ## Reminder Push Collapsing
 
-Class session reminders set `collapseId` on the outgoing Expo message so a
-repeat send of the same reminder **replaces** the earlier notification in the
-device tray instead of stacking a second copy beside it. This matters when a
+Class session reminders set `collapseId` and `tag` on the outgoing Expo message
+so a repeat send of the same reminder **replaces** the earlier notification in
+the device tray instead of stacking a second copy beside it. This matters when a
 session is edited more than once in quick succession.
 
 How it is derived:
@@ -209,15 +209,25 @@ How it is derived:
    `payload.rawEventPayload`.
 3. `sendPushNotification()` hashes it with `buildReminderPushCollapseId()`
    (`apps/api/src/lib/notifications/push-collapse.ts`) into
-   `reminder-<32 hex chars>` and sets it as `collapseId`.
+   `reminder-<32 hex chars>` and sets it as both `collapseId` and `tag`.
 
-The key is hashed rather than sent verbatim because Expo forwards `collapseId`
-as the APNs `apns-collapse-id` header, which rejects values over 64 bytes.
+Both fields are needed because Expo maps them differently per platform:
+
+| Expo field   | iOS                                                                                  | Android                                                                                                 |
+| ------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
+| `collapseId` | `apns-collapse-id`: coalesces in transit **and** replaces the displayed notification | FCM `collapse_key`: only coalesces messages still in transit (for example, while the device is offline) |
+| `tag`        | Not used                                                                             | FCM `notification.tag`: replaces an already-displayed notification with the same tag                    |
+
+Without `tag`, Android users would still see stacked reminders. The key is
+hashed rather than sent verbatim because APNs rejects `apns-collapse-id` values
+over 64 bytes.
 
 Behavior notes:
 
-- Collapsing is performed by APNs and FCM, not by the app. There is no mobile
-  code involved and no schema change backing it.
+- Collapsing is performed by APNs and FCM (through Expo), not by app code. There
+  is no mobile code change and no schema change backing it.
+- Reminders published before this change carry no `reminderDedupeKey`, so they
+  are sent without `collapseId` or `tag` and stack as before.
 - Only reminders carry a `reminderDedupeKey`, so conversational pushes
   (`message.posted` and friends) have no `collapseId` and keep stacking, which
   is the intended behavior for them.
@@ -267,7 +277,7 @@ Provider behavior:
 
 - `push` resolves the projected `activity_feed_items.id` for the recipient and includes it in metadata so mobile can mark the inbox item read on notification tap.
 - `push` sends through Expo using active `push_tokens`; invalid downstream tokens are revoked lazily by the provider.
-- `push` sets `collapseId` for session reminders so a resend replaces the earlier tray entry — see [Reminder Push Collapsing](#reminder-push-collapsing).
+- `push` sets `collapseId` and `tag` for session reminders so a resend replaces the earlier tray entry on iOS and Android — see [Reminder Push Collapsing](#reminder-push-collapsing).
 - `email` and `sms` use the same job title/summary metadata, but currently flow through their own provider wrappers.
 - Every provider outcome writes `event_pipeline_logs` with `succeeded`, `suppressed`, `retryable_failure`, or `fatal_failure`.
 

@@ -1,8 +1,9 @@
 import { createHash } from 'crypto';
 
-// Expo forwards `collapseId` as the APNs `apns-collapse-id` header and as the
-// FCM `collapse_key`. APNs rejects a collapse id longer than 64 bytes, and a
-// reminder dedupe key
+// The id is sent as both Expo `collapseId` (APNs `apns-collapse-id`, FCM
+// `collapse_key`) and Expo `tag` (FCM `notification.tag`, the field that replaces
+// an already-displayed notification on Android). APNs rejects a collapse id
+// longer than 64 bytes, and a reminder dedupe key
 // (`session.reminder:<org>:<space>:<channel>:<occurrenceStart>:<offset>`) is
 // comfortably past that, so the key is hashed into a short stable id instead of
 // being sent verbatim.

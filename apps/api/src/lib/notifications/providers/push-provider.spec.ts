@@ -52,6 +52,7 @@ describe('sendPushNotification', () => {
       body?: string;
       priority?: string;
       collapseId?: string;
+      tag?: string;
     }>;
   }
 
@@ -105,9 +106,50 @@ describe('sendPushNotification', () => {
       metadata: { rawEventPayload: { reminderDedupeKey } },
     });
 
+    const expectedId = buildReminderPushCollapseId(reminderDedupeKey);
+    // collapseId replaces the displayed notification on iOS; on Android only `tag`
+    // does (collapseId there merely coalesces in-transit messages).
+    expect(sentMessages()[0]?.collapseId).toBe(expectedId);
+    expect(sentMessages()[0]?.tag).toBe(expectedId);
+  });
+
+  it('accepts a reminder dedupe key at the metadata root as a fallback', async () => {
+    const reminderDedupeKey =
+      'session.reminder:org-1:space-1:channel-1:2030-03-06T10:00:00.000Z:15';
+    mockSupabaseWithActiveToken();
+
+    await sendPushNotification({
+      orgId: 'org-1',
+      recipientProfileId: 'profile-1',
+      prefKey: 'session.reminder.sent',
+      title: 'Algebra starts in 15 minutes',
+      summary: 'Class starts in 15 minutes',
+      metadata: { reminderDedupeKey },
+    });
+
     expect(sentMessages()[0]?.collapseId).toBe(
       buildReminderPushCollapseId(reminderDedupeKey),
     );
+  });
+
+  it.each([
+    ['a non-string key', { rawEventPayload: { reminderDedupeKey: 42 } }],
+    ['a blank key', { rawEventPayload: { reminderDedupeKey: '   ' } }],
+    ['no metadata', undefined],
+  ])('omits collapseId and tag for %s', async (_label, metadata) => {
+    mockSupabaseWithActiveToken();
+
+    await sendPushNotification({
+      orgId: 'org-1',
+      recipientProfileId: 'profile-1',
+      prefKey: 'session.reminder.sent',
+      title: 'Algebra starts soon',
+      summary: 'Class starts soon',
+      ...(metadata ? { metadata } : {}),
+    });
+
+    expect(sentMessages()[0]).not.toHaveProperty('collapseId');
+    expect(sentMessages()[0]).not.toHaveProperty('tag');
   });
 
   it('omits collapseId for pushes without a reminder dedupe key', async () => {
@@ -123,5 +165,6 @@ describe('sendPushNotification', () => {
     });
 
     expect(sentMessages()[0]).not.toHaveProperty('collapseId');
+    expect(sentMessages()[0]).not.toHaveProperty('tag');
   });
 });

@@ -10,7 +10,7 @@ Engineers operating or debugging scheduled reminder delivery.
 
 ## Last Updated
 
-2026-09-16
+2026-11-15
 
 ## Related Docs
 
@@ -309,9 +309,9 @@ eligibility still apply independently of worker scheduling.
 
 Session reminder jobs also publish `reminderDedupeKey` (the raw
 `reminder_jobs.dedupe_key`) on the `session.reminder.sent` activity payload. The
-push provider turns it into a tray `collapseId`, so a repeat send of the same
-reminder replaces the earlier device notification instead of stacking another
-copy — see
+push provider turns it into a tray `collapseId` (iOS) and `tag` (Android), so a
+repeat send of the same reminder replaces the earlier device notification instead
+of stacking another copy — see
 [Reminder Push Collapsing](push-notifications.md#reminder-push-collapsing).
 
 Both queues reclaim expired leases. Retryable failures use exponential backoff
