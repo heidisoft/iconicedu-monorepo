@@ -3,9 +3,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { requireAdminAuthContext } from '@iconicedu/web/lib/admin/_auth-context';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildScheduleRowsForApi } from '@iconicedu/web/lib/admin/learning-space-create';
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
+import { getLearningSpaceEditContext } from '@iconicedu/web/lib/api/schedules';
 import {
   type CanonicalLearningSpaceSchedule,
   buildCanonicalLearningSpaceSchedulesFromExisting,
@@ -553,83 +553,94 @@ export async function updateLearningSpaceFromPayload(
     throw new Error('Primary channel not found');
   }
 
-  const serviceClient = createSupabaseServiceClient();
-  const [
-    existingParticipantsResponse,
-    existingSchedulesResponse,
-    existingRecurrenceResponse,
-    existingExceptionsResponse,
-    existingOverridesResponse,
-    channelStateResponse,
-  ] = await Promise.all([
-    serviceClient
-      .from('learning_space_participants')
-      .select('profile_id')
-      .eq('org_id', orgId)
-      .eq('learning_space_id', learningSpaceId)
-      .is('deleted_at', null)
-      .returns<Array<{ profile_id: string }>>(),
-    serviceClient
-      .from('class_schedules')
-      .select('id, title, start_at, end_at, timezone')
-      .eq('org_id', orgId)
-      .eq('source_learning_space_id', learningSpaceId)
-      .is('deleted_at', null)
-      .returns<ExistingScheduleSnapshot[]>(),
-    serviceClient
-      .from('class_schedule_recurrence')
-      .select(
-        'id, schedule_id, frequency, interval, count, until, timezone, bysecond, byminute, byhour, byday, bymonthday, byyearday, byweekno, bymonth, bysetpos, wkst',
-      )
-      .eq('org_id', orgId)
-      .is('deleted_at', null)
-      .returns<ExistingRecurrenceSnapshot[]>(),
-    serviceClient
-      .from('class_schedule_recurrence_exceptions')
-      .select('recurrence_id, occurrence_key, reason')
-      .eq('org_id', orgId)
-      .returns<ExistingExceptionSnapshot[]>(),
-    serviceClient
-      .from('class_schedule_recurrence_overrides')
-      .select('recurrence_id, occurrence_key, patch')
-      .eq('org_id', orgId)
-      .returns<ExistingOverrideSnapshot[]>(),
-    serviceClient
-      .from('channels')
-      .select(
-        'topic, description, icon_key, ui_theme_key, ui_defaults, live_session_config',
-      )
-      .eq('org_id', orgId)
-      .eq('id', channelId)
-      .is('deleted_at', null)
-      .maybeSingle<{
-        topic?: string | null;
-        description?: string | null;
-        icon_key?: string | null;
-        ui_theme_key?: string | null;
-        ui_defaults?: unknown;
-        live_session_config?: unknown;
-      }>(),
-  ]);
+  // Everything below reads apps/api's edit-context response into the exact
+  // local shapes the pre-existing diff logic already expects, so that logic
+  // (buildLearningSpaceScheduleDiffPlan, hash comparisons, etc.) needs no
+  // changes — only the read mechanism moved server-side.
+  const editContext = await getLearningSpaceEditContext(supabase, {
+    orgId,
+    learningSpaceId,
+    channelId,
+  });
 
-  if (existingParticipantsResponse.error) {
-    throw new Error(existingParticipantsResponse.error.message);
-  }
-  if (existingSchedulesResponse.error) {
-    throw new Error(existingSchedulesResponse.error.message);
-  }
-  if (existingRecurrenceResponse.error) {
-    throw new Error(existingRecurrenceResponse.error.message);
-  }
-  if (existingExceptionsResponse.error) {
-    throw new Error(existingExceptionsResponse.error.message);
-  }
-  if (existingOverridesResponse.error) {
-    throw new Error(existingOverridesResponse.error.message);
-  }
-  if (channelStateResponse.error) {
-    throw new Error(channelStateResponse.error.message);
-  }
+  const existingParticipantsResponse = {
+    data: editContext.participantProfileIds.map((profileId) => ({
+      profile_id: profileId,
+    })),
+  };
+  const existingSchedulesResponse = {
+    data: editContext.schedules.map(
+      (schedule): ExistingScheduleSnapshot => ({
+        id: schedule.id,
+        title: schedule.title,
+        start_at: schedule.startAt,
+        end_at: schedule.endAt,
+        timezone: schedule.timezone,
+      }),
+    ),
+  };
+  const existingRecurrenceResponse = {
+    data: editContext.recurrences.map(
+      (recurrence): ExistingRecurrenceSnapshot => ({
+        id: recurrence.id,
+        schedule_id: recurrence.scheduleId,
+        frequency: recurrence.frequency,
+        interval: recurrence.interval,
+        count: recurrence.count,
+        until: recurrence.until,
+        timezone: recurrence.timezone,
+        bysecond: recurrence.bySecond,
+        byminute: recurrence.byMinute,
+        byhour: recurrence.byHour,
+        byday: recurrence.byDay,
+        bymonthday: recurrence.byMonthDay,
+        byyearday: recurrence.byYearDay,
+        byweekno: recurrence.byWeekNo,
+        bymonth: recurrence.byMonth,
+        bysetpos: recurrence.bySetPos,
+        wkst: recurrence.wkst,
+      }),
+    ),
+  };
+  const existingExceptionsResponse = {
+    data: editContext.exceptions.map(
+      (exception): ExistingExceptionSnapshot => ({
+        recurrence_id: exception.recurrenceId,
+        occurrence_key: exception.occurrenceKey,
+        reason: exception.reason,
+      }),
+    ),
+  };
+  const existingOverridesResponse = {
+    data: editContext.overrides.map(
+      (override): ExistingOverrideSnapshot => ({
+        recurrence_id: override.recurrenceId,
+        occurrence_key: override.occurrenceKey,
+        patch: override.patch,
+      }),
+    ),
+  };
+  const channelStateResponse: {
+    data: {
+      topic?: string | null;
+      description?: string | null;
+      icon_key?: string | null;
+      ui_theme_key?: string | null;
+      ui_defaults?: unknown;
+      live_session_config?: unknown;
+    } | null;
+  } = {
+    data: editContext.channel
+      ? {
+          topic: editContext.channel.topic,
+          description: editContext.channel.description,
+          icon_key: editContext.channel.iconKey,
+          ui_theme_key: editContext.channel.themeKey,
+          ui_defaults: editContext.channel.uiDefaults,
+          live_session_config: editContext.channel.liveSessionConfig,
+        }
+      : null,
+  };
 
   const existingParticipantIdList = normalizeParticipantIds(
     (existingParticipantsResponse.data ?? []).map((row) => row.profile_id),
