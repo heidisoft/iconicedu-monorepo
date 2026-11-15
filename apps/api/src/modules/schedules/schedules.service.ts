@@ -7,6 +7,10 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { getLocalDate, getLocalTime, toUtcFromLocal } from '@iconicedu/utils';
+import {
+  buildClassSchedulesByIds,
+  buildClassSchedulesByOrg,
+} from '@iconicedu/live-sessions-core';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { publishActivityEvent } from '@iconicedu/api/lib/activity-feed/activity-publisher';
 import {
@@ -29,7 +33,10 @@ import type {
   ScheduleRowInput,
   SplitRecurringSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
-import type { LearningSpaceEditContextVM } from '@iconicedu/shared-types';
+import type {
+  ClassScheduleVM,
+  LearningSpaceEditContextVM,
+} from '@iconicedu/shared-types';
 
 const CLASS_SCHEDULE_SELECT = `
   id, org_id, title, description, location, meeting_link,
@@ -122,6 +129,28 @@ export class SchedulesService {
     const { data, error } = await query;
     if (error) throw new InternalServerErrorException(error.message);
     return this.attachLearningSpaceArchiveMetadata(input.orgId, data ?? []);
+  }
+
+  /** Fully-mapped `ClassScheduleVM`s for the web calendar, the channel-schedules
+   * route, and learning-space schedule lookups. Unlike `list()` this covers every
+   * `source_kind` (class_session/availability_block/manual) — what the calendar
+   * has always shown — and returns VMs, not raw rows.
+   *
+   * Reads run through the caller's RLS-scoped session client and reuse the
+   * `@iconicedu/live-sessions-core` builder (the same one live-session scope
+   * resolution uses), so there is exactly one row → VM mapping to keep correct. */
+  async listForCalendar(
+    accessToken: string,
+    input: { orgId: string; scheduleIds?: string[] },
+  ): Promise<ClassScheduleVM[]> {
+    if (input.scheduleIds && input.scheduleIds.length === 0) {
+      return [];
+    }
+
+    const supabase = createSupabaseSessionClient(accessToken);
+    return input.scheduleIds
+      ? buildClassSchedulesByIds(supabase, input.orgId, input.scheduleIds)
+      : buildClassSchedulesByOrg(supabase, input.orgId);
   }
 
   /** Snapshot of a learning space's own participants/schedules/recurrences/

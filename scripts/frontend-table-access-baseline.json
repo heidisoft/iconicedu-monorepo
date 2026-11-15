@@ -1,0 +1,290 @@
+{
+  "files": {
+    "apps/mobile/src/components/messages/channel-info-sheet.tsx": [
+      "channel_files",
+      "channel_media",
+      "channels"
+    ],
+    "apps/mobile/src/hooks/use-online-profile-ids.ts": ["profile_presence"],
+    "apps/mobile/src/lib/api/channel/queries.ts": ["family_links"],
+    "apps/mobile/src/lib/api/onboarding/queries.ts": [
+      "accounts",
+      "child_profile_grade_level",
+      "child_profiles",
+      "educator_availabilities",
+      "educator_profile_grade_levels",
+      "educator_profile_subjects",
+      "profiles"
+    ],
+    "apps/mobile/src/lib/api/spaces/queries.ts": [
+      "learning_space_channels",
+      "learning_space_participants"
+    ],
+    "apps/web/app/(app)/[orgSlug]/admin/classrooms/[classroomId]/page.tsx": ["profiles"],
+    "apps/web/app/(app)/[orgSlug]/admin/classrooms/new/page.tsx": ["profiles"],
+    "apps/web/app/(app)/[orgSlug]/admin/users/[accountId]/page.tsx": ["accounts"],
+    "apps/web/app/(app)/[orgSlug]/admin/users/actions/invite-user.ts": ["accounts"],
+    "apps/web/app/(app)/[orgSlug]/sidebar-shell.tsx": [
+      "accounts",
+      "channel_members",
+      "child_profile_grade_level",
+      "child_profiles",
+      "educator_profile_badges",
+      "educator_profile_curriculum_tags",
+      "educator_profile_grade_levels",
+      "educator_profile_subjects",
+      "educator_profiles",
+      "profiles",
+      "staff_profile_specialties",
+      "staff_profiles"
+    ],
+    "apps/web/app/actions/family-invite.ts": ["accounts", "family_link_invites"],
+    "apps/web/app/actions/messages.ts": [
+      "<dynamic>",
+      "activity_events",
+      "activity_feed_items",
+      "channel_files",
+      "channel_media",
+      "channel_members",
+      "channels",
+      "message_reactions",
+      "message_saves",
+      "message_text",
+      "messages",
+      "profiles",
+      "thread_participants",
+      "threads"
+    ],
+    "apps/web/app/actions/remove-family-member.ts": ["accounts", "family_links"],
+    "apps/web/app/actions/split-class-schedule-session.ts": [
+      "class_schedules",
+      "learning_spaces"
+    ],
+    "apps/web/app/actions/update-class-schedule-session.ts": [
+      "class_schedules",
+      "learning_spaces"
+    ],
+    "apps/web/app/api/activity-feed/read/route.ts": ["activity_feed_items"],
+    "apps/web/app/api/admin/activity/events/failed/route.ts": ["activity_events"],
+    "apps/web/app/api/admin/activity/suppression/route.ts": [
+      "activity_event_suppression_rules",
+      "activity_events",
+      "profiles"
+    ],
+    "apps/web/app/api/admin/settings/roles/route.ts": ["accounts", "profiles"],
+    "apps/web/app/api/admin/settings/subjects/route.ts": [
+      "educator_profile_subjects",
+      "learning_spaces",
+      "org_subject_catalog"
+    ],
+    "apps/web/app/api/admin/users/delete-user/route.ts": [
+      "accounts",
+      "family_links",
+      "profiles"
+    ],
+    "apps/web/app/api/admin/users/invite-row/route.ts": ["accounts"],
+    "apps/web/app/api/admin/users/update-profile-ext/route.ts": [
+      "child_profiles",
+      "educator_profiles",
+      "profiles",
+      "staff_profiles"
+    ],
+    "apps/web/app/api/admin/users/update-user/route.ts": ["accounts", "profiles"],
+    "apps/web/app/api/messages/channel-files/route.ts": ["messages"],
+    "apps/web/app/api/messages/file-download/route.ts": ["channel_members"],
+    "apps/web/app/api/presence/route.ts": ["profile_presence"],
+    "apps/web/lib/accounts/queries/accounts.query.ts": ["accounts"],
+    "apps/web/lib/activity-feed/projector/recipient-resolution.ts": [
+      "channel_members",
+      "learning_space_participants"
+    ],
+    "apps/web/lib/activity-feed/queries/activity-feed.query.ts": [
+      "activity_feed_items",
+      "activity_feed_sections"
+    ],
+    "apps/web/lib/activity-feed/suppression/active-conversation-suppression.ts": [
+      "channel_read_state",
+      "profile_presence",
+      "profiles"
+    ],
+    "apps/web/lib/activity-feed/suppression/activity-verb-suppression.ts": [
+      "activity_event_suppression_rules"
+    ],
+    "apps/web/lib/admin/channel-create.ts": [
+      "channel_capabilities",
+      "channel_members",
+      "channels"
+    ],
+    "apps/web/lib/admin/channel-delete.ts": ["channels"],
+    "apps/web/lib/admin/channel-update.ts": [
+      "channel_capabilities",
+      "channel_members",
+      "channels"
+    ],
+    "apps/web/lib/admin/entity-status.ts": ["<dynamic>"],
+    "apps/web/lib/admin/learning-space-create.ts": [
+      "channel_capabilities",
+      "channel_members",
+      "channels",
+      "class_schedule_participants",
+      "class_schedule_recurrence",
+      "class_schedule_recurrence_exceptions",
+      "class_schedule_recurrence_overrides",
+      "class_schedules",
+      "learning_space_channels",
+      "learning_space_participants",
+      "learning_spaces"
+    ],
+    "apps/web/lib/admin/learning-space-detail.ts": [
+      "channels",
+      "class_schedule_recurrence",
+      "class_schedule_recurrence_exceptions",
+      "class_schedule_recurrence_overrides",
+      "class_schedules",
+      "learning_space_channels",
+      "learning_space_participants",
+      "learning_spaces"
+    ],
+    "apps/web/lib/admin/learning-space-update.ts": [
+      "channel_members",
+      "channels",
+      "learning_space_channels",
+      "learning_space_participants",
+      "learning_spaces"
+    ],
+    "apps/web/lib/admin/learning-spaces.ts": [
+      "channels",
+      "class_schedule_recurrence",
+      "class_schedules"
+    ],
+    "apps/web/lib/admin/live-session-attendance.query.ts": [
+      "channel_live_session_participant_events",
+      "channel_live_session_participants",
+      "channel_live_sessions",
+      "channels",
+      "learning_space_channels",
+      "learning_spaces"
+    ],
+    "apps/web/lib/channels/actions/ensure-direct-message-channel.ts": [
+      "channel_members",
+      "channels"
+    ],
+    "apps/web/lib/channels/actions/ensure-support-channel.ts": ["channels"],
+    "apps/web/lib/channels/queries/channels.query.ts": [
+      "channel_capabilities",
+      "channel_members",
+      "channel_read_state",
+      "channels"
+    ],
+    "apps/web/lib/dashboard/class-request.ts": [
+      "accounts",
+      "channel_members",
+      "channels",
+      "profiles",
+      "user_roles"
+    ],
+    "apps/web/lib/family/queries/families.query.ts": [
+      "families",
+      "family_link_invites",
+      "family_links"
+    ],
+    "apps/web/lib/family/queries/invite.query.ts": [
+      "accounts",
+      "families",
+      "family_link_invites",
+      "family_links"
+    ],
+    "apps/web/lib/live-sessions/attendance-evaluator.ts": [
+      "channel_live_session_expected_participants",
+      "channel_live_session_participants",
+      "channel_live_sessions"
+    ],
+    "apps/web/lib/live-sessions/service.ts": [
+      "channel_live_session_participants",
+      "channel_live_sessions"
+    ],
+    "apps/web/lib/messages/queries/messages.query.ts": [
+      "channel_files",
+      "channel_media",
+      "channel_read_state",
+      "message_audio_recording",
+      "message_design_file_update",
+      "message_event_reminder",
+      "message_feedback_request",
+      "message_file",
+      "message_homework_submission",
+      "message_image",
+      "message_lesson_assignment",
+      "message_link_preview",
+      "message_live_session_started",
+      "message_payment_reminder",
+      "message_progress_update",
+      "message_reaction_counts",
+      "message_reactions",
+      "message_saves",
+      "message_session_booking",
+      "message_session_complete",
+      "message_session_summary",
+      "message_text",
+      "messages",
+      "thread_participants",
+      "threads"
+    ],
+    "apps/web/lib/messages/queries/support-thread-operations.query.ts": [
+      "messages",
+      "profiles",
+      "support_thread_assignments",
+      "threads",
+      "user_roles"
+    ],
+    "apps/web/lib/messages/support-thread-staffing.ts": [
+      "profiles",
+      "support_thread_assignments",
+      "user_roles"
+    ],
+    "apps/web/lib/messages/support-visibility.ts": [
+      "accounts",
+      "messages",
+      "profiles",
+      "threads",
+      "user_roles"
+    ],
+    "apps/web/lib/onboarding/queries/status.query.ts": ["user_onboarding_status"],
+    "apps/web/lib/org/has-orgs.ts": ["orgs"],
+    "apps/web/lib/org/queries/org.query.ts": ["orgs"],
+    "apps/web/lib/profile/queries/active-profile.query.ts": ["profiles"],
+    "apps/web/lib/profile/queries/child.query.ts": [
+      "child_profile_grade_level",
+      "child_profiles"
+    ],
+    "apps/web/lib/profile/queries/educator.query.ts": [
+      "educator_availabilities",
+      "educator_profile_badges",
+      "educator_profile_curriculum_tags",
+      "educator_profile_grade_levels",
+      "educator_profile_subjects",
+      "educator_profiles"
+    ],
+    "apps/web/lib/profile/queries/family-link-invites.query.ts": ["family_link_invites"],
+    "apps/web/lib/profile/queries/guardian.query.ts": [
+      "family_links",
+      "guardian_profiles"
+    ],
+    "apps/web/lib/profile/queries/presence.query.ts": ["profile_presence"],
+    "apps/web/lib/profile/queries/profiles.query.ts": ["accounts", "profiles"],
+    "apps/web/lib/profile/queries/roles.query.ts": ["user_roles"],
+    "apps/web/lib/profile/queries/staff.query.ts": [
+      "staff_profile_specialties",
+      "staff_profiles"
+    ],
+    "apps/web/lib/sidebar/direct-message-unread-persistence.ts": ["channel_read_state"],
+    "apps/web/lib/sidebar/loadSidebarContext.ts": ["family_link_invites"],
+    "apps/web/lib/spaces/builders/learning-space.builder.ts": ["class_schedules"],
+    "apps/web/lib/spaces/queries/learning-space-relations.query.ts": [
+      "learning_space_channels",
+      "learning_space_participants"
+    ],
+    "apps/web/lib/spaces/queries/learning-spaces.query.ts": ["learning_spaces"],
+    "apps/web/lib/subjects/queries/org-subject-catalog.query.ts": ["org_subject_catalog"]
+  }
+}

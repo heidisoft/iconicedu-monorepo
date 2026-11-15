@@ -42,6 +42,14 @@ New features follow contract → API → frontend ordering. Existing frontend ta
 
 Reviews and repository guards should reject new `supabase.from(...)` use in `apps/web` and `apps/mobile`. Exceptions require a new architectural decision; a PR comment or local convenience is not sufficient.
 
+`scripts/check-frontend-table-access.mjs` (`pnpm guard:frontend-table-access`, run in CI) enforces this as a ratchet:
+
+- every existing direct table read is listed per file in `scripts/frontend-table-access-baseline.json`; a new file, or a new table in a listed file, fails;
+- a baseline entry whose read has been removed also fails, so migrations must delete their entry (`pnpm guard:frontend-table-access:update`) and the list only shrinks;
+- paths whose reads have fully moved behind `apps/api` (for example `apps/web/lib/schedules/`) are API-only and can never be baselined.
+
+Never add entries to the baseline by hand to get a new read past CI.
+
 ## References
 
 - [`AGENTS.md`](../../AGENTS.md)

@@ -22,6 +22,31 @@ import {
   parseSplitRecurringSessionDto,
 } from '@iconicedu/api/modules/schedules/dto';
 
+/** Upper bound on `?scheduleIds=` so a single request cannot fan out into an
+ * unbounded `in (...)` filter. Web only ever asks for one id at a time today. */
+export const MAX_CALENDAR_SCHEDULE_IDS = 100;
+
+function parseScheduleIds(raw: unknown): string[] | undefined {
+  if (raw === undefined) return undefined;
+  if (typeof raw !== 'string') {
+    throw new BadRequestException('scheduleIds must be a comma-separated string');
+  }
+  const ids = Array.from(
+    new Set(
+      raw
+        .split(',')
+        .map((id) => id.trim())
+        .filter((id) => id.length > 0),
+    ),
+  );
+  if (ids.length > MAX_CALENDAR_SCHEDULE_IDS) {
+    throw new BadRequestException(
+      `scheduleIds accepts at most ${MAX_CALENDAR_SCHEDULE_IDS} ids`,
+    );
+  }
+  return ids;
+}
+
 @Controller()
 export class SchedulesController {
   constructor(private readonly schedulesService: SchedulesService) {}
@@ -40,6 +65,22 @@ export class SchedulesController {
       orgId,
       channelId,
     });
+  }
+
+  @Get('schedules/calendar')
+  @UseGuards(AuthGuard)
+  listForCalendar(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('scheduleIds') scheduleIds?: string,
+  ) {
+    if (!orgId || typeof orgId !== 'string') {
+      throw new BadRequestException('orgId is required');
+    }
+    return this.schedulesService.listForCalendar(
+      extractBearerToken(req.headers.authorization),
+      { orgId, scheduleIds: parseScheduleIds(scheduleIds) },
+    );
   }
 
   @Get('schedules/learning-space/context')

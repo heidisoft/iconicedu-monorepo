@@ -132,6 +132,11 @@ jobs:
       - name: Guard Supabase access control
         run: pnpm guard:supabase-access-control
 
+      # Ratchets direct Supabase table reads in apps/web + apps/mobile toward zero
+      # (issue #248): new reads fail, migrated paths stay API-only.
+      - name: Guard frontend table access
+        run: pnpm guard:frontend-table-access
+
       # Temporarily disabled in GitHub Actions. Keep the local script in package.json
       # so the guard can be re-enabled here without reintroducing the implementation.
       # - name: Guard feature flags
@@ -195,6 +200,7 @@ jobs:
         run: |
           pnpm test:commitlint
           pnpm test:guard:supabase-access-control
+          pnpm test:guard:frontend-table-access
 
       # PRs: only affected packages. Push to main: all packages.
       - name: Test
