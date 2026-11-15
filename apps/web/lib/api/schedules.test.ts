@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { getLearningSpaceEditContext, getScheduleCalendar } from './schedules';
+import {
+  getClassScheduleSessionContext,
+  getLearningSpaceEditContext,
+  getScheduleCalendar,
+} from './schedules';
 
 describe('getLearningSpaceEditContext API client', () => {
   const fetchMock = vi.fn();
@@ -124,4 +128,77 @@ describe('getScheduleCalendar API client', () => {
       'nope',
     );
   });
+});
+
+describe('getClassScheduleSessionContext API client', () => {
+  const fetchMock = vi.fn();
+  const supabase = {
+    auth: {
+      getSession: vi.fn(async () => ({
+        data: { session: { access_token: 'session-token' } },
+      })),
+    },
+  } as unknown as SupabaseClient;
+
+  beforeEach(() => {
+    vi.stubGlobal('fetch', fetchMock);
+    fetchMock.mockReset();
+  });
+
+  it('GETs /schedules/session/context with orgId, scheduleId, and the bearer token', async () => {
+    const context = {
+      scheduleId: 'schedule-1',
+      title: 'Algebra',
+      startAt: '2026-03-21T14:00:00.000Z',
+      endAt: '2026-03-21T15:00:00.000Z',
+      timezone: 'America/New_York',
+      sourceLearningSpaceId: 'space-1',
+      sourceChannelId: 'channel-1',
+    };
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(context), {
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+
+    await expect(
+      getClassScheduleSessionContext(supabase, {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+      }),
+    ).resolves.toEqual(context);
+
+    const [url, init] = fetchMock.mock.calls[0];
+    const parsed = new URL(url);
+    expect(parsed.pathname).toMatch(/\/schedules\/session\/context$/);
+    expect(Object.fromEntries(parsed.searchParams)).toEqual({
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+    });
+    expect(init.headers.Authorization).toBe('Bearer session-token');
+  });
+
+  // Contract: these are the exact NestJS 400 bodies the API returns. The thrown
+  // message must equal what apps/web used to throw itself before the check moved
+  // server-side, so the error the user sees is unchanged.
+  it.each([['Archived classrooms cannot be changed.'], ['Schedule not found']])(
+    'rejects with the API message verbatim: %s',
+    async (message) => {
+      fetchMock.mockResolvedValue(
+        new Response(JSON.stringify({ statusCode: 400, message, error: 'Bad Request' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+
+      const error = await getClassScheduleSessionContext(supabase, {
+        orgId: 'org-1',
+        scheduleId: 'schedule-1',
+      }).catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error).message).toBe(message);
+      expect((error as { status?: number }).status).toBe(400);
+    },
+  );
 });

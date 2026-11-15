@@ -24,6 +24,18 @@ export const API_ONLY_PATHS = new Map([
     'apps/web/lib/schedules/',
     'GET /schedules/calendar via getScheduleCalendar (apps/web/lib/api/schedules.ts)',
   ],
+  [
+    'apps/web/app/actions/update-class-schedule-session.ts',
+    'GET /schedules/session/context via getClassScheduleSessionContext (apps/web/lib/api/schedules.ts)',
+  ],
+  [
+    'apps/web/app/actions/split-class-schedule-session.ts',
+    'GET /schedules/session/context via getClassScheduleSessionContext (apps/web/lib/api/schedules.ts)',
+  ],
+  [
+    'apps/web/app/actions/cancel-class-schedule-session.ts',
+    'POST /schedules/session/cancel (the API resolves the schedule itself)',
+  ],
 ]);
 
 function apiOnlyReplacement(filePath) {

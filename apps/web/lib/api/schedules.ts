@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type {
+  ClassScheduleSessionContextVM,
   ClassScheduleVM,
   LearningSpaceEditContextVM,
 } from '@iconicedu/shared-types';
@@ -57,4 +58,17 @@ export async function getScheduleCalendar(
     { orgId: input.orgId, scheduleIds: input.scheduleIds?.join(',') },
   );
   return Array.isArray(schedules) ? schedules : [];
+}
+
+// GET /schedules/session/context — bootstrap for the reschedule/split quick-edit
+// actions. The API rejects missing schedules (400 "Schedule not found") and
+// archived classrooms (400 "Archived classrooms cannot be changed.").
+export function getClassScheduleSessionContext(
+  supabase: SupabaseClient,
+  input: { orgId: string; scheduleId: string },
+) {
+  return createApiClient(supabase).get<ClassScheduleSessionContextVM>(
+    '/schedules/session/context',
+    input,
+  );
 }

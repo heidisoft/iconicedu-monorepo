@@ -141,4 +141,17 @@ describe('cancelClassScheduleSessionAction', () => {
       suppressNotifications: true,
     });
   });
+
+  it('surfaces the API archived-classroom rejection and does not revalidate', async () => {
+    apiPostMock.mockRejectedValue(new Error('Archived classrooms cannot be changed.'));
+
+    await expect(
+      cancelClassScheduleSessionAction({
+        orgSlug: 'iconic-academy',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-03-21T14:00:00.000Z',
+      }),
+    ).rejects.toThrow('Archived classrooms cannot be changed.');
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
 });
