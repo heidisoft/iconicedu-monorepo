@@ -9,10 +9,7 @@ import {
   MARKETING_LEAD_CONTAINER_CLASS,
   MARKETING_SECTION_CLASS,
 } from '@iconicedu/ui-web';
-import {
-  assertMarketingSitePagesEnabled,
-  resolveMarketingLoginHref,
-} from '../../_lib/marketing-site-pages';
+import { resolveMarketingLoginHref } from '../../_lib/marketing-site-pages';
 import {
   breadcrumbJsonLd,
   createMarketingMetadata,
@@ -48,7 +45,6 @@ export async function generateMetadata({ params }: LocationPageProps): Promise<M
 }
 
 export default async function LocationPage({ params }: LocationPageProps) {
-  await assertMarketingSitePagesEnabled();
   const { locationSlug } = await params;
   const location = findLocationLandingPage(locationSlug);
 

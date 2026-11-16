@@ -149,23 +149,6 @@ export const enableClassScheduleSeriesReschedule = flag<
   },
 });
 
-export const enableMarketingSitePages = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-marketing-site-pages',
-  description:
-    'Enables standard marketing pages and regional microsite routes while content is staged.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-marketing-site-pages',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableAssessments = flag<boolean, { profileId?: string | null }>({
   key: 'assessments-enabled',
   description:
@@ -548,7 +531,6 @@ export const webFlags = {
   enableAssessments,
   enableChannelCommunications,
   enableClassScheduleSeriesReschedule,
-  enableMarketingSitePages,
   enableMessagePinning,
   enableMessageSearch,
   enableMessageTypeComposer,

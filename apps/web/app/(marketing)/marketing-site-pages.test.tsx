@@ -41,7 +41,6 @@ import ProgramsPage, {
   metadata as programsMetadata,
 } from '@iconicedu/web/app/(marketing)/programs/page';
 
-const enableMarketingSitePagesRunMock = vi.fn(async () => true);
 const notFoundMock = vi.fn(() => {
   throw new Error('NEXT_NOT_FOUND');
 });
@@ -50,12 +49,6 @@ const resolveDefaultOrgGetStartedPathMock = vi.fn(async () => '/acme/get-started
 
 vi.mock('next/navigation', () => ({
   notFound: () => notFoundMock(),
-}));
-
-vi.mock('@iconicedu/web/flags', () => ({
-  enableMarketingSitePages: {
-    run: (...args: unknown[]) => enableMarketingSitePagesRunMock(...args),
-  },
 }));
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
@@ -70,8 +63,6 @@ vi.mock('@iconicedu/web/lib/org/resolve-auth-path', () => ({
 
 describe('marketing site standard pages', () => {
   beforeEach(() => {
-    enableMarketingSitePagesRunMock.mockReset();
-    enableMarketingSitePagesRunMock.mockResolvedValue(true);
     notFoundMock.mockClear();
     createSupabaseServerClientMock.mockClear();
     resolveDefaultOrgGetStartedPathMock.mockClear();
@@ -157,27 +148,13 @@ describe('marketing site standard pages', () => {
       }
       expect(metadata.alternates?.canonical).toBe(canonical);
       expect(metadata.description).toBeTruthy();
-      expect(enableMarketingSitePagesRunMock).toHaveBeenCalledWith({
-        identify: { profileId: null },
-      });
       expect(resolveDefaultOrgGetStartedPathMock).toHaveBeenCalledWith({});
     },
   );
-
-  it('returns notFound for standard pages when the feature flag is off', async () => {
-    enableMarketingSitePagesRunMock.mockResolvedValue(false);
-
-    await expect(PrivacyPage()).rejects.toThrow('NEXT_NOT_FOUND');
-
-    expect(notFoundMock).toHaveBeenCalled();
-    expect(resolveDefaultOrgGetStartedPathMock).not.toHaveBeenCalled();
-  });
 });
 
 describe('marketing regional microsite page', () => {
   beforeEach(() => {
-    enableMarketingSitePagesRunMock.mockReset();
-    enableMarketingSitePagesRunMock.mockResolvedValue(true);
     notFoundMock.mockClear();
     createSupabaseServerClientMock.mockClear();
     resolveDefaultOrgGetStartedPathMock.mockClear();
@@ -197,27 +174,12 @@ describe('marketing regional microsite page', () => {
       }),
     ).toBeInTheDocument();
     expect(screen.getByText('STEM and coding pathways')).toBeInTheDocument();
-    expect(enableMarketingSitePagesRunMock).toHaveBeenCalledWith({
-      identify: { profileId: null },
-    });
   });
 
   it('returns notFound for unknown regional slugs', async () => {
     await expect(
       RegionalPage({
         params: Promise.resolve({ regionSlug: 'unknown-region' }),
-      }),
-    ).rejects.toThrow('NEXT_NOT_FOUND');
-
-    expect(notFoundMock).toHaveBeenCalled();
-  });
-
-  it('returns notFound for regional pages when the feature flag is off', async () => {
-    enableMarketingSitePagesRunMock.mockResolvedValue(false);
-
-    await expect(
-      RegionalPage({
-        params: Promise.resolve({ regionSlug: 'global-online' }),
       }),
     ).rejects.toThrow('NEXT_NOT_FOUND');
 
@@ -240,8 +202,6 @@ describe('marketing regional microsite page', () => {
 
 describe('marketing program and location landing pages', () => {
   beforeEach(() => {
-    enableMarketingSitePagesRunMock.mockReset();
-    enableMarketingSitePagesRunMock.mockResolvedValue(true);
     notFoundMock.mockClear();
     createSupabaseServerClientMock.mockClear();
     resolveDefaultOrgGetStartedPathMock.mockClear();

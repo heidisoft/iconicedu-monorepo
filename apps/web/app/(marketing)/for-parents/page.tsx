@@ -4,10 +4,7 @@ import {
   MarketingMainMenuPage,
   MarketingMobileAppSection,
 } from '@iconicedu/ui-web';
-import {
-  assertMarketingSitePagesEnabled,
-  resolveMarketingLoginHref,
-} from '../_lib/marketing-site-pages';
+import { resolveMarketingLoginHref } from '../_lib/marketing-site-pages';
 import {
   breadcrumbJsonLd,
   createMarketingMetadata,
@@ -21,7 +18,6 @@ const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/for-parent
 export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function ForParentsPage() {
-  await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
   return (

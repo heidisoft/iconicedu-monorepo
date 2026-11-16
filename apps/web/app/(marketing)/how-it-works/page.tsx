@@ -5,10 +5,7 @@ import {
   MarketingSuccessPathSection,
   MarketingUsCurriculumSection,
 } from '@iconicedu/ui-web';
-import {
-  assertMarketingSitePagesEnabled,
-  resolveMarketingLoginHref,
-} from '../_lib/marketing-site-pages';
+import { resolveMarketingLoginHref } from '../_lib/marketing-site-pages';
 import {
   breadcrumbJsonLd,
   createMarketingMetadata,
@@ -22,7 +19,6 @@ const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/how-it-wor
 export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function HowItWorksPage() {
-  await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
   return (

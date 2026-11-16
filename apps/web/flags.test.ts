@@ -9,7 +9,6 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 import {
   enableAdminSessionAttendanceAnalytics,
   enableChannelCommunications,
-  enableMarketingSitePages,
   enableMessageTypeComposer,
   enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
@@ -92,12 +91,6 @@ describe('web flags', () => {
     expect(enableMobileAppleSignIn.key).toBe('enable-mobile-apple-sign-in');
     expect(enableMobileAppleSignIn.defaultValue).toBe(false);
     expect(webFlags.enableMobileAppleSignIn).toBe(enableMobileAppleSignIn);
-  });
-
-  it('declares the marketing site pages flag with stable metadata', () => {
-    expect(enableMarketingSitePages.key).toBe('enable-marketing-site-pages');
-    expect(enableMarketingSitePages.defaultValue).toBe(false);
-    expect(webFlags.enableMarketingSitePages).toBe(enableMarketingSitePages);
   });
 
   it('declares the session completion carousel flag off by default', () => {
@@ -199,7 +192,6 @@ describe('web flags', () => {
 
     expect(providerData).toBeTruthy();
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
-    expect(JSON.stringify(providerData)).toContain('enable-marketing-site-pages');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
     expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
     expect(JSON.stringify(providerData)).toContain('session-completion-carousel');
