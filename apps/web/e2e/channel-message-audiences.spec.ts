@@ -47,11 +47,12 @@ test.describe('channel message audiences', () => {
       await staff.page.getByRole('button', { name: /Message audience:/i }).click();
       await staff.page.getByText(/^Parent(s)?$/).click();
       await send(staff.page, parentText);
-      await expect(staff.page.getByText(/Private ·/).last()).toBeVisible();
+      await expect(staff.page.getByText(/Only visible to/).last()).toBeVisible();
 
       await parent.page.reload();
       await expect(parent.page.getByText(publicText, { exact: true })).toBeVisible();
       await expect(parent.page.getByText(parentText, { exact: true })).toBeVisible();
+      await expect(parent.page.getByText(/Only visible to/).last()).toBeVisible();
       await tutor.page.reload();
       await expect(tutor.page.getByText(publicText, { exact: true })).toBeVisible();
       await expect(tutor.page.getByText(parentText, { exact: true })).toHaveCount(0);

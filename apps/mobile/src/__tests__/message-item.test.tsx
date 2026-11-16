@@ -467,7 +467,8 @@ describe('MessageItem', () => {
     );
 
     expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
-    expect(screen.getByLabelText('Visible to specific users')).toBeTruthy();
+    expect(screen.getByLabelText('Only visible to selected people')).toBeTruthy();
+    expect(screen.getByText('Only visible to selected people')).toBeTruthy();
   });
 
   it('shows the pinned indicator when isPinned is true (issue #264 P2)', () => {

@@ -13,11 +13,11 @@ name: Channel member message audiences
 - inputText: 'Maestro parent-only welcome'
 - tapOn: 'Send message'
 - assertVisible: 'Maestro parent-only welcome'
-- assertVisible: 'Private.*'
-- assertVisible: 'Visible only to.*'
+- assertVisible: 'Only visible to selected people'
 - tapOn: 'Tutors'
 - tapOn:
     id: message-input
 - inputText: 'Maestro tutor-only handover'
 - tapOn: 'Send message'
 - assertVisible: 'Maestro tutor-only handover'
+- assertVisible: 'Only visible to selected people'
