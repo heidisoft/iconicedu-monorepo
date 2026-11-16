@@ -1259,6 +1259,14 @@ jobs:
               end if;
               if not exists (
                 select 1 from cron.job
+                where jobname = 'notification-job-retention'
+                  and active and schedule = '41 * * * *'
+                  and command = 'select public.purge_notification_job_history();'
+              ) then
+                raise exception 'missing or misconfigured notification-job-retention cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
                 where jobname = 'learning-space-archive-retention'
                   and active and schedule = '23 3 * * *'
                   and command = 'select public.purge_archived_learning_space_artifacts();'
@@ -1974,6 +1982,14 @@ jobs:
               end if;
               if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
                 raise exception 'missing edge-function-channel-read-state-repair cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'notification-job-retention'
+                  and active and schedule = '41 * * * *'
+                  and command = 'select public.purge_notification_job_history();'
+              ) then
+                raise exception 'missing or misconfigured notification-job-retention cron job';
               end if;
               if not exists (
                 select 1 from cron.job
