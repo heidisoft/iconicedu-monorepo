@@ -9,6 +9,28 @@ function resolveDistinctId(profileId?: string | null) {
   return 'anonymous';
 }
 
+function isEnvFlagEnabled(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'on';
+}
+
+function isProductionDeployment() {
+  return (
+    (process.env.VERCEL_ENV ?? process.env.NEXT_PUBLIC_VERCEL_ENV ?? '')
+      .trim()
+      .toLowerCase() === 'production'
+  );
+}
+
+// Local-only escape hatch so developers can exercise the feature without
+// PostHog targeting. Ignored on production deployments.
+function isChannelCommunicationsForcedOn() {
+  return (
+    !isProductionDeployment() &&
+    isEnvFlagEnabled(process.env.ENABLE_CHANNEL_COMMUNICATIONS)
+  );
+}
+
 async function evaluateWebBooleanFlag(input: {
   flagKey: string;
   profileId?: string | null;
@@ -31,6 +53,7 @@ export const enableChannelCommunications = flag<boolean, { profileId?: string | 
   ],
   defaultValue: false,
   async decide({ entities }) {
+    if (isChannelCommunicationsForcedOn()) return true;
     return evaluateWebBooleanFlag({
       flagKey: 'enable-channel-communications',
       profileId: entities?.profileId,

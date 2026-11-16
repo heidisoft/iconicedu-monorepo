@@ -5,6 +5,24 @@ import {
 } from './feature-flags';
 
 describe('mobile feature flags', () => {
+  it('enables channel communications only from its Expo public env flag', () => {
+    delete process.env.EXPO_PUBLIC_ENABLE_CHANNEL_COMMUNICATIONS;
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableChannelCommunications,
+      ),
+    ).toBe(false);
+
+    process.env.EXPO_PUBLIC_ENABLE_CHANNEL_COMMUNICATIONS = 'true';
+    expect(
+      getLocalMobileFeatureFlagFallback(
+        mobileFeatureFlagKeys.enableChannelCommunications,
+      ),
+    ).toBe(true);
+
+    delete process.env.EXPO_PUBLIC_ENABLE_CHANNEL_COMMUNICATIONS;
+  });
+
   it('defaults direct message start rollout to off', async () => {
     delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START;
     delete process.env.EXPO_PUBLIC_APP_ENV;

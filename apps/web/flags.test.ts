@@ -31,6 +31,39 @@ describe('web flags', () => {
     delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
     delete process.env.VERCEL_ENV;
     delete process.env.NEXT_PUBLIC_VERCEL_ENV;
+    delete process.env.ENABLE_CHANNEL_COMMUNICATIONS;
+  });
+
+  it('forces channel communications on from the local env override', async () => {
+    process.env.ENABLE_CHANNEL_COMMUNICATIONS = 'true';
+
+    await expect(
+      (
+        enableChannelCommunications as unknown as {
+          decide: (input: {
+            entities?: { profileId?: string | null };
+          }) => Promise<boolean>;
+        }
+      ).decide({ entities: { profileId: 'profile-1' } }),
+    ).resolves.toBe(true);
+    expect(evaluatePosthogBooleanFlag).not.toHaveBeenCalled();
+  });
+
+  it('ignores the channel communications env override in production', async () => {
+    process.env.ENABLE_CHANNEL_COMMUNICATIONS = 'true';
+    process.env.VERCEL_ENV = 'production';
+    evaluatePosthogBooleanFlag.mockResolvedValueOnce(false);
+
+    await expect(
+      (
+        enableChannelCommunications as unknown as {
+          decide: (input: {
+            entities?: { profileId?: string | null };
+          }) => Promise<boolean>;
+        }
+      ).decide({ entities: { profileId: 'profile-1' } }),
+    ).resolves.toBe(false);
+    expect(evaluatePosthogBooleanFlag).toHaveBeenCalled();
   });
 
   it('declares the channel communications flag with stable metadata', () => {
