@@ -1,6 +1,8 @@
 # Claude Code Repository Guidance
 
-Read and follow [AGENTS.md](AGENTS.md) before changing this repository. It is the shared entry point for all coding assistants.
+The shared rules for every coding assistant live in AGENTS.md, imported here so they load in every session:
+
+@AGENTS.md
 
 The canonical long-form guidance is [docs/internal/ai/agents.md](docs/internal/ai/agents.md). Setup, workflow, architecture, standards, and operations documentation is indexed in [docs/README.md](docs/README.md).
 
