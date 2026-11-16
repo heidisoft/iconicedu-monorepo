@@ -944,7 +944,10 @@ function getVisibilityLabel(message: MessageVM): string | null {
   if (visibility.type === 'all') return null;
   if (visibility.type === 'sender-only') return 'Only visible to you';
   if (visibility.type === 'recipient-only') return 'Only visible to recipient';
-  if (visibility.type === 'specific-users') return 'Visible to specific users';
+  if (visibility.type === 'specific-users') {
+    const count = visibility.userIds.length;
+    return `Private · ${count} ${count === 1 ? 'person' : 'people'}`;
+  }
   return 'Private';
 }
 
@@ -960,7 +963,15 @@ export function VisibilityBadge({
 
   return (
     <Tooltip delayDuration={0}>
-      <TooltipTrigger accessibilityRole="button" accessibilityLabel={label} hitSlop={8}>
+      <TooltipTrigger
+        accessibilityRole="button"
+        accessibilityLabel={
+          message.core.visibility.type === 'specific-users'
+            ? 'Visible to specific users'
+            : label
+        }
+        hitSlop={8}
+      >
         <View
           testID="message-visibility-badge"
           style={[

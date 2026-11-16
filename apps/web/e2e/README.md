@@ -39,6 +39,7 @@ Do not commit an authenticated storage-state file. It contains reusable session 
 - `e2e/marketing-smoke.spec.ts`: public landing page smoke test.
 - `e2e/sidebar-learning-spaces.spec.ts`: student sidebar classes header visibility (requires auth).
 - `e2e/supervised-readonly.spec.ts`: supervised view controls disabled + thread open behavior (requires auth).
+- `e2e/channel-message-audiences.spec.ts`: staff public/private channel sends, inherited private threads, cross-persona visibility, and deletion (requires three synthetic auth states). See the [channel audience E2E guide](../../../docs/getting-started/message-audience-testing.md).
 
 - `e2e/live-session-setup.spec.ts`: deterministic host/member/guest setup,
   passcode correction, refresh recovery, feedback, source/homepage navigation,

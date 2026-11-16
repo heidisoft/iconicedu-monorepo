@@ -92,6 +92,7 @@ Internal engineers, operators, and AI assistants.
 
 - [Mobile Manual Test Plan](testing/mobile-test-plan.md)
 - [Web Playwright Guide](../apps/web/e2e/README.md)
+- [Channel Message Audience E2E Testing](getting-started/message-audience-testing.md)
 
 ### Decisions
 

@@ -22,7 +22,7 @@ async function evaluateWebBooleanFlag(input: {
 }
 
 export const enableChannelCommunications = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-channel-communications',
+  key: platformFeatureFlagKeys.enableChannelCommunications,
   description:
     'Enables channel-level communication features that are still behind rollout control.',
   options: [

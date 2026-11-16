@@ -40,6 +40,7 @@ import { resolveMobileMessageUiTheme } from '@/components/messages/themes/regist
 import {
   MessageInput,
   type EditingMessageContext,
+  type MessageSendMeta,
 } from '@/components/messages/message-input';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
@@ -95,6 +96,9 @@ export default function ChannelConversationScreen() {
   const enableMessageSendReliability = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageSendReliability,
   );
+  const enableChannelCommunications = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableChannelCommunications,
+  );
 
   const orgId = account?.org_id ?? '';
   const accountId =
@@ -134,12 +138,16 @@ export default function ChannelConversationScreen() {
   const resolvedThemeKey = channelMeta?.themeKey ?? null;
   const resolvedMessageUiThemeKey = channelMeta?.messageUiThemeKey ?? 'feed';
 
-  // Channel members — only needed for @mention autocomplete, so skip the
-  // request entirely unless mention authoring is enabled.
+  const canChooseMessageAudience = enableChannelCommunications && !isSupportChannel;
+  // Channel members power mention autocomplete and audience selection.
   const { data: channelMembers } = useQuery({
     queryKey: ['channelMembers', orgId, channelId, profileId] as const,
     queryFn: () => fetchChannelMembers(orgId, channelId ?? '', profileId),
-    enabled: enableMobileMessageComposerParity && !!orgId && !!channelId && !!profileId,
+    enabled:
+      (enableMobileMessageComposerParity || canChooseMessageAudience) &&
+      !!orgId &&
+      !!channelId &&
+      !!profileId,
     staleTime: 60_000,
   });
   const mentionCandidates = useMemo(
@@ -407,13 +415,11 @@ export default function ChannelConversationScreen() {
   // in pendingUploads instead of firing a one-shot Alert on failure, and
   // rethrow so MessageInput keeps the draft around for a retry.
   const handleSend = useCallback(
-    async (
-      text: string,
-      meta?: { mentions?: MessageMentionVM[]; clientMessageId?: string },
-    ) => {
+    async (text: string, meta?: MessageSendMeta) => {
       if (!channelId || !profileId || !orgId) return;
       const mentions = meta?.mentions;
       const clientMessageId = meta?.clientMessageId;
+      const audienceProfileIds = threadReplyTarget ? undefined : meta?.audienceProfileIds;
       const threadParentId = threadReplyTarget?.ids.id;
       const threadId = threadReplyTarget?.social?.thread?.ids.id;
 
@@ -431,6 +437,7 @@ export default function ChannelConversationScreen() {
             mentions,
             threadParentId,
             threadId,
+            audienceProfileIds,
           },
         ]);
         try {
@@ -444,6 +451,7 @@ export default function ChannelConversationScreen() {
             {
               clientMessageId,
               mentions,
+              audienceProfileIds,
             },
           );
           setPendingUploads((prev) => prev.filter((p) => p.id !== clientMessageId));
@@ -485,15 +493,11 @@ export default function ChannelConversationScreen() {
           // Thread reply count lives in the threads table — refetch to update the pill.
           void refetch();
         } else if (quoteReplyTarget) {
-          await sendTextMessage(
-            channelId,
-            profileId,
-            orgId,
-            text,
-            undefined,
-            undefined,
-            quoteReplyTarget.ids.id,
-          );
+          await sendTextMessage(channelId, profileId, orgId, text, undefined, undefined, {
+            replyToMessageId: quoteReplyTarget.ids.id,
+            mentions,
+            audienceProfileIds,
+          });
           setQuoteReplyTarget(null);
           // Realtime subscription handles cache invalidation for non-thread messages.
         } else {
@@ -504,7 +508,9 @@ export default function ChannelConversationScreen() {
             text,
             undefined,
             undefined,
-            mentions?.length ? { mentions } : undefined,
+            mentions?.length || audienceProfileIds?.length
+              ? { mentions, audienceProfileIds }
+              : undefined,
           );
           // Realtime subscription handles cache invalidation for non-thread messages.
         }
@@ -557,7 +563,11 @@ export default function ChannelConversationScreen() {
           pending.caption ?? '',
           pending.threadParentId,
           pending.threadId,
-          { clientMessageId: pending.clientMessageId, mentions: pending.mentions },
+          {
+            clientMessageId: pending.clientMessageId,
+            mentions: pending.mentions,
+            audienceProfileIds: pending.audienceProfileIds,
+          },
         );
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
         if (pending.threadParentId) {
@@ -584,6 +594,7 @@ export default function ChannelConversationScreen() {
       attachments: AttachmentPayload[],
       caption?: string,
       clientMessageId?: string,
+      audienceProfileIds?: string[],
     ) => {
       if (!channelId || !profileId || !orgId || !attachments.length) return;
 
@@ -611,6 +622,7 @@ export default function ChannelConversationScreen() {
           createdAt: new Date().toISOString(),
           caption,
           clientMessageId,
+          audienceProfileIds,
         },
       ]);
 
@@ -634,6 +646,7 @@ export default function ChannelConversationScreen() {
             undefined,
             undefined,
             clientMessageId,
+            audienceProfileIds,
           );
         } else {
           const uploaded = await Promise.all(
@@ -659,6 +672,7 @@ export default function ChannelConversationScreen() {
               undefined,
               undefined,
               clientMessageId,
+              audienceProfileIds,
             );
           } else {
             await sendFilesMessage(
@@ -670,6 +684,7 @@ export default function ChannelConversationScreen() {
               undefined,
               undefined,
               clientMessageId,
+              audienceProfileIds,
             );
           }
         }
@@ -1014,6 +1029,7 @@ export default function ChannelConversationScreen() {
             mentionCandidates={mentionCandidates}
             enableFormatting={enableMobileMessageComposerParity}
             enableSendReliability={enableMessageSendReliability}
+            audienceParticipants={canChooseMessageAudience ? channelMembers : undefined}
           />
         </KeyboardAvoidingView>
       )}

@@ -34,6 +34,7 @@ import {
   enableMessageDrafts,
   enableMessageEdit,
   enableMessageSendReliability,
+  enableChannelCommunications,
 } from '@iconicedu/web/flags';
 
 const INITIAL_MESSAGES_PAGE_SIZE = 40;
@@ -84,6 +85,7 @@ export default async function Page({
     messageDraftsEnabled,
     messageEditEnabled,
     messageSendReliabilityEnabled,
+    messageAudienceEnabled,
   ] = await Promise.all([
     enableMessageTypeComposer.run({ identify }),
     enableAiRefine.run({ identify }),
@@ -98,6 +100,7 @@ export default async function Page({
     enableMessageDrafts.run({ identify }),
     enableMessageEdit.run({ identify }),
     enableMessageSendReliability.run({ identify }),
+    enableChannelCommunications.run({ identify }),
   ]);
   const isStaffReadOnly = isStaffObserverReadOnlyChannel(
     channel,
@@ -128,6 +131,7 @@ export default async function Page({
         enableMessageDrafts={messageDraftsEnabled}
         enableMessageEdit={messageEditEnabled}
         enableMessageSendReliability={messageSendReliabilityEnabled}
+        enableMessageAudience={messageAudienceEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}

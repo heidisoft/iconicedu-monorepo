@@ -157,6 +157,7 @@ type MessagesShellClientProps = {
   enableMessageDrafts?: boolean;
   enableMessageEdit?: boolean;
   enableMessageSendReliability?: boolean;
+  enableMessageAudience?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -201,6 +202,7 @@ export function MessagesShellClient({
   enableMessageDrafts = false,
   enableMessageEdit = false,
   enableMessageSendReliability = false,
+  enableMessageAudience = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -242,6 +244,7 @@ export function MessagesShellClient({
         content?: string;
         threadId?: string | null;
         threadParentId?: string | null;
+        audienceProfileIds?: string[];
       }) => {
         if (!currentUserId) {
           throw new Error('Current user is required');
@@ -339,6 +342,9 @@ export function MessagesShellClient({
               content: input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         } else if (imageUploads.length > 1) {
@@ -357,6 +363,9 @@ export function MessagesShellClient({
               content: input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         }
@@ -374,6 +383,9 @@ export function MessagesShellClient({
               content: imageUploads.length ? undefined : input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         } else if (fileUploads.length > 1) {
@@ -391,6 +403,9 @@ export function MessagesShellClient({
               content: imageUploads.length ? undefined : input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         }
@@ -412,6 +427,9 @@ export function MessagesShellClient({
                   : input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         }
@@ -548,6 +566,7 @@ export function MessagesShellClient({
         enableMessageDrafts={enableMessageDrafts}
         enableMessageEdit={enableMessageEdit}
         enableMessageSendReliability={enableMessageSendReliability}
+        enableMessageAudience={enableMessageAudience}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

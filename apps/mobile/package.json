@@ -34,7 +34,8 @@
     "eas:update": "eas update",
     "eas:update:production": "eas update --channel production",
     "eas:update:preview": "eas update --channel preview",
-    "export:bundle": "EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist"
+    "export:bundle": "EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist",
+    "test:e2e:message-audiences": "maestro test .maestro/message-audiences.yaml"
   },
   "dependencies": {
     "@expo/metro-runtime": "^55.0.6",

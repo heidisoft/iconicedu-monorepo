@@ -199,6 +199,22 @@ describe('MessagesContainer', () => {
     expect(message.core.sender.ids.id).toBe('profile-2');
   });
 
+  it('offers audience selection to a non-staff channel sender', async () => {
+    render(
+      <MessagesContainer
+        channel={channel}
+        currentUserId="profile-1"
+        currentUserProfile={makeParticipant('profile-1', 'guardian')}
+        enableMessageAudience
+      />,
+    );
+
+    await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+    expect(latestMessageInputProps.current?.audienceParticipants).toEqual(
+      channel.collections.participants,
+    );
+  });
+
   it('renders typing indicator for other participants', async () => {
     const onEventHandlers: Array<(event: any) => void> = [];
     const realtimeClient = {
@@ -1026,6 +1042,7 @@ describe('MessagesContainer', () => {
             undefined,
             null,
             'client-msg-1',
+            ['parent-1'],
           );
         } catch {
           // handleSendMessage rethrows on failure by design — swallow here,
@@ -1039,6 +1056,7 @@ describe('MessagesContainer', () => {
         expect.objectContaining({
           content: 'hello there',
           clientMessageId: 'client-msg-1',
+          audience: { profileIds: ['parent-1'] },
         }),
       );
       // Not deleted — kept around as a "Not sent" bubble instead.
@@ -1055,7 +1073,10 @@ describe('MessagesContainer', () => {
       // safe against duplicates if the first attempt actually landed server-side.
       await waitFor(() => expect(sendTextMessage).toHaveBeenCalledTimes(2));
       expect(sendTextMessage.mock.calls[1][0]).toEqual(
-        expect.objectContaining({ clientMessageId: 'client-msg-1' }),
+        expect.objectContaining({
+          clientMessageId: 'client-msg-1',
+          audience: { profileIds: ['parent-1'] },
+        }),
       );
       await waitFor(() =>
         expect(updateMessage).toHaveBeenCalledWith(

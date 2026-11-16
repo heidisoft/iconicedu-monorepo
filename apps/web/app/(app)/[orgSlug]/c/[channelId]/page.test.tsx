@@ -85,6 +85,7 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableMessageSendReliability: {
     run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),
   },
+  enableChannelCommunications: { run: async () => false },
 }));
 
 describe('d/c/[channelId] page', () => {

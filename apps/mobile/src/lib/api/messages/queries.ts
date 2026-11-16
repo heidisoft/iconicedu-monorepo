@@ -172,6 +172,7 @@ export type SendTextMessageOptions = {
   mentions?: MessageMentionVM[];
   /** Id of the message this one is quoting — see MessageSendTextInput.replyToMessageId. */
   replyToMessageId?: string | null;
+  audienceProfileIds?: string[];
 };
 
 export async function sendTextMessage(
@@ -200,6 +201,9 @@ export async function sendTextMessage(
     ...(options.replyToMessageId ? { replyToMessageId: options.replyToMessageId } : {}),
     ...(options.clientMessageId ? { clientMessageId: options.clientMessageId } : {}),
     ...(options.mentions?.length ? { mentions: options.mentions } : {}),
+    ...(options.audienceProfileIds?.length
+      ? { audience: { profileIds: options.audienceProfileIds } }
+      : {}),
   } satisfies MessageSendTextInput);
 }
 
@@ -306,6 +310,7 @@ export async function sendFileMessage(
   threadParentId?: string,
   threadId?: string,
   clientMessageId?: string,
+  audienceProfileIds?: string[],
 ) {
   const result = await apiPost<{ id: string }>('/messages/file', {
     orgId,
@@ -320,6 +325,9 @@ export async function sendFileMessage(
     threadParentId: threadParentId ?? null,
     threadId: threadId ?? null,
     ...(clientMessageId ? { clientMessageId } : {}),
+    ...(audienceProfileIds?.length
+      ? { audience: { profileIds: audienceProfileIds } }
+      : {}),
   } satisfies MessageSendFileInput);
 
   return { id: result.id };
@@ -334,6 +342,7 @@ export async function sendFilesMessage(
   threadParentId?: string,
   threadId?: string,
   clientMessageId?: string,
+  audienceProfileIds?: string[],
 ) {
   if (!files.length) throw new Error('No files provided');
   const result = await apiPost<{ id: string }>('/messages/files', {
@@ -350,6 +359,9 @@ export async function sendFilesMessage(
     threadParentId: threadParentId ?? null,
     threadId: threadId ?? null,
     ...(clientMessageId ? { clientMessageId } : {}),
+    ...(audienceProfileIds?.length
+      ? { audience: { profileIds: audienceProfileIds } }
+      : {}),
   } satisfies MessageSendFilesInput);
 
   return { id: result.id };

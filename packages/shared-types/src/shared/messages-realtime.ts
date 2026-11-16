@@ -1,6 +1,14 @@
 import type { MessageVM } from '../vm/message';
 import type { MessageMentionVM } from '../vm/message';
 
+/**
+ * Explicit immutable audience for a message posted in a non-DM channel.
+ * Role-based UI choices are resolved to profile ids before crossing the API boundary.
+ */
+export type MessageAudienceInput = {
+  profileIds: string[];
+};
+
 export type MessageRealtimeEvent =
   | { type: 'message-added'; message: MessageVM }
   | { type: 'message-updated'; message: MessageVM }
@@ -68,6 +76,7 @@ export type MessageSendTextInput = {
    * message instead of inserting a duplicate.
    */
   clientMessageId?: string;
+  audience?: MessageAudienceInput | null;
 };
 
 export type MessageSendFileInput = {
@@ -84,6 +93,7 @@ export type MessageSendFileInput = {
   threadParentId?: string | null;
   threadId?: string | null;
   clientMessageId?: string;
+  audience?: MessageAudienceInput | null;
 };
 
 export type MessageSendFilesInput = {
@@ -101,6 +111,7 @@ export type MessageSendFilesInput = {
   threadParentId?: string | null;
   threadId?: string | null;
   clientMessageId?: string;
+  audience?: MessageAudienceInput | null;
 };
 
 export type MessageToggleReactionInput = {

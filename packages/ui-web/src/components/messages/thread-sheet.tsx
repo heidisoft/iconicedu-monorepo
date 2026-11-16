@@ -63,6 +63,20 @@ export function ThreadSheet({
     () => (parentMessage ? [parentMessage, ...replies.items] : replies.items),
     [parentMessage, replies.items],
   );
+  const inheritedAudienceLabel = useMemo(() => {
+    const visibility = parentMessage?.core.visibility;
+    if (!visibility || visibility.type !== 'specific-users') return null;
+    const namesById = new Map(
+      channel.collections.participants.map((participant) => [
+        participant.ids.id,
+        participant.profile.displayName,
+      ]),
+    );
+    const names = visibility.userIds
+      .map((id) => namesById.get(id))
+      .filter((name): name is string => Boolean(name));
+    return names.length ? names.join(', ') : 'the original audience';
+  }, [channel.collections.participants, parentMessage]);
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageCountRef = useRef(messages.length);
@@ -130,6 +144,7 @@ export function ThreadSheet({
             participants={channel.collections.participants}
             currentUserId={currentUserId}
             showCreateMessageTypeButton={showCreateMessageTypeButton}
+            inheritedAudienceLabel={inheritedAudienceLabel}
           />
         )}
       </div>
