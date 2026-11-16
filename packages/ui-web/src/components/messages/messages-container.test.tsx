@@ -1026,6 +1026,7 @@ describe('MessagesContainer', () => {
             undefined,
             null,
             'client-msg-1',
+            ['parent-1'],
           );
         } catch {
           // handleSendMessage rethrows on failure by design — swallow here,
@@ -1039,6 +1040,7 @@ describe('MessagesContainer', () => {
         expect.objectContaining({
           content: 'hello there',
           clientMessageId: 'client-msg-1',
+          audience: { profileIds: ['parent-1'] },
         }),
       );
       // Not deleted — kept around as a "Not sent" bubble instead.
@@ -1055,7 +1057,10 @@ describe('MessagesContainer', () => {
       // safe against duplicates if the first attempt actually landed server-side.
       await waitFor(() => expect(sendTextMessage).toHaveBeenCalledTimes(2));
       expect(sendTextMessage.mock.calls[1][0]).toEqual(
-        expect.objectContaining({ clientMessageId: 'client-msg-1' }),
+        expect.objectContaining({
+          clientMessageId: 'client-msg-1',
+          audience: { profileIds: ['parent-1'] },
+        }),
       );
       await waitFor(() =>
         expect(updateMessage).toHaveBeenCalledWith(

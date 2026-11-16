@@ -776,7 +776,7 @@ jobs:
           set -euo pipefail
           MIGRATION_LOG=$(mktemp)
 
-          for ATTEMPT in 1 2 3; do
+          for ATTEMPT in 1 2 3 4 5 6; do
             : > "$MIGRATION_LOG"
 
             if supabase db push \
@@ -787,14 +787,25 @@ jobs:
             fi
 
             # A newly provisioned hosted branch can report ready just before its
-            # migration-history copy finishes. Retry only that exact race; SQL
-            # errors and every other failure must still stop the deployment.
-            if ! grep -q 'schema_migrations_pkey' "$MIGRATION_LOG" || \
-              ! grep -Eq 'Key \(version\)=\([0-9]+\) already exists' "$MIGRATION_LOG"; then
+            # migration-history copy finishes. During that window db push may
+            # see either a duplicate history row or a schema object that the
+            # hosted migration runner already created. Retry only those exact
+            # provisioning races; persistent SQL errors still fail below.
+            HISTORY_ROW_RACE=false
+            HOSTED_SCHEMA_RACE=false
+            if grep -q 'schema_migrations_pkey' "$MIGRATION_LOG" && \
+              grep -Eq 'Key \(version\)=\([0-9]+\) already exists' "$MIGRATION_LOG"; then
+              HISTORY_ROW_RACE=true
+            fi
+            if [[ '${{ steps.supabase-branch.outputs.branch_new }}' == 'true' ]] && \
+              grep -Eq 'already exists \(SQLSTATE (42710|42P07)\)' "$MIGRATION_LOG"; then
+              HOSTED_SCHEMA_RACE=true
+            fi
+            if [[ "$HISTORY_ROW_RACE" != 'true' && "$HOSTED_SCHEMA_RACE" != 'true' ]]; then
               exit 1
             fi
 
-            if [[ "$ATTEMPT" -eq 3 ]]; then
+            if [[ "$ATTEMPT" -eq 6 ]]; then
               echo "::error::Supabase migration history did not stabilize after $ATTEMPT attempts"
               exit 1
             fi

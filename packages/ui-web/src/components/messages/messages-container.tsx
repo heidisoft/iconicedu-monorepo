@@ -433,6 +433,7 @@ export function MessagesContainer({
         mentions?: MessageMentionVM[];
         homework?: AssignmentSendInput;
         clientMessageId: string;
+        audienceProfileIds?: string[];
       }
     >
   >({});
@@ -1005,6 +1006,7 @@ export function MessagesContainer({
                   mentions,
                   homework,
                   clientMessageId,
+                  audienceProfileIds,
                 },
               }));
             } else {
@@ -1055,6 +1057,9 @@ export function MessagesContainer({
               mentions: failed.mentions,
               homework: failed.homework,
               clientMessageId: failed.clientMessageId,
+              audience: failed.audienceProfileIds?.length
+                ? { profileIds: failed.audienceProfileIds }
+                : undefined,
             }),
           );
           clearFailedSend(messageId);
