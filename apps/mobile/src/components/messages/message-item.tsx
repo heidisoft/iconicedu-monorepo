@@ -945,8 +945,7 @@ function getVisibilityLabel(message: MessageVM): string | null {
   if (visibility.type === 'sender-only') return 'Only visible to you';
   if (visibility.type === 'recipient-only') return 'Only visible to recipient';
   if (visibility.type === 'specific-users') {
-    const count = visibility.userIds.length;
-    return `Private · ${count} ${count === 1 ? 'person' : 'people'}`;
+    return 'Only visible to selected people';
   }
   return 'Private';
 }
@@ -963,15 +962,7 @@ export function VisibilityBadge({
 
   return (
     <Tooltip delayDuration={0}>
-      <TooltipTrigger
-        accessibilityRole="button"
-        accessibilityLabel={
-          message.core.visibility.type === 'specific-users'
-            ? 'Visible to specific users'
-            : label
-        }
-        hitSlop={8}
-      >
+      <TooltipTrigger accessibilityRole="button" accessibilityLabel={label} hitSlop={8}>
         <View
           testID="message-visibility-badge"
           style={[
@@ -983,6 +974,9 @@ export function VisibilityBadge({
           ]}
         >
           <EyeOff size={10} color={colors.textMuted} />
+          <Text style={[visibilityBadgeStyles.label, { color: colors.textMuted }]}>
+            {label}
+          </Text>
         </View>
       </TooltipTrigger>
       <TooltipContent sideOffset={6} className="rounded-full px-2.5 py-1">
@@ -1000,6 +994,11 @@ const visibilityBadgeStyles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 4,
+    gap: 4,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });
 

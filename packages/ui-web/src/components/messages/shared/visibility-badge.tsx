@@ -27,8 +27,8 @@ function getVisibilityText(
     const names = visibility.userIds
       .map((id) => participantNames.get(id))
       .filter((name): name is string => Boolean(name));
-    if (!names.length) return 'Private message';
-    return `Private · ${names.join(', ')}`;
+    if (!names.length) return 'Only visible to selected people';
+    return `Only visible to ${names.join(', ')}`;
   }
   return 'Private';
 }
