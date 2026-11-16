@@ -115,5 +115,9 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     );
   }
 
+  if (key === mobileFeatureFlagKeys.enableChannelCommunications) {
+    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_CHANNEL_COMMUNICATIONS);
+  }
+
   return false;
 }
