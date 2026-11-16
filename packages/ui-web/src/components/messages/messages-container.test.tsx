@@ -199,6 +199,22 @@ describe('MessagesContainer', () => {
     expect(message.core.sender.ids.id).toBe('profile-2');
   });
 
+  it('offers audience selection to a non-staff channel sender', async () => {
+    render(
+      <MessagesContainer
+        channel={channel}
+        currentUserId="profile-1"
+        currentUserProfile={makeParticipant('profile-1', 'guardian')}
+        enableMessageAudience
+      />,
+    );
+
+    await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+    expect(latestMessageInputProps.current?.audienceParticipants).toEqual(
+      channel.collections.participants,
+    );
+  });
+
   it('renders typing indicator for other participants', async () => {
     const onEventHandlers: Array<(event: any) => void> = [];
     const realtimeClient = {

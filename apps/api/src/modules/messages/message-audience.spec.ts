@@ -30,7 +30,6 @@ const base = {
   orgId: 'org-1',
   channelId: 'channel-1',
   senderProfileId: 'staff-1',
-  isStaffSender: true,
   supportVisibility: { visibility_type: 'all' as const },
 };
 
@@ -128,16 +127,25 @@ describe('resolveChannelAudienceVisibility', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('rejects non-staff and disabled-flag audience requests', async () => {
+  it('allows any channel member to choose an audience', async () => {
+    const memberQuery = queryReturning({
+      data: [{ profile_id: 'tutor-1' }],
+      error: null,
+    });
     await expect(
       resolveChannelAudienceVisibility({
         ...base,
-        serviceSupabase: { from: jest.fn() } as never,
-        isStaffSender: false,
-        requestedProfileIds: ['parent-1'],
+        serviceSupabase: { from: jest.fn(() => memberQuery) } as never,
+        senderProfileId: 'parent-1',
+        requestedProfileIds: ['tutor-1'],
       }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).resolves.toEqual({
+      visibility_type: 'specific-users',
+      visibility_user_ids: ['parent-1', 'tutor-1'],
+    });
+  });
 
+  it('rejects disabled-flag audience requests', async () => {
     jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
     await expect(
       resolveChannelAudienceVisibility({

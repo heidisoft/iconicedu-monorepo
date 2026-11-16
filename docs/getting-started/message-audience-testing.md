@@ -1,6 +1,6 @@
 # Channel Message Audience E2E Testing
 
-This guide verifies staff identity labels and restricted audiences in ordinary channels and learning-space classrooms. Direct messages and support-channel behavior must remain unchanged.
+This guide verifies staff identity labels and restricted audiences in ordinary channels and learning-space classrooms. Every channel member who can post can choose a message audience. Direct messages and support-channel behavior remain unchanged.
 
 ## What the suite proves
 
@@ -14,7 +14,8 @@ The test matrix covers:
 - deleting a reply, a root message without replies, and a root message with replies;
 - hidden content staying absent from channel history, search, pins, saved items, files, unread counts, notifications, and reconnects;
 - a clear `Staff` sender badge on web and mobile, including DMs;
-- no audience selector in DMs, group DMs, support channels, or non-staff composers.
+- audience selection for staff, parents, students, and tutors who can post;
+- no audience selector in DMs, group DMs, or support channels.
 
 ## Test data
 
@@ -22,13 +23,13 @@ Use one synthetic organization and a dedicated synthetic classroom. Never use an
 
 | Persona          | Profile kind                                        | Purpose                                             |
 | ---------------- | --------------------------------------------------- | --------------------------------------------------- |
-| Staff sender     | `staff` with an organization staff/admin/owner role | Sends all audience variants                         |
-| Parent A         | `guardian`                                          | Included in parent messages                         |
+| Staff sender     | `staff` with an organization staff/admin/owner role | Sends staff-authored audience variants              |
+| Parent A         | `guardian`                                          | Receives parent messages and sends a tutor message  |
 | Student A        | `child`                                             | Confirms parent-only exclusion                      |
 | Tutor A          | `educator`                                          | Included in tutor messages                          |
 | Unrelated parent | `guardian`                                          | Confirms named-recipient and cross-family exclusion |
 
-Enable `enable-channel-communications` for the staff profile. Keep the flag off for one separate staff profile to verify the dark rollout. Enable the existing edit, reply, search, pinning, drafts, and send-reliability flags when exercising those capabilities.
+Enable `enable-channel-communications` for every test sender. Keep the flag off for one separate profile to verify the dark rollout. Enable the existing edit, reply, search, pinning, drafts, and send-reliability flags when exercising those capabilities.
 
 Apply all migrations and start the local stack:
 
@@ -57,7 +58,7 @@ pnpm --filter web exec playwright test \
   --workers=1 --retries=0
 ```
 
-The suite uses three independent browser contexts. It sends a public welcome, parent-only payment message, private thread reply, and tutor-only handover; it then verifies visibility from each persona and deletes the tutor message.
+The suite uses three independent browser contexts. It sends a public welcome, parent-only payment message, private thread reply, and tutor-only handover from staff. It then sends a tutor-only message from the parent account, verifies visibility from every persona, and deletes the staff-authored tutor message.
 
 ## Automated mobile smoke suite
 
@@ -71,7 +72,7 @@ maestro test \
   .maestro/message-audiences.yaml
 ```
 
-This smoke flow verifies that the staff audience picker appears and can send parent and tutor messages. Run the web multi-persona suite for authoritative cross-user privacy checks because one Maestro device holds one signed-in persona.
+This smoke flow can run under any channel member account. It verifies that the audience picker appears and can send parent and tutor messages. Run the web multi-persona suite for authoritative cross-user privacy checks because one Maestro device holds one signed-in persona.
 
 ## Manual web and mobile parity matrix
 
@@ -100,7 +101,7 @@ For each restricted message, verify the excluded account cannot retrieve the mes
 6. inbox/activity feed, push, email, and unread counters;
 7. a forged API request containing a cross-organization or non-member profile ID.
 
-The API must reject audience requests from non-staff, requests for DMs/group DMs, empty effective audiences, disabled-flag callers, and recipients without active channel membership. A thread reply with an audience payload must be rejected; the server and database copy the parent audience.
+The API accepts audience requests from any channel member who can post. It must reject requests for DMs/group DMs, empty effective audiences, disabled-flag callers, and recipients without active channel membership. A thread reply with an audience payload must be rejected; the server and database copy the parent audience.
 
 ## Focused verification
 

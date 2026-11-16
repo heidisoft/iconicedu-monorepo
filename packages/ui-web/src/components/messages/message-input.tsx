@@ -222,7 +222,7 @@ interface MessageInputProps {
     timezone: string;
   }) => Promise<void> | void;
   enableMessageReplyReference?: boolean;
-  /** Eligible recipients for staff-only audience selection. Omit for DMs and non-staff. */
+  /** Eligible channel recipients for audience selection. Omit for DMs and managed support conversations. */
   audienceParticipants?: UserProfileVM[];
   /** Fixed audience description for a private thread reply composer. */
   inheritedAudienceLabel?: string | null;

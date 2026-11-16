@@ -451,7 +451,6 @@ export async function resolveChannelAudienceVisibility(input: {
   orgId: string;
   channelId: string;
   senderProfileId: string;
-  isStaffSender: boolean;
   threadParentId?: string | null;
   replyToMessageId?: string | null;
   requestedProfileIds?: unknown;
@@ -533,9 +532,6 @@ export async function resolveChannelAudienceVisibility(input: {
   }
   if (input.activityContext.channelRouteKind === 'dm') {
     throw new BadRequestException('Direct message audiences cannot be changed');
-  }
-  if (!input.isStaffSender) {
-    throw new ForbiddenException('Only staff can choose a channel message audience');
   }
   const audienceEnabled = await evaluateApiBooleanFlag({
     flagKey: apiFeatureFlagKeys.enableChannelCommunications,
@@ -1594,7 +1590,6 @@ export class MessagesService {
         orgId: input.orgId,
         channelId: input.channelId,
         senderProfileId: actor.profile.id,
-        isStaffSender: staffSender,
         threadParentId: input.threadParentId,
         replyToMessageId: input.replyToMessageId,
         requestedProfileIds: input.audience?.profileIds,
@@ -1956,7 +1951,6 @@ export class MessagesService {
         orgId: input.orgId,
         channelId: input.channelId,
         senderProfileId: actor.profile.id,
-        isStaffSender: staffSender,
         threadParentId: input.threadParentId,
         requestedProfileIds: input.audience?.profileIds,
         supportVisibility,
@@ -2228,7 +2222,6 @@ export class MessagesService {
         orgId: input.orgId,
         channelId: input.channelId,
         senderProfileId: actor.profile.id,
-        isStaffSender: staffSender,
         threadParentId: input.threadParentId,
         requestedProfileIds: input.audience?.profileIds,
         supportVisibility,

@@ -138,9 +138,8 @@ export default function ChannelConversationScreen() {
   const resolvedThemeKey = channelMeta?.themeKey ?? null;
   const resolvedMessageUiThemeKey = channelMeta?.messageUiThemeKey ?? 'feed';
 
-  const canChooseMessageAudience =
-    enableChannelCommunications && profileKind === 'staff' && !isSupportChannel;
-  // Channel members power mention autocomplete and staff audience selection.
+  const canChooseMessageAudience = enableChannelCommunications && !isSupportChannel;
+  // Channel members power mention autocomplete and audience selection.
   const { data: channelMembers } = useQuery({
     queryKey: ['channelMembers', orgId, channelId, profileId] as const,
     queryFn: () => fetchChannelMembers(orgId, channelId ?? '', profileId),

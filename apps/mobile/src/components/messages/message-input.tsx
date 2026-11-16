@@ -196,7 +196,7 @@ type MessageInputProps = {
   // ── Send-failure recovery (capability #2) — gate with enableMessageSendReliability ──
   /** When true, onSend receives a fresh clientMessageId in `meta` on every attempt. */
   enableSendReliability?: boolean;
-  /** Eligible recipients for staff audience selection; omitted in DMs and for non-staff. */
+  /** Eligible channel recipients for audience selection; omitted in DMs and managed support conversations. */
   audienceParticipants?: MessageAudienceParticipant[];
 };
 

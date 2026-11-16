@@ -18,8 +18,8 @@ async function send(page: Page, text: string) {
   await expect(page.getByText(text, { exact: true })).toBeVisible();
 }
 
-test.describe('staff channel message audiences', () => {
-  test('keeps parent and tutor messages private through threads, edits, and deletion', async ({
+test.describe('channel message audiences', () => {
+  test('lets every channel member target recipients and preserves privacy through threads and deletion', async ({
     browser,
   }) => {
     test.skip(
@@ -32,6 +32,7 @@ test.describe('staff channel message audiences', () => {
     const parentText = `E2E parent payment ${runId}`;
     const parentReply = `E2E parent reply ${runId}`;
     const tutorText = `E2E tutor handover ${runId}`;
+    const parentToTutorText = `E2E parent to tutor ${runId}`;
 
     const staff = await openAs(browser, staffAuth!);
     const parent = await openAs(browser, parentAuth!);
@@ -77,6 +78,22 @@ test.describe('staff channel message audiences', () => {
       await expect(tutor.page.getByText(tutorText, { exact: true })).toBeVisible();
       await parent.page.reload();
       await expect(parent.page.getByText(tutorText, { exact: true })).toHaveCount(0);
+
+      // Audience targeting belongs to every channel sender, not only staff/admins.
+      await expect(
+        parent.page.getByRole('button', { name: /Message audience: Everyone/i }),
+      ).toBeVisible();
+      await parent.page.getByRole('button', { name: /Message audience:/i }).click();
+      await parent.page.getByText(/^Tutor(s)?$/).click();
+      await send(parent.page, parentToTutorText);
+      await tutor.page.reload();
+      await expect(
+        tutor.page.getByText(parentToTutorText, { exact: true }),
+      ).toBeVisible();
+      await staff.page.reload();
+      await expect(staff.page.getByText(parentToTutorText, { exact: true })).toHaveCount(
+        0,
+      );
 
       // Deletion must remove the restricted content for every allowed reader.
       const tutorMessage = staff.page.getByText(tutorText, { exact: true });

@@ -1,11 +1,12 @@
 appId: ${APP_ID}
-name: Staff channel message audiences
+name: Channel member message audiences
 ---
 - launchApp:
     clearState: false
 - openLink: ${CLASSROOM_DEEP_LINK}
 - assertVisible:
     id: message-audience-picker
+- assertVisible: 'Everyone'
 - tapOn: 'Parents'
 - tapOn:
     id: message-input
@@ -13,6 +14,7 @@ name: Staff channel message audiences
 - tapOn: 'Send message'
 - assertVisible: 'Maestro parent-only welcome'
 - assertVisible: 'Private.*'
+- assertVisible: 'Visible only to.*'
 - tapOn: 'Tutors'
 - tapOn:
     id: message-input

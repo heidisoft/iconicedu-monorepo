@@ -2342,7 +2342,6 @@ export function MessagesContainer({
               participants={participants}
               audienceParticipants={
                 enableMessageAudience &&
-                currentUserProfile?.kind === 'staff' &&
                 channel.basics.kind === 'channel' &&
                 channel.basics.purpose !== 'support'
                   ? participants
