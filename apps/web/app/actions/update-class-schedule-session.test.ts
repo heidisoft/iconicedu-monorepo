@@ -10,7 +10,6 @@ const getLearningSpaceDetailMock = vi.fn();
 const getClassScheduleSessionContextMock = vi.fn();
 const apiPostMock = vi.fn();
 const revalidatePathMock = vi.fn();
-const enableClassScheduleSeriesRescheduleRunMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) =>
@@ -52,12 +51,6 @@ vi.mock('@iconicedu/web/lib/api/http-client', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
-}));
-
-vi.mock('@iconicedu/web/flags', () => ({
-  enableClassScheduleSeriesReschedule: {
-    run: (...args: unknown[]) => enableClassScheduleSeriesRescheduleRunMock(...args),
-  },
 }));
 
 import { updateClassScheduleSessionAction } from './update-class-schedule-session';
@@ -158,7 +151,6 @@ describe('updateClassScheduleSessionAction', () => {
     getLearningSpaceDetailMock.mockReset();
     apiPostMock.mockReset();
     revalidatePathMock.mockReset();
-    enableClassScheduleSeriesRescheduleRunMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
     getClassScheduleSessionContextMock.mockResolvedValue(createSessionContext());
@@ -170,9 +162,6 @@ describe('updateClassScheduleSessionAction', () => {
       data: { id: 'profile-1' },
     });
     apiPostMock.mockResolvedValue({ success: true, mode: 'recurring' });
-    // ON by default in this suite so the existing scope:'all' tests exercise
-    // real behavior; the dedicated OFF test below overrides this per-case.
-    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(true);
   });
 
   it('delegates recurring reschedules to the API without rewriting exceptions', async () => {
@@ -406,29 +395,6 @@ describe('updateClassScheduleSessionAction', () => {
         scope: 'all',
       }),
     ).rejects.toThrow('Only recurring sessions support editing the whole series.');
-  });
-
-  it("scope 'all' rejects the request when enable-class-schedule-series-reschedule is off", async () => {
-    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(false);
-    getLearningSpaceDetailMock.mockResolvedValue(
-      createLearningSpaceDetail({
-        rule: { frequency: 'weekly', timezone: 'America/New_York' },
-      }),
-    );
-
-    await expect(
-      updateClassScheduleSessionAction({
-        orgSlug: 'iconic-academy',
-        scheduleId: 'schedule-1',
-        occurrenceKey: '2026-03-21T14:00:00.000Z',
-        date: '2026-03-24',
-        startTime: '14:00',
-        endTime: '15:00',
-        timezone: 'America/New_York',
-        scope: 'all',
-      }),
-    ).rejects.toThrow('This feature is not available yet.');
-    expect(apiPostMock).not.toHaveBeenCalled();
   });
 
   it('rejects edits when the API reports the classroom is archived', async () => {

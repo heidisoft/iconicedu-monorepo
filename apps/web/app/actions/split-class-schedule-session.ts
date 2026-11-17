@@ -12,7 +12,6 @@ import {
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { getClassScheduleSessionContext } from '@iconicedu/web/lib/api/schedules';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
-import { enableClassScheduleSeriesReschedule } from '@iconicedu/web/flags';
 
 /** "This and following events": splits the recurring series at the edited
  * occurrence — everything before it keeps the old day/time (and its history,
@@ -95,13 +94,6 @@ export async function splitClassScheduleSessionAction(
   const profileResponse = await getProfileByAccountId(supabase, account.id);
   if (!profileResponse.data) {
     throw new Error('Profile record not found');
-  }
-
-  const seriesRescheduleEnabled = await enableClassScheduleSeriesReschedule.run({
-    identify: { profileId: profileResponse.data.id },
-  });
-  if (!seriesRescheduleEnabled) {
-    throw new Error('This feature is not available yet.');
   }
 
   const sessionContext = await getClassScheduleSessionContext(supabase, {

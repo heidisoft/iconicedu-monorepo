@@ -22,7 +22,6 @@ interface EventCardProps {
   compact?: boolean;
   canCancelSession?: boolean;
   canEditSession?: boolean;
-  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -38,7 +37,6 @@ export function EventCard({
   compact = false,
   canCancelSession = false,
   canEditSession = false,
-  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: EventCardProps) {
@@ -120,7 +118,6 @@ export function EventCard({
       onOpenChange={setOpen}
       canCancelSession={canCancelSession}
       canEditSession={canEditSession}
-      canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
       onCancelSession={onCancelSession}
       onEditSession={onEditSession}
     >

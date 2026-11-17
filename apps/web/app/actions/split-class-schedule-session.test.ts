@@ -10,7 +10,6 @@ const getLearningSpaceDetailMock = vi.fn();
 const getClassScheduleSessionContextMock = vi.fn();
 const apiPostMock = vi.fn();
 const revalidatePathMock = vi.fn();
-const enableClassScheduleSeriesRescheduleRunMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) =>
@@ -52,12 +51,6 @@ vi.mock('@iconicedu/web/lib/api/http-client', () => ({
 
 vi.mock('next/cache', () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
-}));
-
-vi.mock('@iconicedu/web/flags', () => ({
-  enableClassScheduleSeriesReschedule: {
-    run: (...args: unknown[]) => enableClassScheduleSeriesRescheduleRunMock(...args),
-  },
 }));
 
 import { splitClassScheduleSessionAction } from './split-class-schedule-session';
@@ -134,7 +127,6 @@ describe('splitClassScheduleSessionAction', () => {
     getLearningSpaceDetailMock.mockReset();
     apiPostMock.mockReset();
     revalidatePathMock.mockReset();
-    enableClassScheduleSeriesRescheduleRunMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
     getClassScheduleSessionContextMock.mockResolvedValue(createSessionContext());
@@ -144,8 +136,6 @@ describe('splitClassScheduleSessionAction', () => {
     });
     getProfileByAccountIdMock.mockResolvedValue({ data: { id: 'profile-1' } });
     getLearningSpaceDetailMock.mockResolvedValue(createLearningSpaceDetail());
-    // ON by default in this suite; the dedicated OFF test overrides this.
-    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(true);
     apiPostMock.mockResolvedValue({
       success: true,
       oldScheduleId: 'schedule-1',
@@ -242,23 +232,6 @@ describe('splitClassScheduleSessionAction', () => {
         timezone: 'America/New_York',
       }),
     ).rejects.toThrow('Only staff or owner users can edit sessions.');
-  });
-
-  it('rejects the request when enable-class-schedule-series-reschedule is off', async () => {
-    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(false);
-
-    await expect(
-      splitClassScheduleSessionAction({
-        orgSlug: 'iconic-academy',
-        scheduleId: 'schedule-1',
-        occurrenceKey: '2026-09-23T13:10:00.000Z',
-        date: '2026-09-22',
-        startTime: '14:00',
-        endTime: '15:00',
-        timezone: 'America/New_York',
-      }),
-    ).rejects.toThrow('This feature is not available yet.');
-    expect(apiPostMock).not.toHaveBeenCalled();
   });
 
   it('rejects edits when the API reports the classroom is archived', async () => {

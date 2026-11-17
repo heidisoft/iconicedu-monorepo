@@ -40,7 +40,6 @@ interface EventActionsProps {
   /** enable-class-schedule-series-reschedule flag — gates the "This and
    * following events"/"All events" quick-edit scopes; "This event" (today's
    * per-occurrence edit) is unaffected by this flag. */
-  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -92,7 +91,6 @@ export function EventActions({
   onClose,
   canCancelSession = false,
   canEditSession = false,
-  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: EventActionsProps) {
@@ -151,7 +149,6 @@ export function EventActions({
   // complex (multi-weekday, monthly/yearly) or already-elapsed still only
   // offers "This event" (today's per-occurrence override behavior).
   const canOfferSeriesScopes =
-    canUseSeriesRescheduleScopes &&
     isRecurringSession &&
     isSimpleWeeklyRecurrence(event) &&
     isTodayOrLaterLocalDate(

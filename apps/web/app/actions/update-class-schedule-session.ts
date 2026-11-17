@@ -14,7 +14,6 @@ import { createApiClient } from '@iconicedu/web/lib/api/http-client';
 import { getClassScheduleSessionContext } from '@iconicedu/web/lib/api/schedules';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { getLocalDate } from '@iconicedu/utils';
-import { enableClassScheduleSeriesReschedule } from '@iconicedu/web/flags';
 
 export type UpdateClassScheduleSessionActionInput = {
   orgSlug: string;
@@ -137,12 +136,6 @@ export async function updateClassScheduleSessionAction(
   };
 
   if (input.scope === 'all') {
-    const seriesRescheduleEnabled = await enableClassScheduleSeriesReschedule.run({
-      identify: { profileId: actorProfile.id },
-    });
-    if (!seriesRescheduleEnabled) {
-      throw new Error('This feature is not available yet.');
-    }
     if (!isRecurringSchedule) {
       throw new Error('Only recurring sessions support editing the whole series.');
     }
