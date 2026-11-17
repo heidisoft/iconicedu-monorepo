@@ -244,23 +244,6 @@ export const enableMessageListFormatting = flag<boolean, { profileId?: string | 
   },
 });
 
-export const enableMessageDrafts = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableMessageDrafts,
-  description:
-    'Autosaves and restores in-progress message drafts (main and thread composers) on web and mobile.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableMessageDrafts,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMobileMessageComposerParity = flag<
   boolean,
   { profileId?: string | null }
@@ -350,7 +333,6 @@ export const webFlags = {
   enableMessageListFormatting,
   enableMobileAppleSignIn,
   enableMobileGoogleSignIn,
-  enableMessageDrafts,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
 } as const;

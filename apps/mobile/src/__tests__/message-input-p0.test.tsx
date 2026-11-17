@@ -21,7 +21,7 @@ beforeEach(async () => {
   await AsyncStorage.clear();
 });
 
-describe('MessageInput — drafts (enableMessageDrafts)', () => {
+describe('MessageInput — drafts', () => {
   it('is inert when enableDrafts is false: no autosave, no status hint', async () => {
     jest.useFakeTimers();
     render(

@@ -107,9 +107,6 @@ export default function DmConversationScreen() {
   const enableMessageMarkUnread = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
-  const enableMessageDrafts = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMessageDrafts,
-  );
   const enableMobileMessageComposerParity = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileMessageComposerParity,
   );
@@ -1014,7 +1011,7 @@ export default function DmConversationScreen() {
             onScheduleSend={p2.scheduleSend}
             quoteReplyTo={quoteReplyTarget}
             onCancelQuoteReply={() => setQuoteReplyTarget(null)}
-            enableDrafts={enableMessageDrafts}
+            enableDrafts
             draftScope={
               orgId && profileId && accountId && channelId
                 ? { accountId, profileId, orgId, channelId }

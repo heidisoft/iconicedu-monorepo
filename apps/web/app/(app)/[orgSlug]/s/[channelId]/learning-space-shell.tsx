@@ -28,7 +28,6 @@ export function LearningSpaceShell({
   enableMessageReplyReference = false,
   enableNotificationConversationControls = false,
   enableMessageListFormatting = false,
-  enableMessageDrafts = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
   sendTextMessage,
@@ -54,7 +53,6 @@ export function LearningSpaceShell({
   enableMessageReplyReference?: boolean;
   enableNotificationConversationControls?: boolean;
   enableMessageListFormatting?: boolean;
-  enableMessageDrafts?: boolean;
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
@@ -93,7 +91,6 @@ export function LearningSpaceShell({
       enableMessageReplyReference={enableMessageReplyReference}
       enableNotificationConversationControls={enableNotificationConversationControls}
       enableMessageListFormatting={enableMessageListFormatting}
-      enableMessageDrafts={enableMessageDrafts}
       enableMessageSendReliability={enableMessageSendReliability}
       enableMessageAudience={enableMessageAudience}
       panelRegistry={{

@@ -79,13 +79,9 @@ describe('mobile feature flags', () => {
   });
 
   it('keeps the remaining messaging P0 flags off by default', () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS;
     delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY;
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY;
 
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageDrafts),
-    ).toBe(false);
     expect(
       getLocalMobileFeatureFlagFallback(
         mobileFeatureFlagKeys.enableMobileMessageComposerParity,
@@ -99,13 +95,9 @@ describe('mobile feature flags', () => {
   });
 
   it('enables the remaining messaging P0 flags from their Expo public env flags', () => {
-    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS = 'true';
     process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY = 'true';
     process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY = 'true';
 
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageDrafts),
-    ).toBe(true);
     expect(
       getLocalMobileFeatureFlagFallback(
         mobileFeatureFlagKeys.enableMobileMessageComposerParity,
@@ -117,7 +109,6 @@ describe('mobile feature flags', () => {
       ),
     ).toBe(true);
 
-    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS;
     delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY;
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY;
   });

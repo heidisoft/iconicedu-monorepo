@@ -83,9 +83,6 @@ export default function ChannelConversationScreen() {
   const enableMessageMarkUnread = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
-  const enableMessageDrafts = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMessageDrafts,
-  );
   const enableMobileMessageComposerParity = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileMessageComposerParity,
   );
@@ -1006,7 +1003,7 @@ export default function ChannelConversationScreen() {
             profileId={profileId}
             enableScheduledSend={p2.enableScheduledSend}
             onScheduleSend={p2.scheduleSend}
-            enableDrafts={enableMessageDrafts}
+            enableDrafts
             draftScope={
               orgId && profileId && accountId && channelId
                 ? { accountId, profileId, orgId, channelId }

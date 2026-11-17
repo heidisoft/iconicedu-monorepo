@@ -169,7 +169,7 @@ type MessageInputProps = {
   /** Called when the user dismisses the quote-reply preview with ✕. */
   onCancelQuoteReply?: () => void;
 
-  // ── Automatic drafts (issue #264 capability #1) — gate with enableMessageDrafts ──
+  // ── Automatic drafts ──
   enableDrafts?: boolean;
   /** Identifies this composer for AsyncStorage draft scoping. Required when enableDrafts is true. */
   draftScope?: MessageDraftScope;

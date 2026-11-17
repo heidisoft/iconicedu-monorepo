@@ -8,7 +8,6 @@ const learningSpaceShellMock = vi.fn(() => null);
 const buildChannelByIdMock = vi.fn();
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
 const enableP1MessagingFlagRunMock = vi.fn(async () => false);
-const enableMessageDraftsRunMock = vi.fn(async () => false);
 const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/ui-web', () => ({
@@ -67,9 +66,6 @@ vi.mock('@iconicedu/web/flags', () => ({
   },
   enableMessageListFormatting: {
     run: (...args: unknown[]) => enableP1MessagingFlagRunMock(...args),
-  },
-  enableMessageDrafts: {
-    run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
   },
   enableMessageSendReliability: {
     run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),

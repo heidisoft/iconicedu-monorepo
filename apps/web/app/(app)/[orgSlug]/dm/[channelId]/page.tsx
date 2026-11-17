@@ -33,7 +33,6 @@ import {
   enableMessageReplyReference,
   enableNotificationConversationControls,
   enableMessageListFormatting,
-  enableMessageDrafts,
   enableMessageSendReliability,
 } from '@iconicedu/web/flags';
 
@@ -95,7 +94,6 @@ export default async function Page({
     replyReferenceEnabled,
     notificationConversationControlsEnabled,
     listFormattingEnabled,
-    messageDraftsEnabled,
     messageSendReliabilityEnabled,
   ] = await Promise.all([
     enableMessageTypeComposer.run({ identify }),
@@ -106,7 +104,6 @@ export default async function Page({
     enableMessageReplyReference.run({ identify }),
     enableNotificationConversationControls.run({ identify }),
     enableMessageListFormatting.run({ identify }),
-    enableMessageDrafts.run({ identify }),
     enableMessageSendReliability.run({ identify }),
   ]);
 
@@ -152,7 +149,6 @@ export default async function Page({
         enableMessageReplyReference={replyReferenceEnabled}
         enableNotificationConversationControls={notificationConversationControlsEnabled}
         enableMessageListFormatting={listFormattingEnabled}
-        enableMessageDrafts={messageDraftsEnabled}
         enableMessageSendReliability={messageSendReliabilityEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
