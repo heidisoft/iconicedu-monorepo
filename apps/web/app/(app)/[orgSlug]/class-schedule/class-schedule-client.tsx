@@ -27,9 +27,6 @@ type ClassScheduleClientProps = {
   orgSlug: string;
   canCancelSessions: boolean;
   canEditSessions: boolean;
-  /** enable-class-schedule-series-reschedule flag — gates the "This and
-   * following events"/"All events" quick-edit scopes. `canEditSessions`
-   * alone still allows today's per-occurrence edit regardless of this flag. */
   timezone?: string | null;
 };
 

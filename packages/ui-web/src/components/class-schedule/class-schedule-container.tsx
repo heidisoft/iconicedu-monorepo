@@ -29,8 +29,6 @@ interface ClassScheduleContainerProps {
   childrenCount?: number;
   canCancelSessions?: boolean;
   canEditSessions?: boolean;
-  /** enable-class-schedule-series-reschedule flag — gates the "This and
-   * following events"/"All events" quick-edit scopes on recurring sessions. */
   editFullScheduleHref?: string | null;
   onCancelSession?: (
     event: DisplayClassScheduleVM,

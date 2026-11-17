@@ -37,9 +37,6 @@ interface EventActionsProps {
   onClose: () => void;
   canCancelSession?: boolean;
   canEditSession?: boolean;
-  /** enable-class-schedule-series-reschedule flag — gates the "This and
-   * following events"/"All events" quick-edit scopes; "This event" (today's
-   * per-occurrence edit) is unaffected by this flag. */
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
