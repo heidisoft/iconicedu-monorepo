@@ -7,15 +7,12 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 }));
 
 import {
-  enableAdminSessionAttendanceAnalytics,
   enableChannelCommunications,
   enableMessageTypeComposer,
   enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
-  enableSessionCompletionDisputeDetails,
-  enableSessionCompletionVerifiedDuration,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -101,36 +98,6 @@ describe('web flags', () => {
     );
   });
 
-  it('declares admin session attendance analytics off by default', () => {
-    expect(enableAdminSessionAttendanceAnalytics.key).toBe(
-      'admin-session-attendance-analytics',
-    );
-    expect(enableAdminSessionAttendanceAnalytics.defaultValue).toBe(false);
-    expect(webFlags.enableAdminSessionAttendanceAnalytics).toBe(
-      enableAdminSessionAttendanceAnalytics,
-    );
-  });
-
-  it('declares the session completion verified duration flag off by default', () => {
-    expect(enableSessionCompletionVerifiedDuration.key).toBe(
-      'enable-session-completion-verified-duration',
-    );
-    expect(enableSessionCompletionVerifiedDuration.defaultValue).toBe(false);
-    expect(webFlags.enableSessionCompletionVerifiedDuration).toBe(
-      enableSessionCompletionVerifiedDuration,
-    );
-  });
-
-  it('declares the session completion dispute details flag off by default', () => {
-    expect(enableSessionCompletionDisputeDetails.key).toBe(
-      'enable-session-completion-dispute-details',
-    );
-    expect(enableSessionCompletionDisputeDetails.defaultValue).toBe(false);
-    expect(webFlags.enableSessionCompletionDisputeDetails).toBe(
-      enableSessionCompletionDisputeDetails,
-    );
-  });
-
   it('does not require FLAGS env to load the catalog', () => {
     expect(isVercelFlagsSdkConfigured()).toBe(false);
   });
@@ -195,6 +162,5 @@ describe('web flags', () => {
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
     expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
     expect(JSON.stringify(providerData)).toContain('session-completion-carousel');
-    expect(JSON.stringify(providerData)).toContain('admin-session-attendance-analytics');
   });
 });

@@ -219,26 +219,6 @@ export const enableAiSuggestedReplies = flag<boolean, { profileId?: string | nul
   },
 });
 
-export const enableAdminSessionAttendanceAnalytics = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: 'admin-session-attendance-analytics',
-  description:
-    'Enables monthly completed-session analytics, confirmer breakdowns, and advanced filters in admin.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'admin-session-attendance-analytics',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMessagePinning = flag<boolean, { profileId?: string | null }>({
   key: platformFeatureFlagKeys.enableMessagePinning,
   description: 'Allows staff and educators to pin messages within a channel.',
@@ -428,46 +408,6 @@ export const enableMessageSendReliability = flag<boolean, { profileId?: string |
   },
 });
 
-export const enableSessionCompletionVerifiedDuration = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.enableSessionCompletionVerifiedDuration,
-  description:
-    'Lets staff confirm a completed session with a verified partial duration (and note) instead of only the full scheduled length, and use it to resolve an open dispute.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableSessionCompletionVerifiedDuration,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableSessionCompletionDisputeDetails = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.enableSessionCompletionDisputeDetails,
-  description:
-    'Shows the reported dispute category and reason under a disputed participant in the admin completed-sessions list.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableSessionCompletionDisputeDetails,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableOrgAiProviderSettings = flag<boolean, { profileId?: string | null }>({
   key: platformFeatureFlagKeys.enableOrgAiProviderSettings,
   description:
@@ -525,7 +465,6 @@ export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | nu
 export const webFlags = {
   enableClassroomWhiteboard,
   enableClassroomMeetingSettings,
-  enableAdminSessionAttendanceAnalytics,
   enableAiRefine,
   enableAiSuggestedReplies,
   enableAssessments,
@@ -547,8 +486,6 @@ export const webFlags = {
   enableMessageEdit,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
-  enableSessionCompletionVerifiedDuration,
-  enableSessionCompletionDisputeDetails,
   enableOrgAiProviderSettings,
 } as const;
 
