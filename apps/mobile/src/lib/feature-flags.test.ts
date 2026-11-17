@@ -171,18 +171,6 @@ describe('mobile feature flags', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY;
   });
 
-  it('keeps the session completion carousel off unless explicitly enabled', () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL;
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.sessionCompletionCarousel),
-    ).toBe(false);
-
-    process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL = 'true';
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.sessionCompletionCarousel),
-    ).toBe(true);
-  });
-
   it('keeps message pinning, search, and scheduled send off by default', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_PINNING;
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEARCH;

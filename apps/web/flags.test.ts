@@ -9,7 +9,6 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 import {
   enableChannelCommunications,
   enableMessageTypeComposer,
-  enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
   enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
@@ -90,14 +89,6 @@ describe('web flags', () => {
     expect(webFlags.enableMobileAppleSignIn).toBe(enableMobileAppleSignIn);
   });
 
-  it('declares the session completion carousel flag off by default', () => {
-    expect(enableSessionCompletionCarousel.key).toBe('session-completion-carousel');
-    expect(enableSessionCompletionCarousel.defaultValue).toBe(false);
-    expect(webFlags.enableSessionCompletionCarousel).toBe(
-      enableSessionCompletionCarousel,
-    );
-  });
-
   it('does not require FLAGS env to load the catalog', () => {
     expect(isVercelFlagsSdkConfigured()).toBe(false);
   });
@@ -161,6 +152,5 @@ describe('web flags', () => {
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
     expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
-    expect(JSON.stringify(providerData)).toContain('session-completion-carousel');
   });
 });

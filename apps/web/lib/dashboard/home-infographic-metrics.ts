@@ -641,7 +641,6 @@ export async function buildDashboardHomeInfographicMetrics(input: {
   now?: Date;
   pageSize?: number;
   timezone?: string | null;
-  sessionCompletionCarouselEnabled?: boolean;
   isOrgAdminView?: boolean;
 }): Promise<DashboardHomeInfographicMetrics> {
   const now = input.now ?? new Date();
@@ -668,14 +667,11 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     timezone: input.timezone ?? input.currentUserProfile?.prefs?.timezone ?? null,
     viewerProfileId,
   });
-  // Staff/admins see an org-wide summary (every classroom session, all time),
-  // independent of the carousel rollout flag — it's an org KPI, not the
-  // per-student confirmation feature. Everyone else sees their own carousel page
-  // plus a per-profile summary, still gated on the flag.
+  // Staff/admins see an org-wide summary (every classroom session, all time) —
+  // an org KPI, not the per-student confirmation feature. Everyone else sees
+  // their own carousel page plus a per-profile summary.
   const orgCompletionSummaryEnabled = staffOrAdminView;
-  const profileCompletionQueriesEnabled = Boolean(
-    input.sessionCompletionCarouselEnabled && viewerProfileId && !staffOrAdminView,
-  );
+  const profileCompletionQueriesEnabled = Boolean(viewerProfileId && !staffOrAdminView);
   // "Sessions completed" mirrors the "This month" completed-classes tile it
   // replaces, so the completed count — per-profile and org-wide alike — is
   // bounded to the current display month. Pending is unbounded either way.
@@ -727,10 +723,7 @@ export async function buildDashboardHomeInfographicMetrics(input: {
     },
     upcomingSessionsPage: activeRoleData.upcomingSessionsPage,
     completedSessionsPending,
-    sessionCompletionSummary:
-      staffOrAdminView || input.sessionCompletionCarouselEnabled
-        ? (sessionCompletionSummary ?? { completed: 0, pending: 0 })
-        : null,
+    sessionCompletionSummary: sessionCompletionSummary ?? { completed: 0, pending: 0 },
     browseHref: isStaffView ? `/${input.orgSlug}/admin/channels` : `/${input.orgSlug}/s`,
     calendarHref: isStaffView
       ? `/${input.orgSlug}/admin/attendance/sessions`

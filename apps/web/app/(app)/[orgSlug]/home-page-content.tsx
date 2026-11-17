@@ -12,7 +12,6 @@ import {
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
 import { HomePageInfographicClient } from './home-page-infographic-client';
 import { getUserRoles } from '@iconicedu/web/lib/profile/queries/roles.query';
-import { enableSessionCompletionCarousel } from '@iconicedu/web/flags';
 
 // An org admin is a role grant (owner/admin/staff), not a profile kind — mirror
 // requireAdminOrgContext so admins whose profile kind is educator/guardian still
@@ -34,9 +33,6 @@ function resolveRequestRole(kind: string | undefined): ClassRequestRole {
 export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
   const { supabase, account } = await getDashboardAccountContext(orgSlug);
   const { currentUserProfile } = await getDashboardProfileContext(supabase, account.id);
-  const sessionCompletionCarouselEnabled = await enableSessionCompletionCarousel.run({
-    identify: { profileId: currentUserProfile?.ids.id ?? null },
-  });
   const rolesResponse = await getUserRoles(supabase, account.id, account.org_id);
   const roleKeys = new Set<string | null | undefined>(
     (rolesResponse.data ?? []).map((role) => role.role_key),
@@ -49,7 +45,6 @@ export async function HomePageContent({ orgSlug }: { orgSlug: string }) {
     orgSlug,
     currentUserProfile,
     timezone: currentUserProfile?.prefs.timezone ?? null,
-    sessionCompletionCarouselEnabled,
     isOrgAdminView,
   });
 
