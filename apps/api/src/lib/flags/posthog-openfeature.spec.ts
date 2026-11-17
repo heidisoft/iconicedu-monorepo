@@ -25,14 +25,14 @@ describe('evaluateApiBooleanFlag', () => {
       ok: true,
       json: async () => ({
         featureFlags: {
-          [apiFeatureFlagKeys.enableMobileDirectMessageStart]: true,
+          [apiFeatureFlagKeys.enableChannelCommunications]: true,
         },
       }),
     } as Response);
 
     await expect(
       evaluateApiBooleanFlag({
-        flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+        flagKey: apiFeatureFlagKeys.enableChannelCommunications,
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(true);
@@ -44,7 +44,7 @@ describe('evaluateApiBooleanFlag', () => {
 
     await expect(
       evaluateApiBooleanFlag({
-        flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+        flagKey: apiFeatureFlagKeys.enableChannelCommunications,
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(false);
@@ -57,7 +57,7 @@ describe('evaluateApiBooleanFlag', () => {
 
     await expect(
       evaluateApiBooleanFlag({
-        flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+        flagKey: apiFeatureFlagKeys.enableChannelCommunications,
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(true);
@@ -70,7 +70,7 @@ describe('evaluateApiBooleanFlag', () => {
     process.env.APP_ENV = 'local';
     await expect(
       evaluateApiBooleanFlag({
-        flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+        flagKey: apiFeatureFlagKeys.enableChannelCommunications,
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(true);
@@ -79,7 +79,7 @@ describe('evaluateApiBooleanFlag', () => {
     process.env.VERCEL_ENV = 'preview';
     await expect(
       evaluateApiBooleanFlag({
-        flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
+        flagKey: apiFeatureFlagKeys.enableChannelCommunications,
         distinctId: 'profile-1',
       }),
     ).resolves.toBe(true);

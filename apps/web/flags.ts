@@ -77,26 +77,6 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
   },
 });
 
-export const enableMobileDirectMessageStart = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.enableMobileDirectMessageStart,
-  description:
-    'Allows mobile users to start direct message conversations from profile previews and channel member rows.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableMobileDirectMessageStart,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMobileGoogleSignIn = flag<boolean, { profileId?: string | null }>({
   key: platformFeatureFlagKeys.enableMobileGoogleSignIn,
   description: 'Shows the Continue with Google option on the mobile login screen.',
@@ -422,7 +402,6 @@ export const webFlags = {
   enableNotificationConversationControls,
   enableMessageListFormatting,
   enableMobileAppleSignIn,
-  enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
   enableMessageDrafts,
   enableMessageEdit,

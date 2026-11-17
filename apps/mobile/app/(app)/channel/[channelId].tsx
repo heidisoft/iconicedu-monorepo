@@ -77,9 +77,6 @@ export default function ChannelConversationScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
-  const enableMobileDirectMessageStart = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-  );
   const enableMessageReplyReference = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageReplyReference,
   );
@@ -844,13 +841,7 @@ export default function ChannelConversationScreen() {
   const handleUnreadViewed = markChannelRead;
   const handleProfileMessagePress = useCallback(
     async (user: UserProfileVM) => {
-      if (
-        !enableMobileDirectMessageStart ||
-        !orgId ||
-        !profileId ||
-        !user.ids.id ||
-        user.ids.id === profileId
-      ) {
+      if (!orgId || !profileId || !user.ids.id || user.ids.id === profileId) {
         return;
       }
 
@@ -887,7 +878,7 @@ export default function ChannelConversationScreen() {
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [enableMobileDirectMessageStart, orgId, profileId, queryClient, router],
+    [orgId, profileId, queryClient, router],
   );
   const emptyStateCopy = buildMobileChannelEmptyStateCopy({
     channelKind: isSpaceChannel
@@ -1108,9 +1099,7 @@ export default function ChannelConversationScreen() {
         user={profileUser}
         onClose={() => setProfileUser(null)}
         onMessagePress={
-          enableMobileDirectMessageStart &&
-          profileUser &&
-          profileUser.ids.id !== profileId
+          profileUser && profileUser.ids.id !== profileId
             ? () => handleProfileMessagePress(profileUser)
             : undefined
         }

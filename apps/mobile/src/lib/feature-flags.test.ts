@@ -23,46 +23,6 @@ describe('mobile feature flags', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_CHANNEL_COMMUNICATIONS;
   });
 
-  it('defaults direct message start rollout to off', async () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START;
-    delete process.env.EXPO_PUBLIC_APP_ENV;
-
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(false);
-  });
-
-  it('enables direct message start rollout from an Expo public env flag', async () => {
-    delete process.env.EXPO_PUBLIC_APP_ENV;
-    process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START = 'true';
-
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(true);
-  });
-
-  it('does not force direct message start on in local or preview app envs', () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START;
-
-    process.env.EXPO_PUBLIC_APP_ENV = 'local';
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(false);
-
-    process.env.EXPO_PUBLIC_APP_ENV = 'preview';
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(false);
-  });
-
   it('defaults onboarding address search rollout to off', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_ONBOARDING_ADDRESS_SEARCH;
     process.env.EXPO_PUBLIC_APP_ENV = 'local';

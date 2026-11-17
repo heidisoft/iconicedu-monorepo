@@ -89,9 +89,6 @@ export default function SpaceDetailScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
-  const enableMobileDirectMessageStart = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-  );
   const enableMessageReplyReference = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageReplyReference,
   );
@@ -223,13 +220,7 @@ export default function SpaceDetailScreen() {
 
   const handleProfileMessagePress = useCallback(
     async (user: UserProfileVM) => {
-      if (
-        !enableMobileDirectMessageStart ||
-        !orgId ||
-        !profileId ||
-        !user.ids.id ||
-        user.ids.id === profileId
-      ) {
+      if (!orgId || !profileId || !user.ids.id || user.ids.id === profileId) {
         return;
       }
 
@@ -266,7 +257,7 @@ export default function SpaceDetailScreen() {
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [enableMobileDirectMessageStart, orgId, profileId, queryClient, router],
+    [orgId, profileId, queryClient, router],
   );
 
   // ── Long-press actions sheet state ──
@@ -896,9 +887,7 @@ export default function SpaceDetailScreen() {
         user={profileUser}
         onClose={() => setProfileUser(null)}
         onMessagePress={
-          enableMobileDirectMessageStart &&
-          profileUser &&
-          profileUser.ids.id !== profileId
+          profileUser && profileUser.ids.id !== profileId
             ? () => handleProfileMessagePress(profileUser)
             : undefined
         }

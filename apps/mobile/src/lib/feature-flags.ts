@@ -29,12 +29,6 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     );
   }
 
-  if (key === mobileFeatureFlagKeys.enableMobileDirectMessageStart) {
-    return parseBooleanFeatureFlag(
-      process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START,
-    );
-  }
-
   if (key === mobileFeatureFlagKeys.enableMobileGoogleSignIn) {
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_GOOGLE_SIGN_IN);
   }

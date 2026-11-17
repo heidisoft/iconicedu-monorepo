@@ -10,7 +10,6 @@ import {
   enableChannelCommunications,
   enableMessageTypeComposer,
   enableMobileAppleSignIn,
-  enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
@@ -71,12 +70,6 @@ describe('web flags', () => {
     expect(enableMessageTypeComposer.key).toBe('enable-message-type-composer');
     expect(enableMessageTypeComposer.defaultValue).toBe(false);
     expect(webFlags.enableMessageTypeComposer).toBe(enableMessageTypeComposer);
-  });
-
-  it('declares the mobile direct message start flag with stable metadata', () => {
-    expect(enableMobileDirectMessageStart.key).toBe('enable-mobile-direct-message-start');
-    expect(enableMobileDirectMessageStart.defaultValue).toBe(false);
-    expect(webFlags.enableMobileDirectMessageStart).toBe(enableMobileDirectMessageStart);
   });
 
   it('declares the mobile social sign-in flags with stable metadata', () => {
@@ -151,6 +144,5 @@ describe('web flags', () => {
     expect(providerData).toBeTruthy();
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
-    expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
   });
 });
