@@ -1,7 +1,6 @@
 import { MessagesService } from '@iconicedu/api/modules/messages/messages.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
-import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import {
   BadRequestException,
   ForbiddenException,
@@ -15,11 +14,6 @@ jest.mock('@iconicedu/api/lib/supabase/service', () => ({
 
 jest.mock('@iconicedu/api/lib/supabase/session', () => ({
   createSupabaseSessionClient: jest.fn(),
-}));
-
-jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
-  apiFeatureFlagKeys: { enableMessageEdit: 'enable-message-edit' },
-  evaluateApiBooleanFlag: jest.fn(),
 }));
 
 /** A thenable, chainable stand-in for a Supabase PostgrestFilterBuilder. */
@@ -124,20 +118,6 @@ describe('MessagesService.editTextMessage', () => {
   beforeEach(() => {
     jest.mocked(createSupabaseServiceClient).mockReset();
     jest.mocked(createSupabaseSessionClient).mockReset();
-    jest.mocked(evaluateApiBooleanFlag).mockReset().mockResolvedValue(true);
-  });
-
-  it('rejects when the enable-message-edit flag is off', async () => {
-    setUpServiceClient({ messageRow: baseMessageRow() });
-    jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
-
-    await expect(
-      service.editTextMessage(AUTH_USER_ID, 'token', MESSAGE_ID, {
-        orgId: ORG_ID,
-        messageId: MESSAGE_ID,
-        content: 'nope',
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects edits in an archived conversation', async () => {

@@ -14,7 +14,6 @@ const resolveOrgDashboardPathMock = vi.fn(async () => '/iconic-academy');
 const enableMessageTypeComposerRunMock = vi.fn(async () => true);
 const enableP1MessagingFlagRunMock = vi.fn(async () => false);
 const enableMessageDraftsRunMock = vi.fn(async () => false);
-const enableMessageEditRunMock = vi.fn(async () => false);
 const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
 
 vi.mock('next/navigation', () => ({
@@ -97,9 +96,6 @@ vi.mock('@iconicedu/web/flags', () => ({
   },
   enableMessageDrafts: {
     run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
-  },
-  enableMessageEdit: {
-    run: (...args: unknown[]) => enableMessageEditRunMock(...args),
   },
   enableMessageSendReliability: {
     run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),

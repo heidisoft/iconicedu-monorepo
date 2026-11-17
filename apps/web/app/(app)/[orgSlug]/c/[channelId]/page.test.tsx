@@ -12,7 +12,6 @@ const enableMessageReplyReferenceRunMock = vi.fn(async () => true);
 const enableNotificationConversationControlsRunMock = vi.fn(async () => false);
 const enableMessageListFormattingRunMock = vi.fn(async () => true);
 const enableMessageDraftsRunMock = vi.fn(async () => false);
-const enableMessageEditRunMock = vi.fn(async () => false);
 const enableMessageSendReliabilityRunMock = vi.fn(async () => false);
 
 vi.mock('@iconicedu/ui-web', () => ({
@@ -70,9 +69,6 @@ vi.mock('@iconicedu/web/flags', () => ({
   },
   enableMessageDrafts: {
     run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
-  },
-  enableMessageEdit: {
-    run: (...args: unknown[]) => enableMessageEditRunMock(...args),
   },
   enableMessageSendReliability: {
     run: (...args: unknown[]) => enableMessageSendReliabilityRunMock(...args),

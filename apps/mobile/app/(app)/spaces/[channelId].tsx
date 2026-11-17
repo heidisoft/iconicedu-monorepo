@@ -95,7 +95,6 @@ export default function SpaceDetailScreen() {
   const enableMessageMarkUnread = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
-  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
 
   const orgId = account?.org_id ?? '';
   const accountId =
@@ -909,7 +908,6 @@ export default function SpaceDetailScreen() {
         onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
         onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
         isChannelUnread={isChannelUnread}
-        enableEdit={enableMessageEdit}
         onEdit={handleEditMessage}
       />
 

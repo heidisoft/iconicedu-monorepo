@@ -174,7 +174,7 @@ type MessageInputProps = {
   /** Identifies this composer for AsyncStorage draft scoping. Required when enableDrafts is true. */
   draftScope?: MessageDraftScope;
 
-  // ── Edit sent text messages (capability #4) — gate with enableMessageEdit ──
+  // ── Edit sent text messages ──
   /** Non-null puts the composer into edit mode, prefilled with this message's text. */
   editingMessage?: EditingMessageContext | null;
   /** Return true on a successful save; the composer exits edit mode only then. */

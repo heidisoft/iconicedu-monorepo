@@ -153,7 +153,6 @@ type MessagesShellClientProps = {
   enableNotificationConversationControls?: boolean;
   enableMessageListFormatting?: boolean;
   enableMessageDrafts?: boolean;
-  enableMessageEdit?: boolean;
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
   panelRegistry?: Partial<
@@ -196,7 +195,6 @@ export function MessagesShellClient({
   enableNotificationConversationControls = false,
   enableMessageListFormatting = false,
   enableMessageDrafts = false,
-  enableMessageEdit = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
   panelRegistry,
@@ -558,7 +556,6 @@ export function MessagesShellClient({
         enableNotificationConversationControls={enableNotificationConversationControls}
         enableMessageListFormatting={enableMessageListFormatting}
         enableMessageDrafts={enableMessageDrafts}
-        enableMessageEdit={enableMessageEdit}
         enableMessageSendReliability={enableMessageSendReliability}
         enableMessageAudience={enableMessageAudience}
         panelRegistry={panelRegistry}

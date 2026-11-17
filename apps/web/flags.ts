@@ -261,23 +261,6 @@ export const enableMessageDrafts = flag<boolean, { profileId?: string | null }>(
   },
 });
 
-export const enableMessageEdit = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableMessageEdit,
-  description:
-    'Lets a sender edit their own eligible text message within the edit window, on web and mobile.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableMessageEdit,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMobileMessageComposerParity = flag<
   boolean,
   { profileId?: string | null }
@@ -368,7 +351,6 @@ export const webFlags = {
   enableMobileAppleSignIn,
   enableMobileGoogleSignIn,
   enableMessageDrafts,
-  enableMessageEdit,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
 } as const;

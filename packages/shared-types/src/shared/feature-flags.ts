@@ -13,7 +13,6 @@ export const platformFeatureFlagKeys = {
   enableNotificationConversationControls: 'enable-notification-conversation-controls',
   enableMessageListFormatting: 'enable-message-list-formatting',
   enableMessageDrafts: 'enable-message-drafts',
-  enableMessageEdit: 'enable-message-edit',
   enableMobileMessageComposerParity: 'enable-mobile-message-composer-parity',
   enableMessageSendReliability: 'enable-message-send-reliability',
   enableChannelCommunications: 'enable-channel-communications',

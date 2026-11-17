@@ -55,7 +55,6 @@ interface MessagesStateContextValue {
   startReplyTo: (message: MessageVM) => void;
   clearReplyTo: () => void;
   enableMessageDrafts: boolean;
-  enableMessageEdit: boolean;
   enableMessageSendReliability: boolean;
   createTextMessage: (
     content: string,
@@ -177,7 +176,6 @@ export function MessagesStateProvider({
   enableNotificationConversationControls = false,
   enableMessageListFormatting = false,
   enableMessageDrafts = false,
-  enableMessageEdit = false,
   enableMessageSendReliability = false,
   children,
 }: {
@@ -194,7 +192,6 @@ export function MessagesStateProvider({
   enableNotificationConversationControls?: boolean;
   enableMessageListFormatting?: boolean;
   enableMessageDrafts?: boolean;
-  enableMessageEdit?: boolean;
   enableMessageSendReliability?: boolean;
   children: React.ReactNode;
 }) {
@@ -375,7 +372,6 @@ export function MessagesStateProvider({
       startReplyTo,
       clearReplyTo,
       enableMessageDrafts,
-      enableMessageEdit,
       enableMessageSendReliability,
       createTextMessage,
       sendTextMessage,
@@ -430,7 +426,6 @@ export function MessagesStateProvider({
       startReplyTo,
       clearReplyTo,
       enableMessageDrafts,
-      enableMessageEdit,
       enableMessageSendReliability,
       createTextMessage,
       sendTextMessage,

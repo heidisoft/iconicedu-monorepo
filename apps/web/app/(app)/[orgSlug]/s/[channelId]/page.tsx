@@ -30,7 +30,6 @@ import {
   enableNotificationConversationControls,
   enableMessageListFormatting,
   enableMessageDrafts,
-  enableMessageEdit,
   enableMessageSendReliability,
   enableChannelCommunications,
 } from '@iconicedu/web/flags';
@@ -79,7 +78,6 @@ export default async function Page({
     notificationConversationControlsEnabled,
     listFormattingEnabled,
     messageDraftsEnabled,
-    messageEditEnabled,
     messageSendReliabilityEnabled,
     messageAudienceEnabled,
   ] = await Promise.all([
@@ -92,7 +90,6 @@ export default async function Page({
     enableNotificationConversationControls.run({ identify }),
     enableMessageListFormatting.run({ identify }),
     enableMessageDrafts.run({ identify }),
-    enableMessageEdit.run({ identify }),
     enableMessageSendReliability.run({ identify }),
     enableChannelCommunications.run({ identify }),
   ]);
@@ -121,7 +118,6 @@ export default async function Page({
         enableNotificationConversationControls={notificationConversationControlsEnabled}
         enableMessageListFormatting={listFormattingEnabled}
         enableMessageDrafts={messageDraftsEnabled}
-        enableMessageEdit={messageEditEnabled}
         enableMessageSendReliability={messageSendReliabilityEnabled}
         enableMessageAudience={messageAudienceEnabled}
         sendTextMessage={sendTextMessageAction}

@@ -86,7 +86,6 @@ export default function ChannelConversationScreen() {
   const enableMessageDrafts = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageDrafts,
   );
-  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
   const enableMobileMessageComposerParity = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileMessageComposerParity,
   );
@@ -1121,7 +1120,6 @@ export default function ChannelConversationScreen() {
         onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
         onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
         isChannelUnread={isChannelUnread}
-        enableEdit={enableMessageEdit}
         onEdit={handleEditMessage}
       />
 

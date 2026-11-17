@@ -81,8 +81,6 @@ type MessageActionsSheetProps = {
   onMarkUnread?: (message: MessageVM) => void;
   /** Hides the "Mark unread" row when the channel is already showing as unread. */
   isChannelUnread?: boolean;
-  /** Gated behind enableMessageEdit — hides the Edit row entirely when false/omitted. */
-  enableEdit?: boolean;
   onEdit?: (message: MessageVM) => void;
 };
 
@@ -227,7 +225,6 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   onQuoteReply,
   onMarkUnread,
   isChannelUnread = false,
-  enableEdit = false,
   onEdit,
 }) => {
   const { colors } = useTheme();
@@ -352,8 +349,7 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   }, [message, onDelete, onClose]);
 
   const textContent = (message as { content?: { text?: string } })?.content?.text ?? '';
-  const canEdit =
-    !isReadOnly && enableEdit && !!message && isMessageEditEligible(message, isOwn);
+  const canEdit = !isReadOnly && !!message && isMessageEditEligible(message, isOwn);
 
   if (!message) return null;
 

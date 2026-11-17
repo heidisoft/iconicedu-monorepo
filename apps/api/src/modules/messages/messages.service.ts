@@ -1782,17 +1782,6 @@ export class MessagesService {
       senderProfileId: message.sender_profile_id,
     });
 
-    // The client-visible flag only hides the Edit menu entry — enforce it
-    // here too so a client can't invoke the mutation directly during a dark
-    // rollout (flag off) by calling the endpoint without going through UI.
-    const editEnabled = await evaluateApiBooleanFlag({
-      flagKey: apiFeatureFlagKeys.enableMessageEdit,
-      distinctId: actor.profile.id,
-    });
-    if (!editEnabled) {
-      throw new ForbiddenException('Message editing is not available');
-    }
-
     const editWindowMs = MESSAGE_EDIT_WINDOW_MINUTES * 60 * 1000;
     if (Date.now() - new Date(message.created_at).getTime() > editWindowMs) {
       throw new ForbiddenException('The edit window for this message has passed');

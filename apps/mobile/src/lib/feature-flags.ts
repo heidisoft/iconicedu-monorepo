@@ -79,10 +79,6 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS);
   }
 
-  if (key === mobileFeatureFlagKeys.enableMessageEdit) {
-    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT);
-  }
-
   if (key === mobileFeatureFlagKeys.enableMobileMessageComposerParity) {
     return parseBooleanFeatureFlag(
       process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY,

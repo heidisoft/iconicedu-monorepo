@@ -123,7 +123,6 @@ export interface MessagesContainerProps {
   /** Gates draft autosave/restore for the main channel composer. Default off. */
   enableMessageDrafts?: boolean;
   /** Gates the "Edit message" action on the sender's own eligible text messages. Default off. */
-  enableMessageEdit?: boolean;
   /** Gates clientMessageId-based idempotent retry of failed sends. Default off. */
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
@@ -415,7 +414,6 @@ export function MessagesContainer({
   uploadFileMessage,
   joinLiveSession,
   enableMessageDrafts = false,
-  enableMessageEdit = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
 }: MessagesContainerProps) {
@@ -1976,7 +1974,7 @@ export function MessagesContainer({
   ]);
 
   useEffect(() => {
-    if (readOnly || !enableMessageEdit) {
+    if (readOnly) {
       setEditTextMessage(async () => null);
       return;
     }
@@ -1993,7 +1991,6 @@ export function MessagesContainer({
     });
   }, [
     channel.ids.orgId,
-    enableMessageEdit,
     messageWriteClient,
     readOnly,
     setEditTextMessage,

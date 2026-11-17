@@ -145,7 +145,7 @@ describe('MessageInput — drafts (enableMessageDrafts)', () => {
   });
 });
 
-describe('MessageInput — edit mode (enableMessageEdit)', () => {
+describe('MessageInput — edit mode', () => {
   it('does not render Save/Cancel when editingMessage is null', () => {
     render(<MessageInput onSend={jest.fn()} editingMessage={null} />);
     expect(screen.queryByLabelText('Save edit')).toBeNull();
