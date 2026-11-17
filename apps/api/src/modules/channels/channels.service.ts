@@ -1,3 +1,4 @@
+import { authorizeClassroomCallContact } from './classroom-call-contact';
 import { randomUUID } from 'crypto';
 import {
   ForbiddenException,
@@ -5,6 +6,10 @@ import {
   InternalServerErrorException,
 } from '@nestjs/common';
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
+import {
+  apiFeatureFlagKeys,
+  evaluateApiBooleanFlag,
+} from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
@@ -788,9 +793,11 @@ export class ChannelsService {
     return buildDirectMessageChannelResult(channel.id, targetProfile);
   }
 
+  // Call context is backend-only and independently verified; public ensure-dm cannot supply it.
   async ensureDirectMessageChannel(
     accessToken: string,
     input: { orgId: string; profileId: string; otherProfileId: string },
+    options?: { classroomCallId: string },
   ): Promise<DirectMessageChannelResult | null> {
     if (
       !input.orgId ||
@@ -799,6 +806,18 @@ export class ChannelsService {
       input.profileId === input.otherProfileId
     ) {
       return null;
+    }
+
+    if (options?.classroomCallId) {
+      const canCreateClassroomCallContact = await evaluateApiBooleanFlag({
+        flagKey: apiFeatureFlagKeys.enableClassroomCalls,
+        distinctId: input.profileId,
+        personProperties: {
+          profileId: input.profileId,
+          orgId: input.orgId,
+        },
+      });
+      if (!canCreateClassroomCallContact) return null;
     }
 
     const supabase = createSupabaseSessionClient(accessToken);
@@ -854,6 +873,17 @@ export class ChannelsService {
       profile: currentProfile,
     });
     if (!canActAsCurrentProfile) return null;
+    if (
+      options?.classroomCallId &&
+      (targetProfile.kind !== 'educator' ||
+        !(await authorizeClassroomCallContact(
+          writeSupabase,
+          supabase,
+          input,
+          options.classroomCallId,
+        )))
+    )
+      return null;
 
     const tutorContactPair = resolveTutorContactPair(currentProfile, targetProfile);
     if (tutorContactPair) {

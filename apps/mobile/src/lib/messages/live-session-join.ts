@@ -39,8 +39,8 @@ export function resolveExternalJoinProviderLabel(
 /**
  * The join API returns web-relative paths (e.g. `/acme/live-sessions/<id>`)
  * for Daily/Zoom/Jitsi sessions, since that's the shared contract web also
- * consumes directly. Mobile has no in-app room UI, so any non-external path
- * must be resolved against the web app's own origin before it's opened.
+ * consumes directly. Resolve these against the web origin before choosing
+ * native classroom entry or the provider/browser route.
  */
 export function resolveJoinHrefForMobile(joinHref: string): string {
   if (isExternalJoinHref(joinHref)) {
@@ -53,5 +53,18 @@ export function resolveJoinHrefForMobile(joinHref: string): string {
     return new URL(joinHref, webBaseUrl).toString();
   } catch {
     return joinHref;
+  }
+}
+
+/** Owned classroom URLs share one entry path across buttons, message links and OS links. */
+export function getAppLiveSessionIdentifier(href: string): string | undefined {
+  try {
+    const url = new URL(resolveJoinHrefForMobile(href));
+    const base = new URL(resolveJoinHrefForMobile('/'));
+    return url.origin === base.origin
+      ? /^\/live\/([a-zA-Z0-9-]{1,128})\/?$/.exec(url.pathname)?.[1]
+      : undefined;
+  } catch {
+    return undefined;
   }
 }

@@ -326,6 +326,10 @@ export default function InboxScreen() {
           channelId,
           threadId,
           channelRouteKind,
+          classroomCallId:
+            typeof metadata.classroomCallId === 'string'
+              ? metadata.classroomCallId
+              : undefined,
         }) ?? DEFAULT_NOTIFICATION_ROUTE;
 
       router.push(route as Parameters<typeof router.push>[0]);

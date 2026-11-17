@@ -106,7 +106,11 @@ export function applyWhiteboardOperation(
   op: WhiteboardOperationVM,
   role: WhiteboardRole,
 ): WhiteboardDocumentVM {
-  if (role !== 'teacher' && (op.type !== 'elements' || !document.studentEditing))
+  if (
+    role !== 'teacher' &&
+    op.type !== 'presentation' &&
+    (op.type !== 'elements' || !document.studentEditing)
+  )
     throw new ForbiddenException('Whiteboard editing is locked');
   const next = continuousCanvas(document);
   if (op.type === 'presentation') {

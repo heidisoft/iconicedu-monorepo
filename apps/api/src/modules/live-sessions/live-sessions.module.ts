@@ -1,3 +1,6 @@
+import { ChannelsModule } from '../channels/channels.module';
+import { ClassroomCallsController } from './classroom-calls.controller';
+import { ClassroomCallsService } from './classroom-calls.service';
 import { LiveSessionQualityController } from './live-session-quality.controller';
 import { LiveSessionQualityService } from './live-session-quality.service';
 import { ScreenAnnotationsService } from '../screen-annotations/screen-annotations.service';
@@ -14,14 +17,16 @@ import { LiveSessionsController } from '@iconicedu/api/modules/live-sessions/liv
 import { LiveSessionsPublicController } from '@iconicedu/api/modules/live-sessions/live-sessions-public.controller';
 
 @Module({
-  imports: [AuthModule],
+  imports: [AuthModule, ChannelsModule],
   providers: [
+    ClassroomCallsService,
     LiveSessionQualityService,
     ScreenAnnotationsService,
     LiveSessionsService,
     ClassroomMeetingSettingsService,
   ],
   controllers: [
+    ClassroomCallsController,
     LiveSessionQualityController,
     GuestScreenAnnotationsController,
     ScreenAnnotationsController,

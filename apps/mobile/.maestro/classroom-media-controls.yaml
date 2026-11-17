@@ -1,0 +1,30 @@
+appId: com.heidisoft.iconicedu
+name: Native microphone camera and screen share control state transitions
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- tapOn: 'Unmute microphone'
+- assertVisible: 'Mute microphone'
+- tapOn: 'Mute microphone'
+- assertVisible: 'Unmute microphone'
+- tapOn: 'Start video'
+- assertVisible: 'Stop video'
+- tapOn: 'Stop video'
+- assertVisible: 'Start video'
+- tapOn: 'Share screen'
+- assertVisible: 'Stop sharing screen'
+- tapOn: 'Stop sharing screen'
+- assertVisible: 'Share screen'
+- tapOn: 'Leave or end class'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

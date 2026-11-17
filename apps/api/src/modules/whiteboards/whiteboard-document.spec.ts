@@ -64,7 +64,6 @@ describe('whiteboard document and trust boundary', () => {
       { id: 'a', type: 'student-editing' as const, enabled: true },
       { id: 'a', type: 'add-page' as const, pageId: 'two', title: 'two' },
       { id: 'a', type: 'clear-page' as const, pageId: 'one' },
-      { id: 'a', type: 'presentation' as const, enabled: true },
     ])
       expect(() => applyWhiteboardOperation(initial(), op, 'student')).toThrow('locked');
     const locked = applyWhiteboardOperation(
@@ -146,4 +145,22 @@ describe('whiteboard document and trust boundary', () => {
     ])
       expect(() => validateWhiteboardOperation(value)).toThrow();
   });
+});
+
+it('lets authorized participants present without granting moderation or drawing rights', () => {
+  const document = { ...initial(), studentEditing: false };
+  expect(
+    applyWhiteboardOperation(
+      document,
+      { id: 'share', type: 'presentation', enabled: true },
+      'student',
+    ).presenting,
+  ).toBe(true);
+  expect(() =>
+    applyWhiteboardOperation(
+      document,
+      { id: 'permission', type: 'student-editing', enabled: true },
+      'student',
+    ),
+  ).toThrow('locked');
 });

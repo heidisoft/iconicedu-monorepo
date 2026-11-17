@@ -5,6 +5,7 @@ type PushNotificationPayload = {
   orgId: string;
   recipientProfileId: string;
   prefKey: string;
+  call?: { id: string; expiresAt: string };
   title: string;
   priority?: 'high';
   summary?: string | null;
@@ -34,6 +35,7 @@ export type SendPushResult = {
 };
 
 type ExpoPushMessage = {
+  ttl?: number;
   to: string;
   title: string;
   priority?: 'high';
@@ -294,6 +296,14 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
   // 2. Build Expo push messages
   const messages: ExpoPushMessage[] = tokens.map(({ token }) => ({
     to: token,
+    ...(payload.call
+      ? {
+          ttl: Math.max(
+            0,
+            Math.ceil((Date.parse(payload.call.expiresAt) - Date.now()) / 1000),
+          ),
+        }
+      : {}),
     title: payload.title,
     ...(payload.priority ? { priority: payload.priority } : {}),
     body: payload.summary ? payload.summary : (preview ?? undefined),
@@ -311,6 +321,16 @@ export async function sendPushNotification(payload: PushNotificationPayload) {
     //   already-displayed notification on Android.
     ...(collapseId ? { collapseId, tag: collapseId } : {}),
     data: {
+      ...(payload.call
+        ? { classroomCallId: payload.call.id, expiresAt: payload.call.expiresAt }
+        : {}),
+      ...(typeof asRecord(asRecord(payload.metadata).rawEventPayload).classroomCallId ===
+      'string'
+        ? {
+            classroomCallId: asRecord(asRecord(payload.metadata).rawEventPayload)
+              .classroomCallId,
+          }
+        : {}),
       prefKey: payload.prefKey,
       orgId: payload.orgId,
       activityFeedItemId: payload.activityFeedItemId ?? null,

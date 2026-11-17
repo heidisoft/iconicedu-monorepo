@@ -1,0 +1,41 @@
+appId: com.heidisoft.iconicedu
+name: Native annotation drawing and versioned history
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://annotation-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Native annotation test'
+    timeout: 30000
+- assertVisible:
+    id: 'annotation-saved-elements-0'
+# The default laser is transient; select a persistent tool to test saved history.
+- tapOn: 'Pen'
+- swipe:
+    start: '25%,25%'
+    end: '60%,30%'
+    duration: 1000
+- extendedWaitUntil:
+    visible:
+      id: 'annotation-saved-elements-1'
+    timeout: 10000
+- tapOn: 'Undo annotation'
+- assertVisible:
+    id: 'annotation-saved-elements-0'
+- tapOn: 'More annotation actions'
+- tapOn: 'Redo annotation'
+- tapOn: 'Close More annotation actions'
+- assertVisible:
+    id: 'annotation-saved-elements-1'
+- swipe:
+    from:
+      text: 'Screen annotation tools'
+    direction: LEFT
+    duration: 600
+- tapOn: 'More annotation actions'
+- tapOn: 'Sharing and export'
+- tapOn: 'Export annotations image'
+- runFlow: assert-classroom-export.yaml
+- takeScreenshot: native-annotation-export

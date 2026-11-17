@@ -71,6 +71,47 @@ describe('zoom video sdk live session provider', () => {
     expect(decoded.version).toBe(1);
   });
 
+  it('keeps web and native participants in the same room as the host', async () => {
+    process.env.ZOOM_VIDEO_SDK_KEY = 'test-sdk-key';
+    process.env.ZOOM_VIDEO_SDK_SECRET = 'test-sdk-secret';
+    const created = await zoomVideoSdkLiveSessionProvider.createSession({
+      sessionId: 'shared-class',
+      orgId: 'test-org',
+      channelId: 'test-class',
+      scopeKey: 'occurrence:2026-10-15T18:00:00.000Z',
+      mode: 'video',
+    });
+    const claims = await Promise.all(
+      [
+        { profileId: 'host', displayName: 'Teacher', isHost: true },
+        { profileId: 'web-student', displayName: 'Web student', isHost: false },
+        { profileId: 'native-student', displayName: 'Native student', isHost: false },
+      ].map(async (participant) => {
+        const access = await zoomVideoSdkLiveSessionProvider.getJoinAccess({
+          sessionId: 'shared-class',
+          ...created,
+          ...participant,
+        });
+        const decoded = jwt.verify(
+          access.token as string,
+          'test-sdk-secret',
+        ) as jwt.JwtPayload;
+        expect(access.metadata?.sessionName).toBe(decoded.tpc);
+        return decoded;
+      }),
+    );
+    for (const claim of claims) {
+      expect(claim.app_key).toBe('test-sdk-key');
+      expect(claim.tpc).toBe(created.providerSessionId);
+      expect(claim.session_key).toBe(created.providerMetadata?.sessionKey);
+    }
+    expect(claims.map((claim) => claim.role_type)).toEqual([1, 0, 0]);
+    expect(claims.map((claim) => claim.user_key)).toEqual([
+      'host',
+      'web-student',
+      'native-student',
+    ]);
+  });
   it('defaults to participant role when isHost is not set', async () => {
     process.env.ZOOM_VIDEO_SDK_KEY = 'test-sdk-key';
     process.env.ZOOM_VIDEO_SDK_SECRET = 'test-sdk-secret';

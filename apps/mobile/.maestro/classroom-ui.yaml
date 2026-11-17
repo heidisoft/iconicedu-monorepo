@@ -1,0 +1,114 @@
+appId: com.heidisoft.iconicedu
+name: Native classroom UI lifecycle on iPad and Android tablets
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- tapOn:
+    text: 'Allow'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- assertVisible: 'Native SDK [0-9].*'
+- assertVisible: 'Change display name, currently Test teacher'
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Settings'
+- tapOn: 'Settings'
+- tapOn: 'Video settings tab'
+- assertVisible: 'Choose background image'
+- tapOn: 'Camera: Front camera'
+- tapOn: 'Back camera'
+- assertVisible: 'Camera: Back camera'
+- tapOn: 'Camera: Back camera'
+- tapOn: 'Front camera'
+- tapOn: 'Audio settings tab'
+- tapOn: 'Audio output: Speaker'
+- tapOn: 'Test headset'
+- assertVisible: 'Audio output: Test headset'
+- tapOn: 'Audio output: Test headset'
+- tapOn: 'Speaker'
+- scrollUntilVisible:
+    element: 'Test speakers'
+- tapOn: 'Test speakers'
+- assertVisible: 'Stop speaker test'
+- tapOn: 'Stop speaker test'
+- tapOn: 'Close settings'
+- scrollUntilVisible:
+    element: 'Join now'
+    direction: UP
+- tapOn: 'Join now'
+- assertVisible: 'Native classroom test'
+- tapOn: 'Focus Test student'
+- assertVisible: 'Close focused video'
+- tapOn: 'Close focused video'
+- scrollUntilVisible:
+    element: 'More controls'
+    direction: UP
+- tapOn: 'More controls'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Raise hand'
+- runFlow: open-classroom-controls.yaml
+- tapOn: 'Raise hand'
+- runFlow: open-classroom-controls.yaml
+- assertVisible: 'Lower hand'
+- runFlow: open-classroom-controls.yaml
+- tapOn: 'Lower hand'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Messages'
+- tapOn: 'Messages'
+- scrollUntilVisible:
+    element: 'Message'
+- tapOn: 'Message'
+- inputText: 'Hello from native tablet'
+- scrollUntilVisible:
+    element: 'Send message'
+- tapOn: 'Send message'
+- assertVisible: 'Hello from native tablet'
+- assertVisible: 'You'
+- tapOn: 'Close In-call Messages'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Start recording'
+    direction: UP
+- runFlow: open-classroom-controls.yaml
+- tapOn: 'Start recording'
+- scrollUntilVisible:
+    element: 'Recording active'
+    direction: UP
+- assertVisible: 'Recording active'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Pause recording'
+- tapOn: 'Pause recording'
+- assertVisible: 'Recording paused'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Resume recording'
+- tapOn: 'Resume recording'
+- assertVisible: 'Recording active'
+- runFlow: open-classroom-controls.yaml
+- scrollUntilVisible:
+    element: 'Stop recording'
+- runFlow: open-classroom-controls.yaml
+- tapOn: 'Stop recording'
+- runFlow: open-classroom-whiteboard.yaml
+- tapOn: 'More whiteboard actions'
+- scrollUntilVisible:
+    element: 'Allow student editing'
+- tapOn: 'Allow student editing'
+- assertVisible: 'Disable student editing'
+- assertVisible: 'Stop sharing for everyone'
+- runFlow: hide-classroom-whiteboard.yaml
+- assertNotVisible: 'Expand whiteboard to full screen'
+- tapOn: 'Leave or end class'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

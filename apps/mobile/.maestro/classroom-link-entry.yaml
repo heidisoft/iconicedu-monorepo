@@ -1,0 +1,60 @@
+appId: com.heidisoft.iconicedu
+name: Real native entry, invitation refresh recovery and guest admission
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://classroom-link-fixture?mode=invited'
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Guest name'
+    timeout: 30000
+- assertNotVisible: 'Session passcode'
+- tapOn: 'Guest name'
+- inputText: 'Tablet guest'
+- tapOn: 'Continue to preview'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 10000
+- assertVisible: 'Change display name, currently Tablet guest'
+- assertNotVisible: 'Leave class|Leave or end class|End class'
+- openLink: 'iconicedu://classroom-link-fixture?mode=invited&resume=1'
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 10000
+- assertNotVisible: 'Guest name'
+- assertNotVisible: 'Session passcode'
+- assertVisible: 'Change display name, currently Tablet guest'
+- openLink: 'iconicedu://classroom-link-fixture?mode=member'
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Change display name, currently Signed-in student'
+    timeout: 10000
+- assertNotVisible: 'Guest name'
+- assertNotVisible: 'Session passcode'
+- openLink: 'iconicedu://classroom-link-fixture?mode=waiting'
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Guest name'
+    timeout: 10000
+- tapOn: 'Guest name'
+- inputText: 'Waiting guest'
+- tapOn: 'Session passcode'
+- inputText: 'synthetic-passcode'
+- tapOn: 'Continue to preview'
+- extendedWaitUntil:
+    visible: 'Waiting for the teacher to admit you'
+    timeout: 10000
+- assertNotVisible: 'Ready to join\?'
+- tapOn: 'Approve fixture guest'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 10000
+- assertVisible: 'Change display name, currently Waiting guest'

@@ -912,6 +912,38 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
     resolveRecipients: DEFAULT_RECIPIENTS,
     render: (event) => renderSessionItem(event, 'canceled'),
   },
+  'classroom.call.missed': {
+    eventType: 'classroom.call.missed',
+    tabKey: 'classes',
+    importance: 'important',
+    notification: {
+      defaultChannels: ['push'],
+      timing: 'immediate',
+      presenceAware: false,
+    },
+    resolveRecipients: DEFAULT_RECIPIENTS,
+    render: (event) => {
+      const payload = asRecord(event.payload);
+      const tutor = asOptionalString(payload.tutorName) ?? 'your tutor';
+      const title = asOptionalString(payload.classTitle) ?? 'Classroom';
+      const href = buildInboxSourceHref(event, payload);
+      return {
+        verb: 'classroom.call.missed',
+        leading: { kind: 'icon', iconKey: 'Bell', tone: 'warning' },
+        headline: {
+          primary: `Missed call from ${tutor}`,
+          secondary: title,
+          primaryHref: href,
+        },
+        summary: `You missed a class call from ${tutor}. Join the classroom or message your tutor.`,
+        actionButton: { label: 'Join classroom', variant: 'outline', href },
+        metadata: {
+          classroomCallId: payload.classroomCallId,
+          sessionId: payload.sessionId,
+        },
+      };
+    },
+  },
   'session.reminder.sent': {
     eventType: 'session.reminder.sent',
     tabKey: 'classes',

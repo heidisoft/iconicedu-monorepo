@@ -187,6 +187,8 @@ PODS:
     - ExpoModulesCore
   - ExpoCamera (55.0.19):
     - ExpoModulesCore
+  - ExpoCrypto (55.0.19):
+    - ExpoModulesCore
   - ExpoDocumentPicker (55.0.8):
     - ExpoModulesCore
   - ExpoDomWebView (55.0.3):
@@ -1867,6 +1869,16 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - react-native-zoom-video-sdk (2.6.1):
+    - React-Core
+    - ZoomVideoSDK/CptShare (= 2.6.0)
+    - ZoomVideoSDK/util (= 2.6.0)
+    - ZoomVideoSDK/Whiteboard (= 2.6.0)
+    - ZoomVideoSDK/zContext (= 2.6.0)
+    - ZoomVideoSDK/zm_annoter_dynamic (= 2.6.0)
+    - ZoomVideoSDK/zoomcml (= 2.6.0)
+    - ZoomVideoSDK/ZoomTask (= 2.6.0)
+    - ZoomVideoSDK/ZoomVideoSDK (= 2.6.0)
   - React-NativeModulesApple (0.83.2):
     - hermes-engine
     - React-callinvoker
@@ -2273,6 +2285,28 @@ PODS:
     - ReactCommon/turbomodule/core
     - ReactNativeDependencies
     - Yoga
+  - RNCPicker (2.11.4):
+    - hermes-engine
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-Core-prebuilt
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - ReactNativeDependencies
+    - Yoga
   - RNDateTimePicker (8.6.0):
     - hermes-engine
     - RCTRequired
@@ -2566,6 +2600,15 @@ PODS:
     - libwebp (~> 1.0)
     - SDWebImage/Core (~> 5.17)
   - Yoga (0.0.0)
+  - ZoomVideoSDK/CptShare (2.6.0)
+  - ZoomVideoSDK/util (2.6.0)
+  - ZoomVideoSDK/Whiteboard (2.6.0)
+  - ZoomVideoSDK/zContext (2.6.0)
+  - ZoomVideoSDK/zm_annoter_dynamic (2.6.0)
+  - ZoomVideoSDK/zoomcml (2.6.0)
+  - ZoomVideoSDK/ZoomTask (2.6.0)
+  - ZoomVideoSDK/ZoomVideoSDK (2.6.0)
+  - ZoomVideoSDK/ZoomVideoSDKScreenShare (2.6.0)
 
 DEPENDENCIES:
   - EASClient (from `../../../node_modules/expo-eas-client/ios`)
@@ -2581,6 +2624,7 @@ DEPENDENCIES:
   - ExpoAsset (from `../../../node_modules/expo-asset/ios`)
   - ExpoAudio (from `../../../node_modules/expo-audio/ios`)
   - ExpoCamera (from `../../../node_modules/expo-camera/ios`)
+  - ExpoCrypto (from `../../../node_modules/expo-crypto/ios`)
   - ExpoDocumentPicker (from `../../../node_modules/expo-document-picker/ios`)
   - "ExpoDomWebView (from `../../../node_modules/@expo/dom-webview/ios`)"
   - ExpoFileSystem (from `../../../node_modules/expo-file-system/ios`)
@@ -2649,6 +2693,7 @@ DEPENDENCIES:
   - react-native-pdf (from `../../../node_modules/react-native-pdf`)
   - react-native-safe-area-context (from `../../../node_modules/react-native-safe-area-context`)
   - react-native-webview (from `../../../node_modules/react-native-webview`)
+  - "react-native-zoom-video-sdk (from `../../../node_modules/@zoom/react-native-videosdk`)"
   - React-NativeModulesApple (from `../../../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
   - React-networking (from `../../../node_modules/react-native/ReactCommon/react/networking`)
   - React-oscompat (from `../../../node_modules/react-native/ReactCommon/oscompat`)
@@ -2684,6 +2729,7 @@ DEPENDENCIES:
   - ReactCommon/turbomodule/core (from `../../../node_modules/react-native/ReactCommon`)
   - ReactNativeDependencies (from `../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec`)
   - "RNCAsyncStorage (from `../../../node_modules/@react-native-async-storage/async-storage`)"
+  - "RNCPicker (from `../../../node_modules/@react-native-picker/picker`)"
   - "RNDateTimePicker (from `../../../node_modules/@react-native-community/datetimepicker`)"
   - RNGestureHandler (from `../../../node_modules/react-native-gesture-handler`)
   - RNReanimated (from `../../../node_modules/react-native-reanimated`)
@@ -2691,6 +2737,7 @@ DEPENDENCIES:
   - RNSVG (from `../../../node_modules/react-native-svg`)
   - RNWorklets (from `../../../node_modules/react-native-worklets`)
   - Yoga (from `../../../node_modules/react-native/ReactCommon/yoga`)
+  - ZoomVideoSDK/ZoomVideoSDKScreenShare (= 2.6.0)
 
 SPEC REPOS:
   trunk:
@@ -2703,6 +2750,7 @@ SPEC REPOS:
     - SDWebImageAVIFCoder
     - SDWebImageSVGCoder
     - SDWebImageWebPCoder
+    - ZoomVideoSDK
 
 EXTERNAL SOURCES:
   EASClient:
@@ -2731,6 +2779,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/expo-audio/ios"
   ExpoCamera:
     :path: "../../../node_modules/expo-camera/ios"
+  ExpoCrypto:
+    :path: "../../../node_modules/expo-crypto/ios"
   ExpoDocumentPicker:
     :path: "../../../node_modules/expo-document-picker/ios"
   ExpoDomWebView:
@@ -2866,6 +2916,8 @@ EXTERNAL SOURCES:
     :path: "../../../node_modules/react-native-safe-area-context"
   react-native-webview:
     :path: "../../../node_modules/react-native-webview"
+  react-native-zoom-video-sdk:
+    :path: "../../../node_modules/@zoom/react-native-videosdk"
   React-NativeModulesApple:
     :path: "../../../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios"
   React-networking:
@@ -2936,6 +2988,8 @@ EXTERNAL SOURCES:
     :podspec: "../../../node_modules/react-native/third-party-podspecs/ReactNativeDependencies.podspec"
   RNCAsyncStorage:
     :path: "../../../node_modules/@react-native-async-storage/async-storage"
+  RNCPicker:
+    :path: "../../../node_modules/@react-native-picker/picker"
   RNDateTimePicker:
     :path: "../../../node_modules/@react-native-community/datetimepicker"
   RNGestureHandler:
@@ -2965,6 +3019,7 @@ SPEC CHECKSUMS:
   ExpoAsset: bdc7bc21fe25d197c3aa7547e14c12c42087d9c9
   ExpoAudio: af1b3b6271e309bfc1ea4626284a47d3af49c7e1
   ExpoCamera: 7926674f9ec1be53bfc83b21c908b7fadd381b32
+  ExpoCrypto: 219209dfd0fef126db1627b1b9ac989d6a3ce2d0
   ExpoDocumentPicker: 9d82b922be941a74ba52f82df7ba123b334fbb5a
   ExpoDomWebView: f101fb3db4b6eec4163fca51f7507189b7e48661
   ExpoFileSystem: e1a42d7f69f7faae33f4d7d01708f7861f7bd757
@@ -3037,6 +3092,7 @@ SPEC CHECKSUMS:
   react-native-pdf: dac049a15aec41db452e372f85184d3f15741b12
   react-native-safe-area-context: 37e680fc4cace3c0030ee46e8987d24f5d3bdab2
   react-native-webview: 0ed52ddb2eafc64a502871218440b8b4d37961c3
+  react-native-zoom-video-sdk: 2995ec535b6a34464373bea86ca68c98d3b4a686
   React-NativeModulesApple: f9fa097fc24cec967b77bfc05f72d2ea7db05b87
   React-networking: 29a9ae1a2e6ce8bb19174cc47110b36ae7ffcbcd
   React-oscompat: 856e980339052dc5a35980a498e24dd8480acf29
@@ -3072,6 +3128,7 @@ SPEC CHECKSUMS:
   ReactCommon: 8868269b67561136a7970be188b40738135af077
   ReactNativeDependencies: 37ddd33a9b29f3c419ee202e1cd067080c09b1b7
   RNCAsyncStorage: 3a4f5e2777dae1688b781a487923a08569e27fe4
+  RNCPicker: c8a3584b74133464ee926224463fcc54dfdaebca
   RNDateTimePicker: 9c0a849bbe1c256f0854fea255734b715f5ea876
   RNGestureHandler: 5494787ce29288a8941fa825663f2b1fa0a5aaf1
   RNReanimated: 55f3c45edaee604ad1f1447cb13e928cb6e21660
@@ -3083,7 +3140,8 @@ SPEC CHECKSUMS:
   SDWebImageSVGCoder: 15a300a97ec1c8ac958f009c02220ac0402e936c
   SDWebImageWebPCoder: e38c0a70396191361d60c092933e22c20d5b1380
   Yoga: dd994d8c85dca5cc9b10f5df8c01f9ef1d0da191
+  ZoomVideoSDK: 9ec537e245a54bbd0bf89e53a478518f21eb6591
 
-PODFILE CHECKSUM: 5c37dfa29ef22647c706d5a58222463e62ded32d
+PODFILE CHECKSUM: 7bc2a3ffcbe65a14109d9e4267707f18a667d576
 
 COCOAPODS: 1.17.0

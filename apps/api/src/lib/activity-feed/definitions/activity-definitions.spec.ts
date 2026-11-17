@@ -401,3 +401,25 @@ describe('API activity definitions context rendering', () => {
     },
   );
 });
+
+it('renders a missed tutor call with a recoverable classroom action', () => {
+  const definition = getActivityEventDefinition('classroom.call.missed')!;
+  const rendered = definition.render(
+    makeEvent('classroom.call.missed', {
+      tutorName: 'Test tutor',
+      classTitle: 'Test class',
+      classroomCallId: 'call',
+      href: '/academy/calls/call',
+    }),
+  );
+  expect(rendered.headline.primary).toBe('Missed call from Test tutor');
+  expect(rendered.actionButton).toMatchObject({
+    label: 'Join classroom',
+    href: '/academy/calls/call',
+  });
+  expect(rendered.metadata).toMatchObject({ classroomCallId: 'call' });
+  expect(definition.notification).toMatchObject({
+    defaultChannels: ['push'],
+    timing: 'immediate',
+  });
+});

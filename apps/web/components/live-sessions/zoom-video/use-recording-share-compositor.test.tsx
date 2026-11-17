@@ -56,3 +56,28 @@ it('trusts Zoom sender metadata, ignores malformed commands and removes ended sh
   expect(off).toHaveBeenCalledWith('command-channel-message', expect.any(Function));
   expect(mocks.dispose).toHaveBeenCalledOnce();
 });
+it('expires silent presenter metadata so a backgrounded native publisher cannot remain trusted', async () => {
+  vi.useFakeTimers();
+  const events = new Map<string, (data: unknown) => void>();
+  const failure = vi.fn();
+  const client = {
+    getMediaStream: () => ({}),
+    getCommandClient: () => ({ send: vi.fn(async () => '') }),
+    on: (name: string, callback: (data: unknown) => void) => events.set(name, callback),
+    off: vi.fn(),
+  } as unknown as ZoomClient;
+  const { result, unmount } = renderHook(() =>
+    useRecordingShareCompositor(client, false, () => null, failure, 2),
+  );
+  act(() =>
+    events.get('command-channel-message')?.({
+      senderId: '2',
+      text: '{"type":"meeting-composited-share-v1","active":true}',
+    }),
+  );
+  expect(result.current.composited.has(2)).toBe(true);
+  act(() => vi.advanceTimersByTime(6000));
+  expect(result.current.composited.has(2)).toBe(false);
+  expect(failure).toHaveBeenCalledOnce();
+  unmount();
+});

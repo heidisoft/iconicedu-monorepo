@@ -1,6 +1,9 @@
+import { nativeCollaboration } from './helpers/native-collaboration';
 import { execFileSync } from 'node:child_process';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { expect, test, type Browser, type Page } from '@playwright/test';
+// Local capabilities and fixture passwords must not enter traces/recordings.
+test.use({ trace: 'off', video: 'off' });
 function sql(statement: string) {
   execFileSync(
     'docker',
@@ -231,7 +234,7 @@ test('shared-link guest sees presenter marks and draws without an account sessio
     await enableNames(teacher.page);
     await hoverAnnotation(guest.page);
     await expect.poll(() => pointerLabels(teacher.page)).toContain('Guest');
-    await teacher.page.getByRole('button', { name: 'Attention', exact: true }).click();
+    await teacher.page.getByRole('button', { name: 'More', exact: true }).click();
     await teacher.page.getByRole('button', { name: 'Spotlight', exact: true }).click();
     const edge = (await teacher.page
       .locator('[data-shared-content-bounds]')
@@ -398,6 +401,7 @@ test('keeps real API dots and fast highlights after closing and reopening tools'
         bounds.y + bounds.height * 0.55,
       );
     }
+    await teacher.page.getByRole('button', { name: 'More', exact: true }).click();
     await teacher.page.getByRole('button', { name: 'Highlighter', exact: true }).click();
     for (let index = 0; index < 5; index++) {
       await teacher.page.mouse.move(
@@ -458,4 +462,43 @@ test('keeps real API dots and fast highlights after closing and reopening tools'
     for (const context of contexts) await context.close();
     data.cleanup();
   }
+});
+
+test.describe('native annotation API interoperability', () => {
+  test('web and native synchronize marks and undo through the real API', async ({
+    browser,
+  }) => {
+    const device = process.env.NATIVE_SYNC_DEVICE_ID;
+    test.skip(!device, 'Requires native simulator, Metro and local API on port 8998.');
+    test.setTimeout(180000);
+    const data = fixture();
+    const token = randomBytes(32).toString('base64url');
+    sql(
+      `insert into public.screen_annotation_access(live_session_id,token_hash,display_name,expires_at) values ('${data.sessionId}','${createHash('sha256').update(token).digest('hex')}','Native guest',now()+interval '1 hour');`,
+    );
+    const native = await nativeCollaboration(device!, {
+      session: data.sessionId,
+      annotationToken: token,
+    });
+    try {
+      await native.ready();
+      const teacher = await join(browser, {
+        ...data.actors[0],
+        sessionId: data.sessionId,
+      });
+      await draw(teacher.page);
+      await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('1');
+      await native.run('annotation-sync-draw');
+      await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('2');
+      await native.run('annotation-sync-undo');
+      await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('1');
+      await draw(teacher.page);
+      await expect(teacher.page.getByLabel('Synchronized marks')).toHaveText('2');
+      await native.run('annotation-sync-receive');
+      await teacher.context.close();
+    } finally {
+      await native.close();
+      data.cleanup();
+    }
+  });
 });

@@ -9,7 +9,7 @@
 # What it does:
 #   1. Asks whether to generate and build native projects (expo prebuild +
 #      expo run:ios / expo run:android).
-#   2. If skipped, starts Metro bundler for the already-installed dev client.
+#   2. If skipped, starts Metro and opens the installed iOS dev client on macOS.
 #
 # When to rebuild native projects:
 #   - First run on a new machine or after a fresh clone
@@ -52,7 +52,7 @@ else
   echo ""
   echo "  Skip for normal JS work — screens, logic, styling, routing."
   echo ""
-  read -r -p "  Rebuild native projects? [y/N] " answer
+  read -r -p "  Rebuild native projects? [y/N] " answer || answer=""
   case "$answer" in
     [yY] | [yY][eE][sS]) SHOULD_BUILD=true ;;
     *) SHOULD_BUILD=false ;;
@@ -64,7 +64,7 @@ if [ "$SHOULD_BUILD" = true ]; then
   echo ""
   echo "  ── expo prebuild ────────────────────────────────────────────────────"
   echo ""
-  npx expo prebuild
+  pnpm exec expo prebuild
 
   echo ""
   echo "  ── Select platform ──────────────────────────────────────────────────"
@@ -82,14 +82,14 @@ if [ "$SHOULD_BUILD" = true ]; then
       echo "  ── expo run:ios ─────────────────────────────────────────────────────"
       echo "  This builds the app, installs it on the Simulator, and starts Metro."
       echo ""
-      exec npx expo run:ios
+      exec pnpm exec expo run:ios
       ;;
     2 | android | Android)
       echo ""
       echo "  ── expo run:android ─────────────────────────────────────────────────"
       echo "  This builds the app, installs it on the Emulator, and starts Metro."
       echo ""
-      exec npx expo run:android
+      exec pnpm exec expo run:android
       ;;
     q | Q | skip)
       echo ""
@@ -105,7 +105,15 @@ fi
 # ── Start Metro for an already-installed dev client ───────────────────────────
 echo ""
 echo "  ── Starting Metro bundler ───────────────────────────────────────────"
-echo "  Open the ICONIC Academy dev client app on your device and scan the QR"
-echo "  code, or press i (iOS Simulator) / a (Android Emulator) in the terminal."
+if [ "$(uname -s)" = "Darwin" ]; then
+  echo "  Opening the iOS Simulator development client automatically."
+fi
+echo "  For a physical device, scan the QR code in the development client."
+echo "  Press i (iOS Simulator) / a (Android Emulator) to open again."
 echo ""
-exec npx expo start --dev-client --clear
+# Preserve Metro's cache for normal development. Use pnpm dev:mobile --clear
+# when explicitly troubleshooting stale bundles.
+if [ "$(uname -s)" = "Darwin" ]; then
+  exec pnpm exec expo start --dev-client --ios "$@"
+fi
+exec pnpm exec expo start --dev-client "$@"

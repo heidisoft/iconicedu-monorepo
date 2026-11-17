@@ -7,6 +7,7 @@ import { Loader2 } from 'lucide-react';
 import {
   useFocusedFullscreen,
   FocusedFullscreenButton,
+  WhiteboardFullscreenContext,
   FocusedFullscreenStyles,
 } from './focused-fullscreen';
 import { cn } from '@iconicedu/ui-web/lib/utils';
@@ -28,6 +29,7 @@ export function ZoomShareStage({
   localVideoRef,
   whiteboardContainerRef,
   whiteboardContent,
+  whiteboardControlsFullscreen = false,
   dimensions,
   showRemoteShare,
   showLocalShare,
@@ -50,6 +52,7 @@ export function ZoomShareStage({
   localVideoRef: Ref<HTMLVideoElement>;
   whiteboardContainerRef: Ref<HTMLDivElement>;
   whiteboardContent?: ReactNode;
+  whiteboardControlsFullscreen?: boolean;
   dimensions: ShareDimensions;
   showRemoteShare: boolean;
   showLocalShare: boolean;
@@ -194,11 +197,15 @@ export function ZoomShareStage({
         <FocusedFullscreenButton
           fullscreen={boardFullscreen}
           label="whiteboard"
-          visible={showWhiteboard}
+          visible={showWhiteboard && !whiteboardControlsFullscreen}
         />
         {/* Zoom requires an empty mounting element; keep loading UI in the
             wrapper so the SDK owns this child exclusively. */}
-        {whiteboardContent ?? (
+        {whiteboardContent ? (
+          <WhiteboardFullscreenContext.Provider value={boardFullscreen}>
+            {whiteboardContent}
+          </WhiteboardFullscreenContext.Provider>
+        ) : (
           <div ref={whiteboardContainerRef} className="absolute inset-0" />
         )}
         {whiteboardLoading ? (

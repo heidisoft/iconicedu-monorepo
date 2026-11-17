@@ -53,7 +53,7 @@ describe('live session setup', () => {
       passcodeRequired: false,
       linkToken: 'a'.repeat(32),
     });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(screen.queryByText('In meeting as Alex')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Session passcode')).not.toBeInTheDocument();
@@ -74,7 +74,7 @@ describe('live session setup', () => {
       participantName: 'Alex',
       passcodeRequired: false,
     });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(screen.queryByText('In meeting as Alex')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
     expect(mocks.guestJoin).not.toHaveBeenCalled();
@@ -90,7 +90,7 @@ describe('live session setup', () => {
       initialPasscode: 'demo',
       accessToken: 'synthetic-auth',
     });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(screen.queryByLabelText('Your name')).not.toBeInTheDocument();
     expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
       'test-session',
@@ -104,7 +104,7 @@ describe('live session setup', () => {
       accessToken: 'synthetic-auth',
       passcodeRequired: false,
     });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(screen.queryByLabelText('Session passcode')).not.toBeInTheDocument();
     expect(mocks.guestJoin).toHaveBeenCalledExactlyOnceWith(
       'test-session',
@@ -119,7 +119,7 @@ describe('live session setup', () => {
       passcodeRequired: false,
       students: [{ profileId: 'child-one', displayName: 'Alice' }],
     });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(screen.queryByLabelText('Session passcode')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /Join session/ }));
     await waitFor(() =>
@@ -140,7 +140,7 @@ describe('live session setup', () => {
     setup({ initialPasscode: 'demo' });
     await user.type(await screen.findByLabelText('Your name'), 'Sam');
     await user.click(screen.getByRole('button', { name: 'Join session' }));
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(mocks.guestJoin).toHaveBeenCalledWith(
       'test-session',
       { admissionToken: expect.any(String), displayName: 'Sam', passcode: 'demo' },
@@ -163,7 +163,7 @@ describe('live session setup', () => {
     await user.clear(input);
     await user.type(input, 'correct');
     await user.click(screen.getByRole('button', { name: 'Join session' }));
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(mocks.guestJoin).toHaveBeenCalledTimes(2);
   });
   it.each([
@@ -215,9 +215,7 @@ describe('live session setup', () => {
     );
     setup({ participantName: 'Alex', initialPasscode: 'demo' });
     await waitFor(() => expect(mocks.guestJoin).toHaveBeenCalledOnce());
-    expect(
-      await screen.findByText('Check your camera and microphone before joining.'),
-    ).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Join session' })).toBeVisible();
   });
   it.each([
     { credentials: { token: null }, passcode: 'demo', participantName: 'Alex' },
@@ -235,7 +233,7 @@ describe('live session setup', () => {
       }),
     );
     setup({ participantName: 'Alex', initialPasscode: 'demo' });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(mocks.guestJoin).toHaveBeenCalledOnce();
   });
   it('does not restore expired credentials', async () => {
@@ -250,7 +248,7 @@ describe('live session setup', () => {
       }),
     );
     setup({ participantName: 'Alex', initialPasscode: 'demo' });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(mocks.guestJoin).toHaveBeenCalledOnce();
     expect(sessionStorage.getItem('iconicedu:live-session:test-session')).toBeNull();
   });
@@ -276,7 +274,7 @@ describe('live session setup', () => {
       identityKey: 'second-user',
       initialPasscode: 'demo',
     });
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     expect(mocks.guestJoin).toHaveBeenCalledOnce();
   });
   it('joins a single linked student directly from preview and restores that student on refresh', async () => {
@@ -334,7 +332,7 @@ describe('live session setup', () => {
     const join = await screen.findByRole('button', { name: 'Join session' });
     expect(join).toBeDisabled();
     expect(mocks.guestJoin).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('radio', { name: 'Ben' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ben' }));
     expect(join).toBeEnabled();
     fireEvent.click(join);
     await screen.findByText('In meeting as Ben');
@@ -348,6 +346,52 @@ describe('live session setup', () => {
       },
       undefined,
     );
+  });
+  it('selects either sibling or both, generates a combined name, and restores the group', async () => {
+    mocks.guestJoin.mockResolvedValue({
+      ...credentials,
+      displayName: 'Alice & Ben',
+      studentProfileIds: ['child-one', 'child-two'],
+    });
+    const props = {
+      participantName: 'Parent',
+      initialPasscode: 'demo',
+      identityKey: 'parent-group',
+      students: [
+        { profileId: 'child-one', displayName: 'Alice' },
+        { profileId: 'child-two', displayName: 'Ben' },
+      ],
+    };
+    const view = setup(props);
+    const join = await screen.findByRole('button', { name: 'Join session' });
+    expect(join).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Alice' }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ben' }));
+    expect(
+      screen.getByRole('button', { name: 'Change display name, currently Alice & Ben' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Alice' }));
+    expect(
+      screen.getByRole('button', { name: 'Change display name, currently Ben' }),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Alice' }));
+    await waitFor(() => expect(join).toBeEnabled());
+    fireEvent.click(join);
+    await screen.findByText('In meeting as Alice & Ben');
+    expect(mocks.guestJoin).toHaveBeenCalledWith(
+      'test-session',
+      expect.objectContaining({
+        displayName: 'Alice & Ben',
+        studentProfileIds: ['child-one', 'child-two'],
+      }),
+      undefined,
+    );
+    expect(mocks.guestJoin.mock.calls[0][1]).not.toHaveProperty('studentProfileId');
+    view.unmount();
+    mocks.guestJoin.mockClear();
+    setup(props);
+    await screen.findByText('In meeting as Alice & Ben');
+    expect(mocks.guestJoin).not.toHaveBeenCalled();
   });
   it('keeps preview open and allows correcting a rejected parent join passcode', async () => {
     mocks.guestJoin.mockResolvedValueOnce({ status: 403, message: 'Incorrect passcode' });
@@ -396,7 +440,7 @@ describe('live session setup', () => {
       initialPasscode: 'demo',
     };
     const first = setup(props);
-    await screen.findByText('Check your camera and microphone before joining.');
+    await screen.findByRole('button', { name: 'Join session' });
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Join session' })).toBeEnabled(),
     );
@@ -411,7 +455,7 @@ describe('live session setup', () => {
         { profileId: 'child-two', displayName: 'Ben' },
       ],
     });
-    expect(await screen.findByRole('radio', { name: 'Alice' })).not.toBeChecked();
+    expect(await screen.findByRole('checkbox', { name: 'Alice' })).not.toBeChecked();
     expect(screen.queryByText('In meeting as Alex')).not.toBeInTheDocument();
     expect(mocks.guestJoin).not.toHaveBeenCalled();
   });

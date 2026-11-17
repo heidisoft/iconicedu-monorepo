@@ -34,6 +34,13 @@ pnpm --filter web test:e2e:ui
 
 Do not commit an authenticated storage-state file. It contains reusable session data.
 
+The combined classroom runner, source-page live matrix and native tablet commands
+are documented in [Native classroom testing](../../../docs/getting-started/native-classroom.md#complete-classroom-regression-suite).
+Run `pnpm test:e2e:classroom ui web` from the repository root for the deterministic
+browser suite. Live source journeys use `classroom-live-journeys.spec.ts` and require
+the private configuration template in `ops/classroom-e2e.example.json`; they never
+substitute fixture results for successful Zoom media verification.
+
 ## Specs
 
 - `e2e/marketing-smoke.spec.ts`: public landing page smoke test.

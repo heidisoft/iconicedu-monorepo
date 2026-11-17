@@ -1,4 +1,6 @@
 import { Alert, Linking } from 'react-native';
+import { getAppLiveSessionIdentifier } from './live-session-join';
+import { openLiveSession } from './open-live-session';
 
 const URL_PATTERN = /\b((?:https?:\/\/|www\.)[^\s<>()]+)/gi;
 const TRUSTED_HOSTS = [
@@ -84,6 +86,10 @@ export function findFirstMessageLink(text: string): string | null {
 
 export function openMessageLink(url: string): void {
   const normalizedUrl = normalizeUrl(url);
+  if (getAppLiveSessionIdentifier(normalizedUrl)) {
+    void openLiveSession(normalizedUrl);
+    return;
+  }
   if (isTrustedExternalLink(normalizedUrl)) {
     void Linking.openURL(normalizedUrl).catch(() => null);
     return;

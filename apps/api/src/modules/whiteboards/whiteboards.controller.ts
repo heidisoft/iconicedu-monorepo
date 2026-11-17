@@ -16,6 +16,14 @@ export class WhiteboardsController {
   mutate(@Req() req: Request, @Body() body: unknown) {
     return this.boards.mutate(this.token(req), body);
   }
+  @Get('current/viewport')
+  viewports(@Req() req: Request) {
+    return this.boards.getViewports(this.token(req));
+  }
+  @Post('current/viewport')
+  viewport(@Req() req: Request, @Body() body: unknown) {
+    return this.boards.publishViewport(this.token(req), body);
+  }
   @Get('current/laser')
   lasers(@Req() req: Request) {
     return this.boards.getLasers(this.token(req));

@@ -1,3 +1,8 @@
+import { requireMeetingAdmission } from './meeting-admissions';
+jest.mock('./meeting-admissions', () => ({
+  requireMeetingAdmission: jest.fn(async () => undefined),
+  meetingAdmissionStatus: jest.fn(),
+}));
 import { resolveMeetingLink } from './meeting-browser-links';
 jest.mock('./meeting-browser-links', () => ({
   issueMeetingLink: jest.fn(async () => 'synthetic-invitation-token'),
@@ -50,6 +55,7 @@ describe('public live session identity and authorization', () => {
   let hasOrgProfile: boolean;
   let status: string;
   let invitesEnabled: boolean;
+  let restricted: boolean;
   let isClassMember: boolean;
   let isTeacher: boolean;
   let isOrgStaff: boolean;
@@ -57,14 +63,19 @@ describe('public live session identity and authorization', () => {
   let selections: string[];
   let enrolledStudents: string[];
   let lookupFilters: Array<{ table: string; filters: Record<string, unknown> }>;
+  let sessionMetadata: Record<string, unknown>;
+  let providerSessionId: string | null;
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(hasOrgStaffRole).mockResolvedValue(false);
     jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
     authUserId = 'member-auth';
+    sessionMetadata = { sessionName: 'test-class', passcode: 'demo' };
+    providerSessionId = 'test-class';
     hasOrgProfile = true;
     status = 'live';
     invitesEnabled = true;
+    restricted = false;
     isClassMember = true;
     isTeacher = false;
     isOrgStaff = false;
@@ -134,14 +145,15 @@ describe('public live session identity and authorization', () => {
                 provider: 'zoom',
                 status,
                 started_by_profile_id: 'host-profile',
-                provider_session_id: 'test-class',
-                provider_metadata: { sessionName: 'test-class', passcode: 'demo' },
-                ...(!invitesEnabled
+                provider_session_id: providerSessionId,
+                provider_metadata: sessionMetadata,
+                ...(!invitesEnabled || restricted
                   ? {
                       app_metadata: {
                         meetingSettings: {
                           ...DEFAULT_LIVE_SESSION_SETTINGS,
-                          invite: { enabled: false },
+                          invite: { enabled: invitesEnabled },
+                          access: { mode: restricted ? 'restricted' : 'open' },
                         },
                       },
                     }
@@ -182,6 +194,92 @@ describe('public live session identity and authorization', () => {
     });
     jest.mocked(getLiveSessionProvider).mockReturnValue({ getJoinAccess } as never);
     jest.mocked(verifyZoomPasscode).mockReturnValue(true);
+  });
+  it.each([
+    [
+      'provider-issued topic',
+      { sessionName: 'signed-class-topic' },
+      { sessionName: 'stored-class-topic', passcode: 'demo' },
+      'signed-class-topic',
+    ],
+    ['legacy provider ID', undefined, { passcode: 'demo' }, 'test-class'],
+  ])(
+    'uses the same %s for host and participant joins on either client',
+    async (_case, issuedMetadata, storedMetadata, expectedName) => {
+      sessionMetadata = storedMetadata as Record<string, unknown>;
+      getJoinAccess.mockResolvedValue({
+        token: 'synthetic-token',
+        metadata: issuedMetadata,
+      });
+      authUserId = 'host-auth';
+      const service = new LiveSessionsService();
+      const host = await service.getPublicLiveSessionInfo(
+        'session-identity',
+        'synthetic-host-auth',
+      );
+      authUserId = null;
+      const participant = await service.guestJoinLiveSession(
+        'session-identity',
+        'cross-client-participant',
+        { displayName: 'Student', passcode: 'demo' },
+      );
+      expect(host).toMatchObject({
+        isHost: true,
+        hostJoin: { sessionName: expectedName },
+      });
+      expect(participant.sessionName).toBe(expectedName);
+      expect(getJoinAccess).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          sessionId: 'session-identity',
+          providerSessionId: 'test-class',
+          isHost: true,
+        }),
+      );
+      expect(getJoinAccess).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          sessionId: 'session-identity',
+          providerSessionId: 'test-class',
+          isHost: false,
+        }),
+      );
+    },
+  );
+  it('does not replace a blank provider-issued topic with another room name', async () => {
+    getJoinAccess.mockResolvedValue({
+      token: 'synthetic-token',
+      metadata: { sessionName: ' ' },
+    });
+    authUserId = 'host-auth';
+    const service = new LiveSessionsService();
+    await expect(
+      service.getPublicLiveSessionInfo('session-identity', 'synthetic-host-auth'),
+    ).rejects.toThrow('Unable to resolve the classroom session');
+    authUserId = null;
+    await expect(
+      service.guestJoinLiveSession('session-identity', 'blank-topic', {
+        displayName: 'Student',
+        passcode: 'demo',
+      }),
+    ).rejects.toThrow('Unable to resolve the classroom session');
+  });
+  it('rejects credentials with no Zoom topic instead of using the database ID', async () => {
+    providerSessionId = null;
+    sessionMetadata = { passcode: 'demo' };
+    getJoinAccess.mockResolvedValue({ token: 'synthetic-token' });
+    authUserId = 'host-auth';
+    const service = new LiveSessionsService();
+    await expect(
+      service.getPublicLiveSessionInfo('session-identity', 'synthetic-host-auth'),
+    ).rejects.toThrow('Unable to resolve the classroom session');
+    authUserId = null;
+    await expect(
+      service.guestJoinLiveSession('session-identity', 'missing-topic', {
+        displayName: 'Student',
+        passcode: 'demo',
+      }),
+    ).rejects.toThrow('Unable to resolve the classroom session');
   });
   it('resolves a normalized short code to a canonical guest session without credentials', async () => {
     const info = await new LiveSessionsService().getPublicLiveSessionInfo(
@@ -654,6 +752,120 @@ describe('public live session identity and authorization', () => {
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
     expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+  it('authorizes siblings sharing one connection with a combined name and a distinct shared identity', async () => {
+    guardian = true;
+    const service = new LiveSessionsService();
+    const input = {
+      displayName: 'Forged',
+      passcode: 'demo',
+      studentProfileIds: ['child-two', 'child-one'],
+    };
+    const joined = await service.guestJoinLiveSession(
+      'session-identity',
+      'parent-both',
+      input,
+      'auth',
+    );
+    expect(joined).toMatchObject({
+      displayName: 'Alice & Ben',
+      studentProfileIds: ['child-one', 'child-two'],
+    });
+    expect(joined.studentProfileId).toBeUndefined();
+    expect(getJoinAccess).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        displayName: 'Alice & Ben',
+        profileId: expect.stringMatching(/^shared:/),
+        isHost: false,
+      }),
+    );
+    const key =
+      getJoinAccess.mock.calls[getJoinAccess.mock.calls.length - 1][0].profileId;
+    await service.guestJoinLiveSession(
+      'session-identity',
+      'parent-both-again',
+      {
+        ...input,
+        studentProfileIds: ['child-one', 'child-two'],
+        displayNameOverride: 'Study buddies',
+      },
+      'auth',
+    );
+    expect(getJoinAccess).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        profileId: key,
+        displayName: 'Study buddies',
+        isHost: false,
+      }),
+    );
+    expect(issueWhiteboardAccess).toHaveBeenLastCalledWith(
+      'session-identity',
+      'student',
+      'Study buddies',
+    );
+  });
+  it.each([
+    { ids: ['child-one', 'unrelated-child'] },
+    { ids: ['child-one', 'child-one'] },
+    { ids: [] },
+  ])('rejects invalid shared selections $ids', async ({ ids }) => {
+    guardian = true;
+    await expect(
+      new LiveSessionsService().guestJoinLiveSession(
+        'session-identity',
+        'parent-invalid-group',
+        { displayName: 'Parent', passcode: 'demo', studentProfileIds: ids },
+        'auth',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(getJoinAccess).not.toHaveBeenCalled();
+  });
+  it('rejects group selection by a non-parent', async () => {
+    await expect(
+      new LiveSessionsService().guestJoinLiveSession(
+        'session-identity',
+        'spoof-group',
+        {
+          displayName: 'Parent',
+          passcode: 'demo',
+          studentProfileIds: ['child-one', 'child-two'],
+        },
+        'auth',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+  it('binds admission to the full canonical sibling set rather than only one student', async () => {
+    guardian = true;
+    restricted = true;
+    const service = new LiveSessionsService();
+    const input = {
+      displayName: 'Parent',
+      passcode: 'demo',
+      admissionToken: 'a'.repeat(32),
+      studentProfileIds: ['child-two', 'child-one'],
+    };
+    await service.guestJoinLiveSession(
+      'session-identity',
+      'group-admission',
+      input,
+      'auth',
+    );
+    const first = jest.mocked(requireMeetingAdmission).mock.calls[0][2];
+    expect(JSON.parse(first)[1]).toEqual(['child-one', 'child-two']);
+    await service.guestJoinLiveSession(
+      'session-identity',
+      'group-admission-repeat',
+      { ...input, studentProfileIds: ['child-one', 'child-two'] },
+      'auth',
+    );
+    expect(jest.mocked(requireMeetingAdmission).mock.calls[1][2]).toBe(first);
+    await service.guestJoinLiveSession(
+      'session-identity',
+      'single-admission',
+      { ...input, studentProfileIds: ['child-one'] },
+      'auth',
+    );
+    expect(jest.mocked(requireMeetingAdmission).mock.calls[2][2]).not.toBe(first);
   });
   it('checks selected student membership when shared invitations are disabled', async () => {
     guardian = true;

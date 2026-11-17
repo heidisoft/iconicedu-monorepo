@@ -1,0 +1,47 @@
+appId: com.heidisoft.iconicedu
+name: Android native picture-in-picture transition and restoration
+---
+- runFlow: bootstrap.yaml
+- openLink: iconicedu://classroom-fixture
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- tapOn: 'Join now'
+- tapOn: 'More controls'
+- tapOn: 'Open floating call'
+- extendedWaitUntil:
+    visible:
+      id: 'classroom-picture-in-picture'
+    timeout: 10000
+- assertNotVisible: 'Leave class|Leave or end class|End class'
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible: 'Native classroom test'
+    timeout: 15000
+- assertVisible: 'Leave class|Leave or end class|End class'
+- tapOn: 'More controls'
+- tapOn: 'Settings'
+- tapOn: 'Meeting settings tab'
+- tapOn: 'Automatic floating call'
+- tapOn: 'Close settings'
+- pressKey: HOME
+- extendedWaitUntil:
+    visible:
+      id: 'classroom-picture-in-picture'
+    timeout: 10000
+- assertNotVisible: 'Leave class|Leave or end class|End class'
+- launchApp:
+    stopApp: false
+- extendedWaitUntil:
+    visible: 'Native classroom test'
+    timeout: 15000
+- tapOn: 'More controls'
+- tapOn: 'Settings'
+- tapOn: 'Meeting settings tab'
+- tapOn: 'Automatic floating call'
+- tapOn: 'Close settings'

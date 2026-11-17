@@ -1,3 +1,4 @@
+import { IncomingClassCall } from '@iconicedu/web/components/live-sessions/incoming-class-call';
 import type { ReactNode } from 'react';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
@@ -21,7 +22,7 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import { enableAssessments } from '@iconicedu/web/flags';
+import { enableAssessments, enableClassroomCalls } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -97,6 +98,9 @@ export default async function Layout({
   const assessmentsEnabled = await enableAssessments.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
+  const classroomCallsEnabled = await enableClassroomCalls.run({
+    identify: { profileId: familyViewResolution.effectiveProfile.id },
+  });
   const includeReports = false;
 
   return (
@@ -112,6 +116,7 @@ export default async function Layout({
         })}
         subjectOptions={subjectOptions}
       >
+        {classroomCallsEnabled && <IncomingClassCall />}
         {children}
       </SidebarShell>
     </SidebarProvider>

@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { AnnotationObject, AnnotationSnapshot } from '@iconicedu/shared-types';
-import { AnnotationStrokeBuffer, applyAnnotationCommit, moveAnnotation } from './state';
+import {
+  AnnotationStrokeBuffer,
+  applyAnnotationCommit,
+  moveAnnotation,
+  participantCursorColors,
+} from './state';
 const object: AnnotationObject = {
   id: 'one',
   roomId: 'room',
@@ -77,6 +82,20 @@ describe('annotation synchronization', () => {
         .objects[0].deleted,
     ).toBe(true);
   });
+  it('merges delayed distinct strokes without reverting newer permissions', () => {
+    const latest = { ...snapshot, revision: 4, studentsEnabled: false };
+    const result = applyAnnotationCommit(latest, {
+      eventId: 'delayed',
+      roomId: 'room',
+      revision: 2,
+      objects: [{ ...object, id: 'second' }],
+      studentsEnabled: true,
+      ended: false,
+    });
+    expect(result.objects.map((item) => item.id)).toEqual(['one', 'second']);
+    expect(result.revision).toBe(4);
+    expect(result.studentsEnabled).toBe(false);
+  });
   it('buffers reordered stroke packets and ignores retransmissions', () => {
     const buffer = new AnnotationStrokeBuffer([{ x: 0, y: 0 }]);
     expect(buffer.append(2, [{ x: 1, y: 1 }])).toHaveLength(1);
@@ -95,4 +114,12 @@ describe('annotation synchronization', () => {
       { x: 1, y: 0.3 },
     ]);
   });
+});
+
+it('uses pale participant backgrounds and dark foregrounds with a safe fallback', () => {
+  expect(participantCursorColors('#ff0000')).toEqual({
+    background: '#ffe6e6',
+    foreground: '#730000',
+  });
+  expect(participantCursorColors('invalid')).toEqual(participantCursorColors('#475569'));
 });

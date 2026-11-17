@@ -14,7 +14,6 @@ import {
   Heart,
   Highlighter,
   Hand,
-  Shapes,
   LocateFixed,
   Minus,
   MousePointer2,
@@ -23,7 +22,6 @@ import {
   Redo2,
   Square,
   Star,
-  Stamp,
   Type,
   Undo2,
   X,
@@ -152,7 +150,9 @@ function ToolMenu({
   active = false,
   surface,
   inset,
+  hideTrigger = false,
 }: {
+  hideTrigger?: boolean;
   label: string;
   icon: ReactNode;
   open: boolean;
@@ -167,14 +167,19 @@ function ToolMenu({
   const content = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
-    const opener = trigger.current;
+    const opener = hideTrigger
+      ? trigger.current
+          ?.closest('[role="toolbar"]')
+          ?.querySelector<HTMLButtonElement>('[aria-label="More"]')
+      : trigger.current;
     content.current?.focus();
     return () => opener?.focus();
-  }, [open]);
+  }, [open, hideTrigger]);
   return (
     <div>
       <button
         ref={trigger}
+        hidden={hideTrigger}
         type="button"
         aria-label={label}
         aria-expanded={open}
@@ -250,6 +255,7 @@ export function AnnotationToolbar({
   setItalic,
   onFormat,
   onQuickStyle,
+  backgroundColor,
   onDuplicate,
   onDelete,
   onSave,
@@ -283,7 +289,12 @@ export function AnnotationToolbar({
   italic: boolean;
   setItalic: (value: boolean) => void;
   onFormat: () => void;
-  onQuickStyle?: (style: { strokeColor?: string; strokeWidth?: number }) => void;
+  backgroundColor?: string;
+  onQuickStyle?: (style: {
+    strokeColor?: string;
+    strokeWidth?: number;
+    backgroundColor?: string;
+  }) => void;
   onDuplicate: () => void;
   onDelete: () => void;
   onSave: () => void;
@@ -298,7 +309,9 @@ export function AnnotationToolbar({
   useEffect(() => {
     if (autoExpand) setExpanded(true);
   }, [autoExpand]);
+  const [spacious, setSpacious] = useState(false);
   const [panel, setPanel] = useState<string | null>(null);
+  const [stylesVisible, setStylesVisible] = useState(true);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const previousToolbarWidth = useRef<number | null>(null);
@@ -351,13 +364,15 @@ export function AnnotationToolbar({
       /* Browser storage is optional. */
     }
   };
-  const showQuickStyles = expanded && canDraw && !['cursor', 'eraser'].includes(tool);
+  const showQuickStyles =
+    expanded && canDraw && stylesVisible && !['cursor', 'eraser'].includes(tool);
   useEffect(() => {
     if (!surface || !toolbarRef.current) return;
     const measure = () => {
       const toolbar = toolbarRef.current;
       if (!toolbar) return;
       setInset(toolbar.offsetHeight + 16);
+      setSpacious(surface.clientWidth >= 760 && surface.clientHeight >= 600);
       if (surface.clientWidth > 0 && surface.clientHeight > 0) {
         setPosition((previous) => {
           const next = {
@@ -389,7 +404,7 @@ export function AnnotationToolbar({
   const side = dock === 'bottom' ? 'top' : 'bottom';
   const panelInset = inset + (showQuickStyles ? 48 : 0);
   const button =
-    'flex min-h-8 w-full items-center rounded-sm px-2 py-1 text-xs text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
+    'flex min-h-10 w-full items-center rounded-lg px-3 py-2 text-sm text-left hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-40';
   const close = () => {
     setExpanded(false);
     setPanel(null);
@@ -409,6 +424,7 @@ export function AnnotationToolbar({
     return () => document.removeEventListener('pointerdown', outside);
   }, [surface]);
   const choose = (next: AnnotationTool) => {
+    setStylesVisible((visible) => (next === tool ? !visible : true));
     setTool(next);
     setPanel(null);
   };
@@ -569,55 +585,6 @@ export function AnnotationToolbar({
             <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
             <div
               role="group"
-              aria-label="More drawing tools"
-              className="flex shrink-0 items-center gap-1"
-            >
-              <ToolMenu
-                {...menuProps('Shapes')}
-                icon={<Shapes size={16} aria-hidden="true" />}
-                active={shapes.includes(tool)}
-              >
-                <div className="space-y-3">
-                  <PanelSection label="Lines and arrows">
-                    {grid(shapes.slice(0, 3))}
-                  </PanelSection>
-                  <PanelSection label="Outline shapes">
-                    {grid(shapes.slice(3, 6))}
-                  </PanelSection>
-                  <PanelSection label="Filled shapes">
-                    {grid(shapes.slice(6, 8))}
-                  </PanelSection>
-                  <PanelSection label="Highlights">{grid(shapes.slice(8))}</PanelSection>
-                </div>
-              </ToolMenu>
-              <ToolButton
-                compact
-                tool="highlighter"
-                active={tool === 'highlighter'}
-                disabled={!canDraw}
-                choose={() => choose('highlighter')}
-              />
-              <ToolMenu
-                {...menuProps('Stamps')}
-                icon={<Stamp size={16} aria-hidden="true" />}
-                active={stamps.includes(tool)}
-              >
-                {grid(stamps)}
-              </ToolMenu>
-              <ToolMenu
-                {...menuProps('Attention')}
-                icon={<LocateFixed size={16} aria-hidden="true" />}
-                active={attention.includes(tool)}
-              >
-                {grid(attention)}
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Temporary marks to guide your class.
-                </p>
-              </ToolMenu>
-            </div>
-            <span aria-hidden="true" className="mx-1 h-6 w-px shrink-0 bg-border" />
-            <div
-              role="group"
               aria-label="Annotation history"
               className="flex shrink-0 items-center gap-1"
             >
@@ -632,20 +599,34 @@ export function AnnotationToolbar({
                 <Undo2 size={16} aria-hidden="true" />
                 <span className="sr-only">Undo</span>
               </button>
-              <button
-                type="button"
-                aria-label="Redo"
-                title="Redo (⌘/Ctrl+Shift+Z)"
-                className={iconButton}
-                disabled={!canDraw || !redoCount}
-                onClick={redo}
-              >
-                <Redo2 size={16} aria-hidden="true" />
-                <span className="sr-only">Redo</span>
-              </button>
             </div>
+            {spacious && (
+              <div className="flex">
+                <button
+                  type="button"
+                  aria-label="Redo"
+                  title="Redo"
+                  className={iconButton}
+                  disabled={!canDraw || !redoCount}
+                  onClick={redo}
+                >
+                  <Redo2 size={16} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  aria-label="Highlighter"
+                  title="Highlighter"
+                  className={iconButton}
+                  disabled={!canDraw}
+                  onClick={() => setTool('highlighter')}
+                >
+                  <Highlighter size={16} aria-hidden="true" />
+                </button>
+              </div>
+            )}
             <ToolMenu
               {...menuProps('Format')}
+              hideTrigger
               icon={
                 <span className="relative">
                   <Palette size={16} aria-hidden="true" />
@@ -787,9 +768,34 @@ export function AnnotationToolbar({
             </ToolMenu>
             <ToolMenu
               {...menuProps('More')}
+              active={[...shapes, ...stamps, ...attention, 'highlighter'].includes(tool)}
               icon={<Ellipsis size={16} aria-hidden="true" />}
             >
               <div className="space-y-3">
+                <PanelSection label="Shapes">{grid(shapes)}</PanelSection>
+                <PanelSection label="Highlight and stamps">
+                  {grid(['highlighter', ...stamps])}
+                </PanelSection>
+                <PanelSection label="Attention">{grid(attention)}</PanelSection>
+                <PanelSection label="History and style">
+                  <button
+                    type="button"
+                    className={button}
+                    disabled={!canDraw || !redoCount}
+                    onClick={redo}
+                  >
+                    <Redo2 size={16} className="mr-2" />
+                    Redo
+                  </button>
+                  <button
+                    type="button"
+                    className={button}
+                    onClick={() => setPanel('Format')}
+                  >
+                    <Palette size={16} className="mr-2" />
+                    Format
+                  </button>
+                </PanelSection>
                 <PanelSection label="Selection">
                   <button
                     type="button"
@@ -817,6 +823,7 @@ export function AnnotationToolbar({
                     disabled={!canDraw}
                     onClick={() => clear('mine')}
                   >
+                    <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
                     Clear mine
                   </button>
                   {tutor && (
@@ -826,6 +833,7 @@ export function AnnotationToolbar({
                         className={button}
                         onClick={() => clear('students')}
                       >
+                        <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
                         Clear participants
                       </button>
                       <button
@@ -833,6 +841,7 @@ export function AnnotationToolbar({
                         className={button}
                         onClick={() => clear('all')}
                       >
+                        <Trash2 size={16} className="mr-2 inline" aria-hidden="true" />
                         Clear all
                       </button>
                     </>
@@ -894,13 +903,27 @@ export function AnnotationToolbar({
           }
         >
           <DrawingStyleStrip
+            open={stylesVisible}
+            onOpenChange={setStylesVisible}
             className="pointer-events-auto w-fit"
+            onClose={() => setPanel(null)}
             color={color}
             width={width}
             widths={[1, 3, 6]}
-            fill="transparent"
+            fill={
+              backgroundColor ??
+              (tool.includes('Filled') || tool.includes('Highlight')
+                ? color
+                : 'transparent')
+            }
             showWidth={tool !== 'text'}
-            showFill={false}
+            showFill={[
+              'rectangle',
+              'rectangleFilled',
+              'ellipse',
+              'ellipseFilled',
+              'diamond',
+            ].includes(tool)}
             optionsOpen={panel === 'Format'}
             onStyle={(style) => {
               onQuickStyle?.(style);

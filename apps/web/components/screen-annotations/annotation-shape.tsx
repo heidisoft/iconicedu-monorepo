@@ -92,7 +92,10 @@ export const AnnotationShape = memo(function AnnotationShape({
         {...common}
         width={bounds.width}
         height={bounds.height}
-        fill={object.type === 'rectangle' ? undefined : object.style.color}
+        fill={
+          object.style.backgroundColor ??
+          (object.type === 'rectangle' ? undefined : object.style.color)
+        }
       />
     );
   else if (object.type.startsWith('ellipse'))
@@ -103,7 +106,10 @@ export const AnnotationShape = memo(function AnnotationShape({
         y={bounds.height / 2}
         radiusX={bounds.width / 2}
         radiusY={bounds.height / 2}
-        fill={object.type === 'ellipse' ? undefined : object.style.color}
+        fill={
+          object.style.backgroundColor ??
+          (object.type === 'ellipse' ? undefined : object.style.color)
+        }
       />
     );
   else if (object.type === 'diamond')
@@ -111,6 +117,7 @@ export const AnnotationShape = memo(function AnnotationShape({
       <Line
         {...common}
         closed
+        fill={object.style.backgroundColor}
         points={[
           bounds.width / 2,
           0,

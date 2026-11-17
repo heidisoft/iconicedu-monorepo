@@ -2,6 +2,9 @@ import { ForbiddenException, InternalServerErrorException } from '@nestjs/common
 import { ChannelsService } from './channels.service';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
+
+const mockEvaluateApiBooleanFlag = evaluateApiBooleanFlag as jest.Mock;
 
 /** A thenable, chainable stand-in for a directly-awaited (no .maybeSingle()) query. */
 function makeThenableChain(result: { data: unknown; error: null }) {
@@ -61,6 +64,13 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(() => mockServiceClient),
 }));
+jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
+  apiFeatureFlagKeys: {
+    enableClassroomCalls: 'classroom-calls',
+  },
+  evaluateApiBooleanFlag: jest.fn(async () => true),
+}));
+
 // PrismaService is injected but not used by markRead.
 jest.mock('@iconicedu/api/prisma/prisma.service', () => ({
   PrismaService: jest.fn(),
@@ -1086,4 +1096,20 @@ describe('ChannelsService.getDirectMessages', () => {
     expect(channelsChain.in).toHaveBeenCalledWith('status', ['active', 'archived']);
     expect(result).toMatchObject({ id: 'channel-1', is_archived: true });
   });
+});
+
+it('keeps classroom-call contact behind the classroom-calls server flag', async () => {
+  jest.clearAllMocks();
+  mockEvaluateApiBooleanFlag.mockResolvedValueOnce(false);
+  await expect(
+    makeService().ensureDirectMessageChannel(
+      'token',
+      { orgId: 'org', profileId: 'recipient', otherProfileId: 'tutor' },
+      { classroomCallId: 'call' },
+    ),
+  ).resolves.toBeNull();
+  expect(mockEvaluateApiBooleanFlag).toHaveBeenCalledTimes(1);
+  expect(mockEvaluateApiBooleanFlag).toHaveBeenLastCalledWith(
+    expect.objectContaining({ flagKey: 'classroom-calls' }),
+  );
 });

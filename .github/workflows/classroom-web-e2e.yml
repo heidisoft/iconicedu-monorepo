@@ -1,0 +1,62 @@
+name: Web Classroom E2E
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - apps/web/**
+      - packages/ui-web/**
+      - packages/shared-types/**
+      - packages/live-sessions-core/**
+      - packages/utils/**
+      - scripts/classroom-e2e*
+      - ops/classroom-e2e.example.json
+      - package.json
+      - pnpm-lock.yaml
+      - .github/workflows/classroom-web-e2e.yml
+permissions:
+  contents: read
+concurrency:
+  group: classroom-web-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  classroom:
+    name: Classroom browser UI regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+      TURBO_TELEMETRY_DISABLED: '1'
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: synthetic-test-key
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - name: Install dependencies and shared packages
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm build:packages
+      - name: Install Chromium
+        run: pnpm --filter web exec playwright install chromium --with-deps
+      - name: Validate source journey matrix
+        run: pnpm test:e2e:classroom:config
+      - name: Run deterministic classroom browser suite
+        run: pnpm test:e2e:classroom ui web
+      - name: Upload synthetic failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: classroom-web-diagnostics
+          path: |
+            apps/web/playwright-report
+            apps/web/test-results
+          retention-days: 5

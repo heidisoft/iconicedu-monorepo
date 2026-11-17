@@ -1,0 +1,8 @@
+appId: com.heidisoft.iconicedu
+name: Open secondary classroom controls when the call bar is visible
+---
+- runFlow:
+    when:
+      visible: 'More controls'
+    commands:
+      - tapOn: 'More controls'

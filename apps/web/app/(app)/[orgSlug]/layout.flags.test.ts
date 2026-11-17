@@ -14,6 +14,7 @@ const {
   listActiveOrgSubjectCatalogMock,
   mapOrgSubjectRowsToOptionsMock,
   buildAdminMenuSectionsMock,
+  enableClassroomCallsRunMock,
   enableAssessmentsRunMock,
   shouldRedirectToAuthResumeMock,
   resolveOrgDashboardPathMock,
@@ -33,6 +34,7 @@ const {
   listActiveOrgSubjectCatalogMock: vi.fn(),
   mapOrgSubjectRowsToOptionsMock: vi.fn(),
   buildAdminMenuSectionsMock: vi.fn(),
+  enableClassroomCallsRunMock: vi.fn(),
   enableAssessmentsRunMock: vi.fn(),
   shouldRedirectToAuthResumeMock: vi.fn(),
   resolveOrgDashboardPathMock: vi.fn(),
@@ -98,6 +100,9 @@ vi.mock('@iconicedu/web/lib/data/admin-menu-sections', () => ({
 }));
 
 vi.mock('@iconicedu/web/flags', () => ({
+  enableClassroomCalls: {
+    run: (...args: unknown[]) => enableClassroomCallsRunMock(...args),
+  },
   enableAssessments: {
     run: (...args: unknown[]) => enableAssessmentsRunMock(...args),
   },
@@ -126,6 +131,7 @@ describe('org layout persona flags', () => {
     vi.restoreAllMocks();
     delete process.env.DEBUG_POSTHOG_FLAGS;
 
+    enableClassroomCallsRunMock.mockReset().mockResolvedValue(false);
     sidebarShellMock.mockReset();
     createSupabaseServerClientMock.mockReset();
     requireAuthedUserMock.mockReset();
@@ -231,4 +237,18 @@ describe('org layout persona flags', () => {
 
     expect(infoSpy).not.toHaveBeenCalled();
   });
+  it.each([false, true])(
+    'gates the incoming-call receiver when classroom calls is %s',
+    async (enabled) => {
+      enableClassroomCallsRunMock.mockResolvedValue(enabled);
+      const element = await Layout({
+        children: null,
+        params: Promise.resolve({ orgSlug: 'iconic-academy' }),
+      });
+      const shell = (
+        element as { props: { children: { props: { children: unknown[] } } } }
+      ).props.children;
+      expect(Boolean(shell.props.children[0])).toBe(enabled);
+    },
+  );
 });

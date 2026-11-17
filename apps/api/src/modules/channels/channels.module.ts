@@ -8,5 +8,6 @@ import { ThreadsModule } from '@iconicedu/api/modules/threads/threads.module';
   imports: [AuthModule, ThreadsModule],
   providers: [ChannelsService],
   controllers: [ChannelsController],
+  exports: [ChannelsService],
 })
 export class ChannelsModule {}

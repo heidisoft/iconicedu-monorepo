@@ -1,0 +1,51 @@
+appId: com.heidisoft.iconicedu
+name: Native live annotation receiver - a peer must present a fresh synthetic slide
+---
+- openLink: 'iconicedu://classroom/${SESSION_ID}'
+- tapOn:
+    text: 'Open'
+    optional: true
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 45000
+- assertNotVisible: 'Session passcode'
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- extendedWaitUntil:
+    visible: 'More controls'
+    timeout: 60000
+- extendedWaitUntil:
+    visible: 'Open annotation toolbar'
+    timeout: 30000
+- tapOn: 'Open annotation toolbar'
+- extendedWaitUntil:
+    visible:
+      id: 'annotation-saved-elements-0'
+    timeout: 30000
+- tapOn: 'Pen'
+- swipe:
+    start: '35%,35%'
+    end: '60%,40%'
+    duration: 1000
+- extendedWaitUntil:
+    visible:
+      id: 'annotation-saved-elements-1'
+    timeout: 30000
+- tapOn: 'Undo annotation'
+- assertVisible:
+    id: 'annotation-saved-elements-0'
+- tapOn: 'More annotation actions'
+- tapOn: 'Redo annotation'
+- tapOn: 'Close More annotation actions'
+- assertVisible:
+    id: 'annotation-saved-elements-1'
+- tapOn: 'Undo annotation'
+- assertVisible:
+    id: 'annotation-saved-elements-0'
+- scrollUntilVisible:
+    element: 'Leave class|Leave or end class|End class'
+- tapOn: 'Leave class|Leave or end class|End class'
+- tapOn: 'Leave'
+- assertVisible: 'You left the classroom'

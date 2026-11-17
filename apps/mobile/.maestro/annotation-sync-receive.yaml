@@ -1,0 +1,6 @@
+appId: com.heidisoft.iconicedu
+---
+- extendedWaitUntil:
+    visible:
+      id: 'annotation-saved-elements-2'
+    timeout: 30000

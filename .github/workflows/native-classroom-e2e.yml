@@ -1,0 +1,76 @@
+name: Native Classroom E2E
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [main]
+    paths:
+      - apps/mobile/**
+      - packages/shared-types/**
+      - packages/ui-native/**
+      - packages/utils/**
+      - pnpm-lock.yaml
+      - scripts/apply-vendor-fixes.mjs
+      - scripts/vendor-fixes/**
+      - .github/actions/setup-native-classroom-test/**
+      - .github/workflows/native-classroom-e2e.yml
+permissions:
+  contents: read
+concurrency:
+  group: native-classroom-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  CI: '1'
+  EXPO_NO_TELEMETRY: '1'
+  TURBO_TELEMETRY_DISABLED: '1'
+  MAESTRO_CLI_NO_ANALYTICS: '1'
+  # UI fixtures never use a deployed backend, user account, SDK JWT or SDK secret.
+  EXPO_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+  EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: synthetic-test-key
+  EXPO_PUBLIC_API_URL: http://127.0.0.1:8999
+  EXPO_PUBLIC_WEB_URL: http://127.0.0.1:3000
+jobs:
+  ipad:
+    name: iPad native classroom UI
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-native-classroom-test
+      - name: Build and test iPad simulator
+        run: bash apps/mobile/scripts/native-classroom-e2e.sh ios
+      - name: Upload synthetic test diagnostics
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: native-classroom-ipad-diagnostics
+          path: |
+            ${{ runner.temp }}/iconic-native-e2e/*.log
+            ~/.maestro/tests
+          include-hidden-files: true
+          retention-days: 5
+  android:
+    name: Android tablet native classroom UI
+    # Google APIs images provide ARM translation for the ARM-only Zoom SDK.
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-native-classroom-test
+      - name: Enable emulator acceleration
+        run: sudo chmod 666 /dev/kvm
+      - name: Build and test Android tablet emulator
+        run: bash apps/mobile/scripts/native-classroom-e2e.sh android
+      - name: Upload synthetic test diagnostics
+        if: failure() || cancelled()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: native-classroom-android-diagnostics
+          path: |
+            ${{ runner.temp }}/iconic-native-e2e/*.log
+            ~/.maestro/tests
+          include-hidden-files: true
+          retention-days: 5

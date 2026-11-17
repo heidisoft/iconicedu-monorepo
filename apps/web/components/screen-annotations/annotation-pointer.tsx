@@ -1,7 +1,8 @@
 'use client';
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { Circle, Group, Label, Tag, Text } from 'react-konva';
+import { Circle, Group, Label, Tag, Text, Path } from 'react-konva';
 import Konva from 'konva';
+import { participantCursorColors } from '@iconicedu/utils';
 import type { AnnotationPoint } from '@iconicedu/shared-types';
 /** Tween canvas nodes directly; pointer interpolation does not redraw permanent shapes. */
 export function AnnotationPointer({
@@ -21,6 +22,7 @@ export function AnnotationPointer({
   color: string;
   showName?: boolean;
 }) {
+  const palette = participantCursorColors(color);
   const displayName = name.trim() || 'Participant';
   const node = useRef<Konva.Group>(null);
   const label = useRef<Konva.Label>(null);
@@ -66,23 +68,21 @@ export function AnnotationPointer({
   return (
     <Group ref={node} x={initial.current.x} y={initial.current.y} listening={false}>
       {tool === 'spotlight' && <Circle radius={12} fill={color} opacity={0.5} />}
+      <Path
+        data="M0 0 L0 18 L5 13 L9 21 L13 19 L9 11 L16 11 Z"
+        fill={palette.foreground}
+        stroke="#ffffff"
+        strokeWidth={1.5}
+      />
       {showName && (
         <Label ref={label} x={16} y={8} listening={false}>
-          <Tag fill={color} cornerRadius={4} />
+          <Tag fill={palette.background} cornerRadius={4} />
           <Text
             ref={labelText}
             wrap="none"
             ellipsis
             text={displayName}
-            fill={(() => {
-              const channels = color
-                .replace('#', '')
-                .match(/.{2}/g)
-                ?.map((value) => parseInt(value, 16)) ?? [0, 0, 0];
-              return channels[0] * 0.299 + channels[1] * 0.587 + channels[2] * 0.114 > 150
-                ? '#111827'
-                : '#ffffff';
-            })()}
+            fill={palette.foreground}
             fontSize={12}
             padding={5}
           />

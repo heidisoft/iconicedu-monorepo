@@ -6,11 +6,20 @@ import type {
   SocketId,
 } from '@excalidraw/excalidraw/types';
 import { participantColor } from '@iconicedu/utils';
-import type { WhiteboardLaserSampleVM } from '@iconicedu/shared-types';
+import type {
+  WhiteboardLaserSampleVM,
+  WhiteboardSnapshotVM,
+} from '@iconicedu/shared-types';
 import { createWhiteboardRepository } from '@iconicedu/web/lib/whiteboard/api';
 
 /** Transport native scene-coordinate laser events; Excalidraw owns trail rendering. */
-export function useWhiteboardLaser(api: ExcalidrawImperativeAPI | null, token?: string) {
+export function useWhiteboardLaser(
+  api: ExcalidrawImperativeAPI | null,
+  token?: string,
+  presence: WhiteboardSnapshotVM['presence'] = [],
+) {
+  const people = useRef(presence);
+  people.current = presence;
   const outgoing = useRef<WhiteboardLaserSampleVM[]>([]);
   const version = useRef(0);
   const lastMovement = useRef(0);
@@ -95,6 +104,7 @@ export function useWhiteboardLaser(api: ExcalidrawImperativeAPI | null, token?: 
         const sample = peer.queue.shift();
         if (sample) {
           collaborators.set(socket, {
+            username: people.current.find((person) => person.id === actor)?.name,
             pointer: {
               x: sample.x,
               y: sample.y,

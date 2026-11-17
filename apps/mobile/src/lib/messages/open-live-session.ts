@@ -1,23 +1,49 @@
+import { redirectClassroomLink } from '@/lib/classroom/incoming-link';
+import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Linking, Alert } from 'react-native';
+import { Linking, Alert, NativeModules } from 'react-native';
+import { supabase } from '@/lib/supabase/client';
 import { apiPost } from '@/lib/api/http-client';
-import { resolveJoinHrefForMobile } from './live-session-join';
+import {
+  resolveJoinHrefForMobile,
+  getAppLiveSessionIdentifier,
+} from './live-session-join';
 
-function meetingIdentifier(href: string) {
-  const url = new URL(resolveJoinHrefForMobile(href));
-  const base = new URL(
-    process.env.EXPO_PUBLIC_WEB_URL?.trim() || 'http://localhost:3000',
-  );
-  return url.origin === base.origin
-    ? /^\/live\/([^/]+)$/.exec(url.pathname)?.[1]
-    : undefined;
-}
 /** Personal handoffs are never used for sharing or copied to the clipboard. */
 export async function openLiveSession(href: string) {
   try {
-    const identifier = meetingIdentifier(href);
+    const identifier = getAppLiveSessionIdentifier(href);
     if (!identifier) {
       await Linking.openURL(resolveJoinHrefForMobile(href));
+      return;
+    }
+    if (NativeModules.RNZoomVideoSdk) {
+      const destination = await redirectClassroomLink(
+        resolveJoinHrefForMobile(href),
+        new URL(resolveJoinHrefForMobile('/')).origin,
+      );
+      const resolved = /^\/classroom\/([a-zA-Z0-9-]+)\?entry=([\d-]+)$/.exec(destination);
+      if (!resolved) {
+        router.navigate('/classroom-link-error');
+        return;
+      }
+      router.navigate({
+        pathname: '/classroom/[sessionId]',
+        params: { sessionId: resolved[1], entry: resolved[2] },
+      });
+      return;
+    }
+    const fragment = new URLSearchParams(
+      new URL(resolveJoinHrefForMobile(href)).hash.slice(1),
+    );
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (fragment.has('invite') || fragment.has('handoff') || !session) {
+      await WebBrowser.openBrowserAsync(resolveJoinHrefForMobile(href), {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
+        enableDefaultShareMenuItem: false,
+      });
       return;
     }
     const { browserPath } = await apiPost<{ browserPath: string }>(
@@ -37,7 +63,7 @@ export async function openLiveSession(href: string) {
   }
 }
 export async function getLiveSessionShareUrl(href: string) {
-  const identifier = meetingIdentifier(href);
+  const identifier = getAppLiveSessionIdentifier(href);
   if (!identifier) return resolveJoinHrefForMobile(href);
   const result = await apiPost<{ sharePath?: string; joinPath: string }>(
     `/live-sessions/${encodeURIComponent(identifier)}/invite-link`,

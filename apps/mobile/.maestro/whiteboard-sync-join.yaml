@@ -1,0 +1,15 @@
+appId: com.heidisoft.iconicedu
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://whiteboard-sync-fixture?role=student&run=${RUN_ID}'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- extendedWaitUntil:
+    visible: 'Cross-client classroom'
+    timeout: 30000
+- assertNotVisible: 'Expand whiteboard to full screen'

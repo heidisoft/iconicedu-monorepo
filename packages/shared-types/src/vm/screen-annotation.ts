@@ -36,6 +36,7 @@ export type AnnotationObject = {
   points: AnnotationPoint[];
   style: {
     color: string;
+    backgroundColor?: string;
     width: number;
     opacity: number;
     fontSize: number;

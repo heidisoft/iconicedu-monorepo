@@ -8,28 +8,83 @@
 
 /* Begin PBXBuildFile section */
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
+		15A4E098610C4A52A11F2F26 /* VideoToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC7048A8E89B4EA38F378453 /* VideoToolbox.framework */; };
+		1ACC816206E949C08312D80B /* ClassroomBroadcast.appex in Copy Files */ = {isa = PBXBuildFile; fileRef = FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */; };
+		1E11FCAB05C2463485CC6222 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0FF42BBED7C54B61913F2E7E /* CoreMedia.framework */; };
+		2414236765614920BCD6945A /* ClassroomDevices.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */; };
 		26C7980F1CFE97ED4B38C57D /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 0FE19EA555FF8B29EE48CAA6 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		47180A428C174DBFA4A43114 /* ClassroomControls.mm in Sources */ = {isa = PBXBuildFile; fileRef = 1BD9C533BFF74A11AF7B2027 /* ClassroomControls.mm */; };
 		70892F8ED801D4B103FBA34E /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95B5A15D7E790B5B522304F2 /* ExpoModulesProvider.swift */; };
+		72D1844AED50815BB68C3264 /* libPods-ClassroomBroadcast.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 9F815B89CE136F7DB4734D32 /* libPods-ClassroomBroadcast.a */; };
 		7A0DCF41099C84EA0573562D /* libPods-ICONICAcademy.a in Frameworks */ = {isa = PBXBuildFile; fileRef = DEF651BFDACAF7C152D55242 /* libPods-ICONICAcademy.a */; };
+		7C7F1F322BAB4830A44EB68C /* ReplayKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5BAF00888DE4083A5B76F22 /* ReplayKit.framework */; };
+		7DD7BBB29D0546D5BB8624A0 /* ClassroomPictureInPicture.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */; };
+		9C5C8F4F41A041E482ABFBA9 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 471C92766F194F1D97179765 /* CoreGraphics.framework */; };
+		9DF1B68B59FA40EA8E798E9A /* SampleHandler.mm in Sources */ = {isa = PBXBuildFile; fileRef = 7037881777FF4A52945707EC /* SampleHandler.mm */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
+		D7A99CFB6BC84F768F80E5DE /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6E2213861A044CFD9D886CFB /* CoreVideo.framework */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
+		FB8AF98D8D7440E8B3C59DB8 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F332677D276F484E808CEB04 /* SceneDelegate.swift */; };
+		CEECEFC94CC54A73966EF8C3 /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7A70DAE48E7C4065974E7DC3 /* CoreImage.framework */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		39F5B4D929214E79B76B8D92 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 83CBB9F71A601CBA00E9B192 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0A443885C1FB4021A5C8FFBC;
+			remoteInfo = ClassroomBroadcast;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		30D2C7F330CC42549C02BF63 /* Copy Files */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				1ACC816206E949C08312D80B /* ClassroomBroadcast.appex in Copy Files */,
+			);
+			name = "Copy Files";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
-		0FE19EA555FF8B29EE48CAA6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; name = PrivacyInfo.xcprivacy; path = ICONICAcademy/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		05CEA34A1D9F4A6CA95D2D8D /* SampleHandler.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; path = SampleHandler.mm; sourceTree = "<group>"; };
+		0FE19EA555FF8B29EE48CAA6 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xml; name = PrivacyInfo.xcprivacy; path = ICONICAcademy/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		0FF42BBED7C54B61913F2E7E /* CoreMedia.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		13B07F961A680F5B00A75B9A /* ICONICAcademy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ICONICAcademy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		13B07FB51A68108700A75B9A /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = Images.xcassets; path = ICONICAcademy/Images.xcassets; sourceTree = "<group>"; };
 		13B07FB61A68108700A75B9A /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = Info.plist; path = ICONICAcademy/Info.plist; sourceTree = "<group>"; };
+		1BD9C533BFF74A11AF7B2027 /* ClassroomControls.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomControls.mm; path = ICONICAcademy/ClassroomControls.mm; sourceTree = "<group>"; };
+		232A1EB6F40BBA82F70D4651 /* Pods-ClassroomBroadcast.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ClassroomBroadcast.debug.xcconfig"; path = "Target Support Files/Pods-ClassroomBroadcast/Pods-ClassroomBroadcast.debug.xcconfig"; sourceTree = "<group>"; };
+		471C92766F194F1D97179765 /* CoreGraphics.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		552149887B75450B991740E9 /* ClassroomBroadcast.entitlements */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = unknown; path = ClassroomBroadcast.entitlements; sourceTree = "<group>"; };
+		5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomDevices.mm; path = ICONICAcademy/ClassroomDevices.mm; sourceTree = "<group>"; };
+		6E2213861A044CFD9D886CFB /* CoreVideo.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
+		7037881777FF4A52945707EC /* SampleHandler.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = SampleHandler.mm; path = ClassroomBroadcast/SampleHandler.mm; sourceTree = "<group>"; };
+		7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = sourcecode.cpp.objcpp; name = ClassroomPictureInPicture.mm; path = ICONICAcademy/ClassroomPictureInPicture.mm; sourceTree = "<group>"; };
 		95B5A15D7E790B5B522304F2 /* ExpoModulesProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ExpoModulesProvider.swift; path = "Pods/Target Support Files/Pods-ICONICAcademy/ExpoModulesProvider.swift"; sourceTree = "<group>"; };
+		9F815B89CE136F7DB4734D32 /* libPods-ClassroomBroadcast.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ClassroomBroadcast.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = ICONICAcademy/SplashScreen.storyboard; sourceTree = "<group>"; };
 		B3FADCE25CE3FEB4CD94E70F /* Pods-ICONICAcademy.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ICONICAcademy.release.xcconfig"; path = "Target Support Files/Pods-ICONICAcademy/Pods-ICONICAcademy.release.xcconfig"; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
+		D5BAF00888DE4083A5B76F22 /* ReplayKit.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = ReplayKit.framework; path = System/Library/Frameworks/ReplayKit.framework; sourceTree = SDKROOT; };
 		D81235C51751955E8DCDC7E9 /* Pods-ICONICAcademy.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ICONICAcademy.debug.xcconfig"; path = "Target Support Files/Pods-ICONICAcademy/Pods-ICONICAcademy.debug.xcconfig"; sourceTree = "<group>"; };
+		DC7048A8E89B4EA38F378453 /* VideoToolbox.framework */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 9; includeInIndex = 0; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
 		DEF651BFDACAF7C152D55242 /* libPods-ICONICAcademy.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-ICONICAcademy.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		E29B6F17AA5641139E7D836C /* ClassroomBroadcast-Info.plist */ = {isa = PBXFileReference; explicitFileType = undefined; fileEncoding = 4; includeInIndex = 0; lastKnownFileType = text.plist.xml; path = "ClassroomBroadcast-Info.plist"; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
+		F04EB2D20284047386B2A308 /* Pods-ClassroomBroadcast.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-ClassroomBroadcast.release.xcconfig"; path = "Target Support Files/Pods-ClassroomBroadcast/Pods-ClassroomBroadcast.release.xcconfig"; sourceTree = "<group>"; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = ICONICAcademy/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* ICONICAcademy-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "ICONICAcademy-Bridging-Header.h"; path = "ICONICAcademy/ICONICAcademy-Bridging-Header.h"; sourceTree = "<group>"; };
+		FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; fileEncoding = 9; includeInIndex = 0; path = ClassroomBroadcast.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		F332677D276F484E808CEB04 /* SceneDelegate.swift */ = {isa = PBXFileReference; name = "SceneDelegate.swift"; path = "ICONICAcademy/SceneDelegate.swift"; sourceTree = "<group>"; fileEncoding = 4; lastKnownFileType = sourcecode.swift; explicitFileType = undefined; includeInIndex = 0; };
+		7A70DAE48E7C4065974E7DC3 /* CoreImage.framework */ = {isa = PBXFileReference; name = "CoreImage.framework"; path = "System/Library/Frameworks/CoreImage.framework"; sourceTree = SDKROOT; fileEncoding = undefined; lastKnownFileType = wrapper.framework; explicitFileType = undefined; includeInIndex = 0; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -41,6 +96,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		BEB7CF57589943C49C3EDDB7 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7C7F1F322BAB4830A44EB68C /* ReplayKit.framework in Frameworks */,
+				9C5C8F4F41A041E482ABFBA9 /* CoreGraphics.framework in Frameworks */,
+				D7A99CFB6BC84F768F80E5DE /* CoreVideo.framework in Frameworks */,
+				1E11FCAB05C2463485CC6222 /* CoreMedia.framework in Frameworks */,
+				15A4E098610C4A52A11F2F26 /* VideoToolbox.framework in Frameworks */,
+				72D1844AED50815BB68C3264 /* libPods-ClassroomBroadcast.a in Frameworks */,
+				CEECEFC94CC54A73966EF8C3 /* CoreImage.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -48,6 +117,7 @@
 			isa = PBXGroup;
 			children = (
 				95B5A15D7E790B5B522304F2 /* ExpoModulesProvider.swift */,
+				1BD9C533BFF74A11AF7B2027 /* ClassroomControls.mm */,
 			);
 			name = ICONICAcademy;
 			sourceTree = "<group>";
@@ -71,8 +141,9 @@
 			children = (
 				D81235C51751955E8DCDC7E9 /* Pods-ICONICAcademy.debug.xcconfig */,
 				B3FADCE25CE3FEB4CD94E70F /* Pods-ICONICAcademy.release.xcconfig */,
+				232A1EB6F40BBA82F70D4651 /* Pods-ClassroomBroadcast.debug.xcconfig */,
+				F04EB2D20284047386B2A308 /* Pods-ClassroomBroadcast.release.xcconfig */,
 			);
-			name = Pods;
 			path = Pods;
 			sourceTree = "<group>";
 		};
@@ -81,8 +152,33 @@
 			children = (
 				ED297162215061F000B7C4FE /* JavaScriptCore.framework */,
 				DEF651BFDACAF7C152D55242 /* libPods-ICONICAcademy.a */,
+				D5BAF00888DE4083A5B76F22 /* ReplayKit.framework */,
+				471C92766F194F1D97179765 /* CoreGraphics.framework */,
+				6E2213861A044CFD9D886CFB /* CoreVideo.framework */,
+				0FF42BBED7C54B61913F2E7E /* CoreMedia.framework */,
+				DC7048A8E89B4EA38F378453 /* VideoToolbox.framework */,
+				9F815B89CE136F7DB4734D32 /* libPods-ClassroomBroadcast.a */,
+				7A70DAE48E7C4065974E7DC3 /* CoreImage.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		46F4E324F91C43DA9DC82882 /* ClassroomBroadcast */ = {
+			isa = PBXGroup;
+			children = (
+				05CEA34A1D9F4A6CA95D2D8D /* SampleHandler.mm */,
+				E29B6F17AA5641139E7D836C /* ClassroomBroadcast-Info.plist */,
+				552149887B75450B991740E9 /* ClassroomBroadcast.entitlements */,
+			);
+			path = ClassroomBroadcast;
+			sourceTree = "<group>";
+		};
+		51576A123080ED50005175D3 /* Recovered References */ = {
+			isa = PBXGroup;
+			children = (
+				7037881777FF4A52945707EC /* SampleHandler.mm */,
+			);
+			name = "Recovered References";
 			sourceTree = "<group>";
 		};
 		832341AE1AAA6A7D00B99B32 /* Libraries */ = {
@@ -101,6 +197,11 @@
 				2D16E6871FA4F8E400B85C8A /* Frameworks */,
 				1839E5B996866A706E725A77 /* Pods */,
 				88C22C23BF2B3A239372ADDD /* ExpoModulesProviders */,
+				46F4E324F91C43DA9DC82882 /* ClassroomBroadcast */,
+				5F6A247FDB9349DCA4D2B84F /* ClassroomDevices.mm */,
+				7E7670B63A304F58A6938BD3 /* ClassroomPictureInPicture.mm */,
+				51576A123080ED50005175D3 /* Recovered References */,
+				F332677D276F484E808CEB04 /* SceneDelegate.swift */,
 			);
 			indentWidth = 2;
 			sourceTree = "<group>";
@@ -111,6 +212,7 @@
 			isa = PBXGroup;
 			children = (
 				13B07F961A680F5B00A75B9A /* ICONICAcademy.app */,
+				FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -135,6 +237,23 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		0A443885C1FB4021A5C8FFBC /* ClassroomBroadcast */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 997999301D034756868D4AA9 /* Build configuration list for PBXNativeTarget "ClassroomBroadcast" */;
+			buildPhases = (
+				8DC5FFE675539D43F4686DB0 /* [CP] Check Pods Manifest.lock */,
+				8EAEAB3CF5D84383A723F56C /* Sources */,
+				BEB7CF57589943C49C3EDDB7 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ClassroomBroadcast;
+			productName = ClassroomBroadcast;
+			productReference = FC26F9FDFD6E49BAAA7B19CD /* ClassroomBroadcast.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		13B07F861A680F5B00A75B9A /* ICONICAcademy */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 13B07F931A680F5B00A75B9A /* Build configuration list for PBXNativeTarget "ICONICAcademy" */;
@@ -148,10 +267,12 @@
 				800E24972A6A228C8D4807E9 /* [CP] Copy Pods Resources */,
 				15E3E0F504B14BFBABE16057 /* [Expo Dev Launcher] Strip Local Network Keys for Release */,
 				745B284EB02803201DE1A27F /* [CP] Embed Pods Frameworks */,
+				30D2C7F330CC42549C02BF63 /* Copy Files */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BBD0FD4B5CDE4EBD85E4D746 /* PBXTargetDependency */,
 			);
 			name = ICONICAcademy;
 			productName = ICONICAcademy;
@@ -166,8 +287,14 @@
 			attributes = {
 				LastUpgradeCheck = 1130;
 				TargetAttributes = {
+					0A443885C1FB4021A5C8FFBC = {
+						DevelopmentTeam = 5NVN93C486;
+						ProvisioningStyle = Automatic;
+					};
 					13B07F861A680F5B00A75B9A = {
+						DevelopmentTeam = 5NVN93C486;
 						LastSwiftMigration = 1250;
+						ProvisioningStyle = Automatic;
 					};
 				};
 			};
@@ -185,6 +312,7 @@
 			projectRoot = "";
 			targets = (
 				13B07F861A680F5B00A75B9A /* ICONICAcademy */,
+				0A443885C1FB4021A5C8FFBC /* ClassroomBroadcast */,
 			);
 		};
 /* End PBXProject section */
@@ -266,12 +394,28 @@
 				"${PODS_ROOT}/Target Support Files/Pods-ICONICAcademy/Pods-ICONICAcademy-frameworks.sh",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/React-Core-prebuilt/React.framework/React",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ReactNativeDependencies/ReactNativeDependencies.framework/ReactNativeDependencies",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/CptShare/CptShare.framework/CptShare",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/Whiteboard/Whiteboard.framework/Whiteboard",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/ZoomTask/ZoomTask.framework/ZoomTask",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/ZoomVideoSDK/ZoomVideoSDK.framework/ZoomVideoSDK",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/util/util.framework/util",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/zContext/zContext.framework/zContext",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/zm_annoter_dynamic/zm_annoter_dynamic.framework/zm_annoter_dynamic",
+				"${PODS_XCFRAMEWORKS_BUILD_DIR}/ZoomVideoSDK/zoomcml/zoomcml.framework/zoomcml",
 				"${PODS_XCFRAMEWORKS_BUILD_DIR}/hermes-engine/Pre-built/hermesvm.framework/hermesvm",
 			);
 			name = "[CP] Embed Pods Frameworks";
 			outputPaths = (
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/React.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ReactNativeDependencies.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/CptShare.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/Whiteboard.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ZoomTask.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/ZoomVideoSDK.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/util.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/zContext.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/zm_annoter_dynamic.framework",
+				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/zoomcml.framework",
 				"${TARGET_BUILD_DIR}/${FRAMEWORKS_FOLDER_PATH}/hermesvm.framework",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -329,6 +473,28 @@
 			shellScript = "\"${PODS_ROOT}/Target Support Files/Pods-ICONICAcademy/Pods-ICONICAcademy-resources.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
+		8DC5FFE675539D43F4686DB0 /* [CP] Check Pods Manifest.lock */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"${PODS_PODFILE_DIR_PATH}/Podfile.lock",
+				"${PODS_ROOT}/Manifest.lock",
+			);
+			name = "[CP] Check Pods Manifest.lock";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(DERIVED_FILE_DIR)/Pods-ClassroomBroadcast-checkManifestLockResult.txt",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "diff \"${PODS_PODFILE_DIR_PATH}/Podfile.lock\" \"${PODS_ROOT}/Manifest.lock\" > /dev/null\nif [ $? != 0 ] ; then\n    # print error to STDERR\n    echo \"error: The sandbox is not in sync with the Podfile.lock. Run 'pod install' or update your CocoaPods installation.\" >&2\n    exit 1\nfi\n# This output is used by Xcode 'outputs' to avoid re-running this script phase.\necho \"SUCCESS\" > \"${SCRIPT_OUTPUT_FILE_0}\"\n";
+			showEnvVarsInLog = 0;
+		};
 		A084C218D3277CFD741671E1 /* [Expo] Configure project */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -362,12 +528,60 @@
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
 				70892F8ED801D4B103FBA34E /* ExpoModulesProvider.swift in Sources */,
+				47180A428C174DBFA4A43114 /* ClassroomControls.mm in Sources */,
+				2414236765614920BCD6945A /* ClassroomDevices.mm in Sources */,
+				7DD7BBB29D0546D5BB8624A0 /* ClassroomPictureInPicture.mm in Sources */,
+				FB8AF98D8D7440E8B3C59DB8 /* SceneDelegate.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8EAEAB3CF5D84383A723F56C /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9DF1B68B59FA40EA8E798E9A /* SampleHandler.mm in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		BBD0FD4B5CDE4EBD85E4D746 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0A443885C1FB4021A5C8FFBC /* ClassroomBroadcast */;
+			targetProxy = 39F5B4D929214E79B76B8D92 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		0C3952F8D5564FA78F8BD48D /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = F04EB2D20284047386B2A308 /* Pods-ClassroomBroadcast.release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CODE_SIGN_ENTITLEMENTS = ClassroomBroadcast/ClassroomBroadcast.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 5NVN93C486;
+				ENABLE_BITCODE = NO;
+				INFOPLIST_FILE = "ClassroomBroadcast/ClassroomBroadcast-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.2;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_RELEASE";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.heidisoft.iconicedu.classroom-broadcast";
+				PRODUCT_NAME = ClassroomBroadcast;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		13B07F941A680F5B00A75B9A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = D81235C51751955E8DCDC7E9 /* Pods-ICONICAcademy.debug.xcconfig */;
@@ -375,7 +589,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = ICONICAcademy/ICONICAcademy.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5NVN93C486;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(inherited)",
@@ -411,7 +628,10 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = ICONICAcademy/ICONICAcademy.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5NVN93C486;
 				INFOPLIST_FILE = ICONICAcademy/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -433,6 +653,38 @@
 				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Release;
+		};
+		1529D303EA3047268D59FCB2 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 232A1EB6F40BBA82F70D4651 /* Pods-ClassroomBroadcast.debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CODE_SIGN_ENTITLEMENTS = ClassroomBroadcast/ClassroomBroadcast.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 5NVN93C486;
+				ENABLE_BITCODE = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				INFOPLIST_FILE = "ClassroomBroadcast/ClassroomBroadcast-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 0.1.2;
+				OTHER_SWIFT_FLAGS = "$(inherited) -D EXPO_CONFIGURATION_DEBUG";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.heidisoft.iconicedu.classroom-broadcast";
+				PRODUCT_NAME = ClassroomBroadcast;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
 		};
 		83CBBA201A601CBA00E9B192 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -573,6 +825,15 @@
 			buildConfigurations = (
 				83CBBA201A601CBA00E9B192 /* Debug */,
 				83CBBA211A601CBA00E9B192 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		997999301D034756868D4AA9 /* Build configuration list for PBXNativeTarget "ClassroomBroadcast" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1529D303EA3047268D59FCB2 /* Debug */,
+				0C3952F8D5564FA78F8BD48D /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -1,5 +1,9 @@
+import { Alert, Linking } from 'react-native';
+import { openLiveSession } from './open-live-session';
+jest.mock('./open-live-session', () => ({ openLiveSession: jest.fn() }));
 import {
   findFirstMessageLink,
+  openMessageLink,
   isTrustedExternalLink,
   splitMessageTextByLinks,
 } from '@/lib/messages/link-opening';
@@ -48,4 +52,23 @@ describe('message link opening helpers', () => {
       'https://first.com',
     );
   });
+});
+
+it('opens an owned classroom hyperlink through the same native Join handler', () => {
+  jest.clearAllMocks();
+  process.env.EXPO_PUBLIC_WEB_URL = 'https://app.iconicedu.com';
+  const open = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+  openMessageLink('https://app.iconicedu.com/live/aaaa-bbbb#invite=synthetic');
+  expect(openLiveSession).toHaveBeenCalledWith(
+    'https://app.iconicedu.com/live/aaaa-bbbb#invite=synthetic',
+  );
+  expect(open).not.toHaveBeenCalled();
+});
+it('does not treat a lookalike external host as a classroom', () => {
+  jest.clearAllMocks();
+  process.env.EXPO_PUBLIC_WEB_URL = 'https://app.iconicedu.com';
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  openMessageLink('https://app.iconicedu.com.example.test/live/aaaa');
+  expect(openLiveSession).not.toHaveBeenCalled();
+  expect(alert).toHaveBeenCalled();
 });

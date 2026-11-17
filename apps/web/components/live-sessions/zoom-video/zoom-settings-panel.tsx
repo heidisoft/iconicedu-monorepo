@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { SharePrivilege } from '@zoom/videosdk';
-import { Check, Settings, UserRound } from 'lucide-react';
+import { Check, Settings, UserRound, Mic, Video, SlidersHorizontal } from 'lucide-react';
 import { Label } from '@iconicedu/ui-web/ui/label';
 import { RadioGroup, RadioGroupItem } from '@iconicedu/ui-web/ui/radio-group';
 import { DeviceSelect } from '../media-device-select';
@@ -21,6 +21,7 @@ import { ZoomMeetingDialog } from './zoom-meeting-dialog';
 type Props = {
   disabled?: boolean;
   feedback?: ReactNode;
+  audioCheck?: ReactNode;
   open: boolean;
   hideTrigger?: boolean;
   pictureInPictureSettings?: ReactNode;
@@ -88,9 +89,18 @@ export function ZoomSettingsPanel(props: Props) {
       <fieldset disabled={props.disabled} className="min-w-0">
         <Tabs defaultValue="audio">
           <TabsList className="w-full">
-            <TabsTrigger value="audio">Audio</TabsTrigger>
-            <TabsTrigger value="video">Video</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced</TabsTrigger>
+            <TabsTrigger value="audio" className="gap-1.5">
+              <Mic aria-hidden="true" className="size-4" />
+              Audio
+            </TabsTrigger>
+            <TabsTrigger value="video" className="gap-1.5">
+              <Video aria-hidden="true" className="size-4" />
+              Video
+            </TabsTrigger>
+            <TabsTrigger value="advanced" className="gap-1.5">
+              <SlidersHorizontal aria-hidden="true" className="size-4" />
+              Advanced
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="audio" className="space-y-4 pt-1">
             <DeviceSelect
@@ -137,6 +147,9 @@ export function ZoomSettingsPanel(props: Props) {
                 </RadioGroup>
               </div>
             ) : null}
+            {props.audioCheck && (
+              <div className="rounded-xl border p-3">{props.audioCheck}</div>
+            )}
           </TabsContent>
           <TabsContent value="video" className="space-y-4 pt-1">
             <DeviceSelect

@@ -489,7 +489,7 @@ test('uses themed paper and soft controls without changing saved drawings', asyn
       'data-element-count',
       '1',
     );
-    await page.getByRole('button', { name: 'View controls' }).click();
+    await page.getByRole('button', { name: 'More whiteboard actions' }).click();
     await page.getByRole('menuitem', { name: 'Fit content', exact: true }).click();
     await expect
       .poll(async () =>
@@ -551,19 +551,25 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
     );
     await expect(page.getByRole('menu')).toHaveCount(0);
     await expect(page.getByRole('menuitem', { name: 'Export board' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'More whiteboard actions', exact: true })
+      .click();
     await expect(page.getByRole('menuitemradio', { name: 'Rectangle' })).toBeVisible();
     await page.screenshot({ path: '/tmp/iconicedu-whiteboard-toolbar-mobile.png' });
     await page.getByRole('menuitemradio', { name: 'Rectangle' }).click();
     await expect(
-      page.getByRole('button', { name: 'Shapes', exact: true }),
+      page.getByRole('button', { name: 'More whiteboard actions', exact: true }),
     ).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByRole('button', { name: 'Shapes', exact: true })).toBeFocused();
-    await page.getByRole('button', { name: 'View controls' }).focus();
+    await expect(
+      page.getByRole('button', { name: 'More whiteboard actions', exact: true }),
+    ).toBeFocused();
+    await page.getByRole('button', { name: 'More whiteboard actions' }).focus();
     await page.keyboard.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'Fit content' })).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'View controls' })).toBeFocused();
+    await expect(
+      page.getByRole('button', { name: 'More whiteboard actions' }),
+    ).toBeFocused();
     await page.setViewportSize({ width: 1280, height: 720 });
     await page
       .getByTestId('classroom-whiteboard')
@@ -575,7 +581,9 @@ test('reveals grouped whiteboard controls on demand on mobile and in fullscreen'
         .getByRole('menuitem', { name: 'Export board' }),
     ).toBeVisible();
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'More whiteboard actions', exact: true })
+      .click();
     await expect(
       page
         .getByTestId('classroom-whiteboard')
@@ -652,7 +660,9 @@ test('shows contextual styles, preserves choices and syncs styled drawings', asy
     await expect.poll(async () => (await read())[0]?.data.strokeColor).toBe('#1971c2');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect.poll(async () => (await read())[0]?.data.strokeColor).toBe('#e03131');
-    await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'More whiteboard actions', exact: true })
+      .click();
     await page.getByRole('menuitemradio', { name: 'Rectangle', exact: true }).click();
     await expect(panel.getByText('Background', { exact: true })).toBeVisible();
     await panel.getByTitle('#a5d8ff', { exact: true }).click();
@@ -713,7 +723,9 @@ test('persists diamond shapes and organizational frames', async ({
     const box = await page.getByTestId('whiteboard-canvas').boundingBox();
     if (!box) throw new Error('Canvas unavailable');
     const drawShape = async (name: string, start: number, end: number) => {
-      await page.getByRole('button', { name: 'Shapes', exact: true }).click();
+      await page
+        .getByRole('button', { name: 'More whiteboard actions', exact: true })
+        .click();
       await page.getByRole('menuitemradio', { name, exact: true }).click();
       await page.mouse.move(
         box.x + box.width / 2 + start,

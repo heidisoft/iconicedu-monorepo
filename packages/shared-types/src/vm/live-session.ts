@@ -163,6 +163,8 @@ export type LiveSessionJoinRequest = {
   displayName: string;
   passcode: string;
   studentProfileId?: UUID;
+  /** Students sharing this connection; every identity is verified by apps/api. */
+  studentProfileIds?: UUID[];
 };
 
 /** Credentials issued by apps/api after host authorization or passcode verification. */
@@ -170,10 +172,13 @@ export type LiveSessionJoinCredentialsVM = {
   sharePath?: string;
   /** API-verified student represented by a signed-in guardian. */
   studentProfileId?: UUID;
+  /** Students sharing this connection; every identity is verified by apps/api. */
+  studentProfileIds?: UUID[];
   /** Meeting-scoped opaque annotation capability for shared-link participants. */
   annotationToken?: string;
   whiteboard?: import('./whiteboard').WhiteboardAccessVM;
   token: string;
+  /** Canonical Zoom topic for this class session; web and native pass it to the SDK verbatim. */
   sessionName: string;
   displayName: string;
   meetingPasscode?: string | null;
@@ -249,3 +254,57 @@ export type LiveSessionQualityEventVM = {
   level: string;
   occurred_at: string;
 };
+
+/** API-authorized class roster and expiring app call invitations. */
+export type ClassroomCallStatusVM =
+  | 'ringing'
+  | 'accepted'
+  | 'declined'
+  | 'cancelled'
+  | 'expired';
+export type ClassroomCallVM = {
+  id: string;
+  sessionId: string;
+  callerName: string;
+  classTitle: string;
+  status: ClassroomCallStatusVM;
+  expiresAt: string;
+  canJoin?: boolean;
+  joinUnavailableReason?: string;
+  messageAvailable?: boolean;
+};
+export type ClassroomRosterMemberVM = {
+  profileId: string;
+  displayName: string;
+  kind: 'educator' | 'guardian' | 'child';
+  joined: boolean;
+  canCall: boolean;
+  call?: ClassroomCallVM;
+};
+export type ClassroomRosterVM = {
+  callingUnavailableReason?: string;
+  enabled: boolean;
+  canCall: boolean;
+  members: ClassroomRosterMemberVM[];
+};
+
+/** Stable relative ordering for controls shared by web and native meetings. */
+export const CLASSROOM_PRIMARY_CONTROL_ORDER = [
+  'microphone',
+  'camera',
+  'screen',
+  'whiteboard',
+  'more',
+  'leave',
+] as const;
+export const CLASSROOM_MORE_CONTROL_ORDER = [
+  'recording',
+  'participants',
+  'messages',
+  'invite',
+  'whiteboard',
+  'picture-in-picture',
+  'captions',
+  'annotations',
+  'settings',
+] as const;

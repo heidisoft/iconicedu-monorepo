@@ -5,13 +5,24 @@ import { CaptureUpdateAction, Excalidraw, restoreElements } from '@excalidraw/ex
 import '@excalidraw/excalidraw/index.css';
 import type { ExcalidrawElement } from '@excalidraw/excalidraw/element/types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
-import type { WhiteboardElementVM } from '@iconicedu/shared-types';
+import type {
+  WhiteboardViewportVM,
+  WhiteboardElementVM,
+  WhiteboardViewportPresenceVM,
+  WhiteboardSnapshotVM,
+} from '@iconicedu/shared-types';
 import { ExcalidrawWhiteboardEngine, wrapCanvasElements } from './excalidraw-engine';
 import type { WhiteboardEngine, WhiteboardTool } from './whiteboard-engine';
 import './whiteboard-canvas.css';
 import { useWhiteboardLaser } from './use-whiteboard-laser';
 import { DrawingStyleStrip } from '@iconicedu/ui-web/ui/drawing-style-strip';
 import { sceneFingerprint } from './scene-history';
+import {
+  participantColor,
+  participantCursorColors,
+  resolveWhiteboardFollow,
+  animateWhiteboardFollow,
+} from '@iconicedu/utils';
 
 export function ExcalidrawCanvas({
   elements,
@@ -22,8 +33,18 @@ export function ExcalidrawCanvas({
   onChange,
   onEngine,
   onToolChange,
+  onViewport,
+  viewport,
+  followSource,
+  writers = [],
+  presence = [],
 }: {
+  writers?: WhiteboardViewportPresenceVM[];
+  presence?: WhiteboardSnapshotVM['presence'];
   token?: string;
+  onViewport?: (viewport: WhiteboardViewportVM) => void;
+  viewport?: WhiteboardViewportVM;
+  followSource?: string;
   defaultColor?: string;
   tool: WhiteboardTool;
   elements: WhiteboardElementVM[];
@@ -36,6 +57,7 @@ export function ExcalidrawCanvas({
   const theme = resolvedTheme === 'dark' ? 'dark' : 'light';
   const [grid, setGrid] = useState<'none' | 'dots' | 'lines'>('dots');
   const [optionsOpen, setOptionsOpen] = useState(false);
+  const [stylesVisible, setStylesVisible] = useState(true);
   const [quickStyle, setQuickStyle] = useState({
     color: '#1e293b',
     width: 2,
@@ -43,8 +65,58 @@ export function ExcalidrawCanvas({
     type: 'selection',
   });
   const [hasStyleOptions, setHasStyleOptions] = useState(false);
+  const interacting = useRef(false);
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
-  const onPointerUpdate = useWhiteboardLaser(api, token);
+  const defaultToolApplied = useRef(false);
+  const previousSource = useRef<string | undefined>(undefined);
+  const previousViewport = useRef<WhiteboardViewportVM | undefined>(undefined);
+  const pointer = useRef<{ x: number; y: number } | undefined>(undefined);
+  const writing = useRef<{ x: number; y: number } | undefined>(undefined);
+  const writingTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const cancelFollow = useRef<() => void>(() => {});
+  useEffect(
+    () => () => {
+      cancelFollow.current();
+      if (writingTimer.current) clearTimeout(writingTimer.current);
+    },
+    [],
+  );
+  useEffect(() => {
+    cancelFollow.current();
+    if (!api || !viewport) return;
+    const state = api.getAppState();
+    if (interacting.current || state.editingTextElement) return;
+    cancelFollow.current();
+    if (previousSource.current !== followSource) previousViewport.current = undefined;
+    previousSource.current = followSource;
+    const from = {
+      centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+      centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+      zoom: state.zoom.value,
+    };
+    const to = resolveWhiteboardFollow(from, viewport, previousViewport.current, state);
+    previousViewport.current = viewport;
+    cancelFollow.current = animateWhiteboardFollow(
+      from,
+      to,
+      (next) =>
+        api.updateScene({
+          appState: {
+            scrollX: state.width / (2 * next.zoom) - next.centerX,
+            scrollY: state.height / (2 * next.zoom) - next.centerY,
+            zoom: { value: next.zoom as typeof state.zoom.value },
+          },
+          captureUpdate: CaptureUpdateAction.NEVER,
+        }),
+      {
+        request: (callback) => requestAnimationFrame(callback),
+        cancel: (id) => cancelAnimationFrame(id),
+        blocked: () => interacting.current || !!api.getAppState().editingTextElement,
+        reducedMotion: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      },
+    );
+  }, [api, viewport, followSource]);
+  const onPointerUpdate = useWhiteboardLaser(api, token, presence);
   const engineRef = useRef<ExcalidrawWhiteboardEngine | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -73,10 +145,30 @@ export function ExcalidrawCanvas({
       (next) => onChangeRef.current(next),
       setGrid,
     );
+    engine.onToolSelected = (same) => {
+      setStylesVisible((visible) => (same ? !visible : true));
+      setOptionsOpen(false);
+    };
     engineRef.current = engine;
     remoteFingerprint.current = sceneFingerprint(currentRef.current);
     engine.importScene(currentRef.current);
     engine.setEditable(editableRef.current);
+    if (api.getSceneElements().length)
+      api.scrollToContent(api.getSceneElements(), {
+        fitToContent: true,
+        animate: false,
+        maxZoom: 1,
+      });
+    else {
+      const state = api.getAppState();
+      api.updateScene({
+        appState: {
+          scrollX: state.width / (2 * state.zoom.value),
+          scrollY: state.height / (2 * state.zoom.value),
+        },
+        captureUpdate: CaptureUpdateAction.NEVER,
+      });
+    }
     onEngine(engine);
     return () => {
       engine.dispose();
@@ -92,6 +184,12 @@ export function ExcalidrawCanvas({
     }
   }, [elements]);
   useEffect(() => engineRef.current?.setEditable(editable), [editable]);
+  useEffect(() => {
+    if (!api || !editable || defaultToolApplied.current) return;
+    defaultToolApplied.current = true;
+    api.setActiveTool({ type: 'laser' });
+  }, [api, editable]);
+
   useEffect(() => setOptionsOpen(false), [tool, editable]);
   useEffect(() => {
     if (!api) return;
@@ -120,6 +218,8 @@ export function ExcalidrawCanvas({
         }
       }}
       onPointerDownCapture={(event) => {
+        interacting.current = true;
+        cancelFollow.current();
         if ((event.target as HTMLElement).closest('.whiteboard-quick-styles')) return;
         if (
           !(event.target as HTMLElement).closest(
@@ -129,8 +229,14 @@ export function ExcalidrawCanvas({
           setOptionsOpen(false);
         engineRef.current?.begin();
       }}
-      onPointerUpCapture={() => requestAnimationFrame(() => engineRef.current?.commit())}
-      onPointerCancelCapture={() => engineRef.current?.commit()}
+      onPointerUpCapture={() => {
+        interacting.current = false;
+        requestAnimationFrame(() => engineRef.current?.commit());
+      }}
+      onPointerCancelCapture={() => {
+        interacting.current = false;
+        engineRef.current?.commit();
+      }}
       onKeyDownCapture={(event) => {
         if (event.key === 'Escape') setOptionsOpen(false);
         if (
@@ -173,8 +279,102 @@ export function ExcalidrawCanvas({
         }
       }}
     >
+      <div className="pointer-events-none absolute inset-0 z-[2] overflow-hidden">
+        {api &&
+          writers
+            .filter((person) => person.expiresAt > Date.now())
+            .map((person) => {
+              const point = person.viewport.pointer ?? person.viewport.writing;
+              const palette = participantCursorColors(
+                participantColor(
+                  person.actorId,
+                  presence.map((peer) => peer.id),
+                ),
+              );
+              const name = presence.find((peer) => peer.id === person.actorId)?.name;
+              const view = api.getAppState();
+              return (
+                point &&
+                name && (
+                  <span
+                    key={person.actorId}
+                    className="absolute rounded-lg bg-background px-2 py-1 text-xs text-foreground shadow-sm"
+                    style={{
+                      backgroundColor: palette.background,
+                      color: palette.foreground,
+                      left: (point.x + view.scrollX) * view.zoom.value + 16,
+                      top: (point.y + view.scrollY) * view.zoom.value + 8,
+                    }}
+                  >
+                    <svg
+                      width="18"
+                      height="24"
+                      viewBox="0 0 18 24"
+                      aria-hidden="true"
+                      style={{ position: 'absolute', left: -16, top: -8 }}
+                    >
+                      <path
+                        d="M1 1 L1 18 L6 13 L10 21 L14 19 L10 11 L17 11 Z"
+                        fill={palette.foreground}
+                        stroke="#fff"
+                        strokeWidth="1.5"
+                      />
+                    </svg>
+                    {name}
+                  </span>
+                )
+              );
+            })}
+      </div>
       <Excalidraw
-        onPointerUpdate={onPointerUpdate}
+        onPointerUpdate={(event) => {
+          onPointerUpdate(event);
+          pointer.current = { x: event.pointer.x, y: event.pointer.y };
+          if (api && editable) {
+            const state = api.getAppState();
+            onViewport?.({
+              centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+              centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+              zoom: state.zoom.value,
+              pointer: pointer.current,
+              ...(writing.current ? { writing: writing.current } : {}),
+            });
+          }
+
+          if (
+            !api ||
+            !editable ||
+            event.button !== 'down' ||
+            ![
+              'freedraw',
+              'text',
+              'line',
+              'arrow',
+              'rectangle',
+              'ellipse',
+              'diamond',
+              'frame',
+            ].includes(api.getAppState().activeTool.type)
+          )
+            return;
+          writing.current = { x: event.pointer.x, y: event.pointer.y };
+          const publish = () => {
+            const state = api.getAppState();
+            onViewport?.({
+              centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+              centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+              zoom: state.zoom.value,
+              ...(writing.current ? { writing: writing.current } : {}),
+              ...(pointer.current ? { pointer: pointer.current } : {}),
+            });
+          };
+          publish();
+          if (writingTimer.current) clearTimeout(writingTimer.current);
+          writingTimer.current = setTimeout(() => {
+            writing.current = undefined;
+            publish();
+          }, 1500);
+        }}
         theme={theme}
         excalidrawAPI={setApi}
         initialData={{
@@ -233,6 +433,13 @@ export function ExcalidrawCanvas({
           },
         }}
         onChange={(next, state) => {
+          onViewport?.({
+            centerX: state.width / (2 * state.zoom.value) - state.scrollX,
+            centerY: state.height / (2 * state.zoom.value) - state.scrollY,
+            zoom: state.zoom.value,
+            ...(writing.current ? { writing: writing.current } : {}),
+            ...(pointer.current ? { pointer: pointer.current } : {}),
+          });
           const selected = next.find(
             (element) => !element.isDeleted && state.selectedElementIds[element.id],
           );
@@ -270,6 +477,12 @@ export function ExcalidrawCanvas({
         <DrawingStyleStrip
           className="whiteboard-quick-styles absolute left-3 z-40"
           {...{ optionsOpen }}
+          open={stylesVisible}
+          onOpenChange={setStylesVisible}
+          onClose={() => {
+            setOptionsOpen(false);
+            api?.updateScene({ appState: { openMenu: null } });
+          }}
           color={quickStyle.color}
           width={quickStyle.width}
           fill={quickStyle.fill}

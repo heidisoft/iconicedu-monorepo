@@ -1,0 +1,10 @@
+appId: com.heidisoft.iconicedu
+---
+- runFlow: bootstrap.yaml
+- openLink: 'iconicedu://live/invalid%2Fidentifier#invite=synthetic'
+- assertVisible: 'Unable to open classroom'
+# A warm OS link must preserve existing routes and not strand the app on the error.
+- openLink: 'iconicedu://classroom-link-fixture?mode=member'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000

@@ -45,3 +45,5 @@ export {
 } from '@iconicedu/ui-native/utils/styled';
 
 export * from '@iconicedu/ui-native/components/MeetingPasscode';
+export { LaserPointerIcon } from './components/laser-pointer-icon';
+export { DrawingStyleStrip } from './components/drawing-style-strip';

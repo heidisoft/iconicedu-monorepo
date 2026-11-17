@@ -205,6 +205,45 @@ describe('annotation client', () => {
       vi.useRealTimers();
     }
   });
+  it('retains ink after retry exhaustion and allows a manual retry with the same receipt', async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.apply.mockRejectedValue(new Error('offline'));
+      const { result, unmount } = renderHook(() =>
+        useScreenAnnotations('session', '123'),
+      );
+      await act(async () => {});
+      let saved!: Promise<unknown>;
+      act(() => {
+        saved = result.current
+          .execute({ eventId: 'retained-stroke', kind: 'put', object, baseVersion: 0 })
+          .catch(() => undefined);
+      });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20000);
+        await saved;
+      });
+      expect(result.current.objects).toHaveLength(1);
+      expect(mocks.apply).toHaveBeenCalledTimes(8);
+      mocks.apply.mockResolvedValue({
+        eventId: 'retained-stroke',
+        roomId: 'room',
+        revision: 1,
+        objects: [{ ...object, version: 1 }],
+        studentsEnabled: true,
+        ended: false,
+      });
+      await act(async () => {
+        await result.current.retry();
+      });
+      expect(mocks.apply.mock.calls.at(-1)?.[1].eventId).toBe('retained-stroke');
+      expect(result.current.objects[0].version).toBe(1);
+      expect(result.current.error).toBeNull();
+      unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it('renders locally before acknowledgement, retries with the same event ID and records history', async () => {
     let acknowledge!: (value: unknown) => void;
     mocks.apply

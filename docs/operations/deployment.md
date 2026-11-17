@@ -88,13 +88,14 @@ eas login
 
 ### Build profiles
 
-Three profiles are configured in `apps/mobile/eas.json`:
+Four profiles are configured in `apps/mobile/eas.json`:
 
-| Profile       | Use for                        | Distribution                           |
-| ------------- | ------------------------------ | -------------------------------------- |
-| `development` | Local testing with dev client  | Internal                               |
-| `preview`     | Stakeholder testing            | Internal (TestFlight / internal track) |
-| `production`  | App Store / Play Store release | Store                                  |
+| Profile         | Use for                          | Distribution                                     |
+| --------------- | -------------------------------- | ------------------------------------------------ |
+| `development`   | Local testing with dev client    | Internal (iOS: registered devices only)          |
+| `preview`       | Quick checks on your own devices | Internal (iOS: registered devices only)          |
+| `preview-store` | Stakeholder and QA testing       | TestFlight (iOS) and Play internal testing track |
+| `production`    | App Store / Play Store release   | Store                                            |
 
 ### Development build
 
@@ -112,11 +113,27 @@ pnpm dev:mobile
 
 ### Preview build
 
-For stakeholder testing or QA. Distributed via TestFlight (iOS) or an internal Google Play track.
+For quick checks on your own devices. Internal distribution signs iOS builds with an ad hoc provisioning profile, so an iPhone installs the build only if it was registered before the build ran. Otherwise iOS reports that the app's integrity could not be verified. Register a device with `eas device:create`, rebuild, and turn on Developer Mode (Settings → Privacy & Security) on iOS 16 or later.
 
 ```bash
 pnpm mobile:eas:build:preview
 ```
+
+### Store preview build
+
+For stakeholder testing or QA without registering devices. `preview-store` extends `preview`, keeping its environment and `preview` update channel, but signs for the stores and submits each build: iOS to TestFlight and Android to the Play internal testing track. Testers install from TestFlight or the Play Store.
+
+```bash
+pnpm mobile:eas:build:preview:store
+```
+
+From GitHub, run the **Create EAS Build** workflow with the `preview-store` profile. It submits the builds automatically. One-time setup:
+
+- Set the `ASC_APP_ID` repository variable to the App Store Connect app ID.
+- Store an App Store Connect API key in the EAS iOS credentials and a Google service account key in the EAS Android credentials, so submissions run non-interactively.
+- Google Play only accepts API uploads after the first release of the app has been uploaded manually in Play Console.
+
+The builds share the production app IDs, so a device holds either the store preview build or the released app, not both. Internal testers get each build as soon as it has been processed. External TestFlight testers need Apple's beta review for the first build of each version.
 
 ### Production build
 

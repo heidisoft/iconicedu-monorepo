@@ -1,3 +1,4 @@
+import { ApiHttpError } from './http-error';
 import { supabase } from '@/lib/supabase/client';
 
 function resolveApiBaseUrl(): string {
@@ -35,7 +36,10 @@ async function parseResponse<T>(response: Response): Promise<T> {
     const errorBody = (await response.json().catch(() => null)) as {
       message?: string;
     } | null;
-    throw new Error(errorBody?.message ?? `API error ${response.status}`);
+    throw new ApiHttpError(
+      errorBody?.message ?? `API error ${response.status}`,
+      response.status,
+    );
   }
 
   if (response.status === 204) {
@@ -102,4 +106,54 @@ export async function apiGet<T>(
   });
 
   return parseResponse<T>(response);
+}
+
+/** Meeting-scoped capabilities are verified by apps/api, not by Supabase auth. */
+export async function capabilityGet<T>(path: string, token: string): Promise<T> {
+  return parseResponse<T>(
+    await fetch(`${resolveApiBaseUrl()}${path}`, {
+      headers: { Authorization: `Bearer ${token}`, 'Cache-Control': 'no-store' },
+    }),
+  );
+}
+export async function capabilityPost<T>(
+  path: string,
+  token: string,
+  body: unknown,
+): Promise<T> {
+  return parseResponse<T>(
+    await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** Existing public API routes may use a signed-in identity, but also accept guests. */
+async function getOptionalAuthHeaders(): Promise<Record<string, string>> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return {
+    'Content-Type': 'application/json',
+    'Cache-Control': 'no-store',
+    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+  };
+}
+export async function publicApiGet<T>(path: string): Promise<T> {
+  return parseResponse<T>(
+    await fetch(`${resolveApiBaseUrl()}${path}`, {
+      headers: await getOptionalAuthHeaders(),
+    }),
+  );
+}
+export async function publicApiPost<T>(path: string, body: unknown): Promise<T> {
+  return parseResponse<T>(
+    await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method: 'POST',
+      headers: await getOptionalAuthHeaders(),
+      body: JSON.stringify(body),
+    }),
+  );
 }

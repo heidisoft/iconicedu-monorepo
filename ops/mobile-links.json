@@ -1,0 +1,8 @@
+{
+  "domains": ["app.iconicedu.com"],
+  "iosApplicationIdentifiers": ["5NVN93C486.com.heidisoft.iconicedu"],
+  "androidPackage": "com.heidisoft.iconicedu",
+  "androidCertificateSha256": [
+    "39:40:40:8E:E0:FB:2E:A0:3D:03:E6:8B:B7:C7:A3:56:C7:F3:4B:DE:E3:01:08:07:68:E6:D5:69:77:6E:FA:DC"
+  ]
+}

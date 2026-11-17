@@ -99,3 +99,11 @@ describe('NOTIFICATION_REGISTRY', () => {
     expect(DEFAULT_NOTIFICATION_ROUTE).toBe('/(app)/(tabs)/inbox');
   });
 });
+
+it('routes missed class calls to their authorized join/message options', () => {
+  expect(
+    NOTIFICATION_REGISTRY['classroom.call.missed'].getRoute({
+      classroomCallId: 'call-id',
+    }),
+  ).toBe('/classroom-call/call-id');
+});

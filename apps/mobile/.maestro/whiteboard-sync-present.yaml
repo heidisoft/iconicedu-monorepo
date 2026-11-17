@@ -1,0 +1,17 @@
+appId: com.heidisoft.iconicedu
+---
+- openLink: 'iconicedu://whiteboard-sync-fixture?role=teacher&run=${RUN_ID}'
+- extendedWaitUntil:
+    visible: 'Ready to join\?'
+    timeout: 30000
+- tapOn: 'Turn camera off'
+- scrollUntilVisible:
+    element: 'Join now'
+- tapOn: 'Join now'
+- runFlow: open-classroom-whiteboard.yaml
+- tapOn: 'More whiteboard actions'
+- extendedWaitUntil:
+    visible: 'Stop sharing for everyone'
+    timeout: 30000
+- tapOn: 'Allow student editing'
+- assertVisible: 'Disable student editing'

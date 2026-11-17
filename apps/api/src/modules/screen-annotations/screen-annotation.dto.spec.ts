@@ -153,3 +153,27 @@ describe('ephemeral laser validation', () => {
     expect(() => parseAnnotationLasers([{ ...stroke(), sequence: 0.5 }])).toThrow();
   });
 });
+
+it.each(['transparent', '#1971c2'])(
+  'preserves valid annotation fill %s',
+  (backgroundColor) => {
+    const parsed = parseAnnotationOperation({
+      ...input,
+      object: { ...input.object, style: { ...input.object.style, backgroundColor } },
+    });
+    expect(parsed.kind === 'put' && parsed.object.style.backgroundColor).toBe(
+      backgroundColor,
+    );
+  },
+);
+it.each(['url(https://example.com)', 'red', 42])(
+  'rejects unsafe annotation fill %s',
+  (backgroundColor) => {
+    expect(() =>
+      parseAnnotationOperation({
+        ...input,
+        object: { ...input.object, style: { ...input.object.style, backgroundColor } },
+      }),
+    ).toThrow('Invalid annotation background color');
+  },
+);

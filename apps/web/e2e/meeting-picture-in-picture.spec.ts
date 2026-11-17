@@ -30,6 +30,7 @@ test.beforeEach(async ({ page }) => {
     });
     Object.assign(window, {
       triggerMeetingPip: () => handlers.get('enterpictureinpicture')?.(),
+      hasMeetingPipHandler: () => !!handlers.get('enterpictureinpicture'),
     });
   });
   await page.goto('/visual-test/meeting-pip');
@@ -113,6 +114,11 @@ test('uses automatic browser entry and permits bringing the call back from the o
   page,
   context,
 }) => {
+  // The call registers its automatic-entry handler after connecting; on slow runners
+  // triggering earlier silently does nothing.
+  await page.waitForFunction(() =>
+    (window as Window & { hasMeetingPipHandler: () => boolean }).hasMeetingPipHandler(),
+  );
   const opened = context.waitForEvent('page');
   await page.evaluate(() =>
     (window as Window & { triggerMeetingPip: () => void }).triggerMeetingPip(),

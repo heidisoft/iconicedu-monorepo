@@ -18,7 +18,12 @@ function buildOccurrenceLabel(schedule: ClassScheduleVM, occurrenceKey: string) 
   })}`;
 }
 
-function findRelevantOccurrence(schedule: ClassScheduleVM, now: Date) {
+function findRelevantOccurrence(
+  schedule: ClassScheduleVM,
+  now: Date,
+  strictClassTime = false,
+  occurrenceKey?: string,
+) {
   const rangeStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const rangeEnd = new Date(now.getTime() + UPCOMING_OCCURRENCE_LOOKAHEAD_MS);
   const expanded = expandRecurringEvents([schedule], rangeStart, rangeEnd);
@@ -28,6 +33,14 @@ function findRelevantOccurrence(schedule: ClassScheduleVM, now: Date) {
     .filter((event) => {
       const startAt = new Date(event.startAt).getTime();
       const endAt = new Date(event.endAt).getTime();
+      if (occurrenceKey && startAt !== Date.parse(occurrenceKey)) return false;
+      if (strictClassTime)
+        return (
+          event.status !== 'cancelled' &&
+          !event.uiState?.disabled &&
+          startAt <= nowTime &&
+          nowTime < endAt
+        );
       return (
         startAt - EARLY_JOIN_ALLOWANCE_MS <= nowTime &&
         endAt + RECENT_OCCURRENCE_GRACE_MS > nowTime
@@ -53,17 +66,26 @@ export async function resolveChannelLiveSessionScope(input: {
   orgId: string;
   channelId: string;
   now?: Date;
+  /** Call invitations never use join grace periods or cancelled slots. */
+  strictClassTime?: boolean;
+  scheduleId?: string;
+  occurrenceKey?: string;
 }): Promise<ResolvedLiveSessionScope> {
   const now = input.now ?? new Date();
   const schedules = await buildClassSchedulesByOrg(input.supabase, input.orgId);
   const channelSchedules = schedules.filter(
     (schedule) =>
       schedule.source.kind === 'class_session' &&
-      schedule.source.channelId === input.channelId,
+      schedule.source.channelId === input.channelId &&
+      (!input.scheduleId || schedule.ids.id === input.scheduleId),
   );
 
   for (const schedule of channelSchedules) {
-    const relevantOccurrence = findRelevantOccurrence(schedule, now);
+    const relevantOccurrence = findRelevantOccurrence(
+      schedule,
+      now,
+      input.strictClassTime,
+    );
     if (!relevantOccurrence.occurrence) {
       continue;
     }

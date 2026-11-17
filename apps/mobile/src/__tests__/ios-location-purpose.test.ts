@@ -3,13 +3,13 @@ import path from 'node:path';
 
 const PURPOSE_STRINGS = {
   NSCameraUsageDescription:
-    'ICONIC Academy uses your camera only when you choose to take a photo, for example to add an image attachment to a class or direct message.',
+    'ICONIC Academy uses your camera when you choose classroom video or take a photo, for example to join a live class or attach an image to a message.',
   NSFaceIDUsageDescription:
     'ICONIC Academy uses Face ID only when you choose biometric access, for example to unlock your saved app session more securely.',
   NSLocationWhenInUseUsageDescription:
     'ICONIC Academy uses your location during onboarding to detect your time zone and city, region, and country; for example, this helps show class times in your local time zone.',
   NSMicrophoneUsageDescription:
-    'ICONIC Academy uses your microphone only when you choose to record audio, for example to send a voice message in a class or direct message conversation.',
+    'ICONIC Academy uses your microphone when you choose classroom audio or record a voice message, for example to speak during a live class.',
   NSPhotoLibraryAddUsageDescription:
     'ICONIC Academy saves images to your photo library only when you choose to save a message image, for example keeping a class attachment for later.',
   NSPhotoLibraryUsageDescription:
