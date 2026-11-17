@@ -138,7 +138,7 @@ export function LearningSpacesTable({ rows, orgSlug }: LearningSpacesTableProps)
         toast.error(payload.message ?? 'Unable to delete classroom.');
         return;
       }
-      toast.success('Classroom deleted.');
+      toast.success('Classroom deleted. It can be restored for 30 days.');
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to delete classroom.');
@@ -320,7 +320,10 @@ export function LearningSpacesTable({ rows, orgSlug }: LearningSpacesTableProps)
           <AlertDialogHeader>
             <AlertDialogTitle>Delete classroom?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove the classroom, its channels, and schedules.
+              The classroom is archived and removed from everyone&apos;s lists: members
+              lose access, tutor direct messages for this class close, and upcoming
+              reminders are canceled. Attendance, session summaries, and other reports are
+              kept. You can restore it for 30 days.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

@@ -46,6 +46,8 @@ export type PendingUpload = {
   /** Thread targeting for a `type: 'text'` row's retry, so it resends into the same thread. */
   threadParentId?: string;
   threadId?: string;
+  /** Immutable non-DM audience retained for an idempotent retry. */
+  audienceProfileIds?: string[];
 };
 
 type PendingMessageRowProps = {

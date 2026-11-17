@@ -10,12 +10,13 @@ Engineers operating or debugging scheduled reminder delivery.
 
 ## Last Updated
 
-2026-04-20
+2026-11-15
 
 ## Related Docs
 
 - [Documentation Hub](../README.md)
 - [Deployment](deployment.md)
+- [Push Notifications](push-notifications.md)
 
 This sets up a Supabase scheduled Edge Function that calls:
 
@@ -85,7 +86,7 @@ rating below their name; staff and child confirmations are not listed there.
 Recipient records are supplemented with the current schedule roster and family
 links when a tutor or parent has no response record.
 
-The existing `admin-session-attendance-analytics` flag still controls the dashboard.
+The attendance analytics dashboard is available to every org admin.
 `flag-exempt: maintenance of existing attendance reporting date limits, confirmation
 accuracy, and table presentation` covers the shared table and API corrections.
 Deploy the API before the web app to include pending tutors and individual ratings.
@@ -305,6 +306,13 @@ a minute bucket. It preserves active leases, retry attempts and terminal results
 it does not automatically resend a succeeded delivery. A deliberate replay should
 inspect and retry the existing failed/dead-letter job. Preferences and recipient
 eligibility still apply independently of worker scheduling.
+
+Session reminder jobs also publish `reminderDedupeKey` (the raw
+`reminder_jobs.dedupe_key`) on the `session.reminder.sent` activity payload. The
+push provider turns it into a tray `collapseId` (iOS) and `tag` (Android), so a
+repeat send of the same reminder replaces the earlier device notification instead
+of stacking another copy — see
+[Reminder Push Collapsing](push-notifications.md#reminder-push-collapsing).
 
 Both queues reclaim expired leases. Retryable failures use exponential backoff
 from 15 seconds up to ten minutes, with eight attempts by default. Delivery is

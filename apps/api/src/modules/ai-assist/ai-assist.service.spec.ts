@@ -2,7 +2,6 @@ import { AiAssistService } from './ai-assist.service';
 import { MessagesService } from '@iconicedu/api/modules/messages/messages.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import type { OrgAiSettingsService } from '@iconicedu/api/lib/ai/org-ai-settings.service';
-import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import {
   BadRequestException,
   ForbiddenException,
@@ -11,13 +10,6 @@ import {
 
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(),
-}));
-jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
-  apiFeatureFlagKeys: {
-    enableAiRefine: 'enable-ai-refine',
-    enableAiSuggestedReplies: 'enable-ai-suggested-replies',
-  },
-  evaluateApiBooleanFlag: jest.fn(),
 }));
 
 function makeChain(result: { data: unknown; error: null; count?: number }) {
@@ -84,28 +76,6 @@ function setUpSupabase(input: { membershipFound: boolean; usageCount?: number })
 describe('AiAssistService.refineDraft', () => {
   beforeEach(() => {
     jest.mocked(createSupabaseServiceClient).mockReset();
-    jest.mocked(evaluateApiBooleanFlag).mockReset().mockResolvedValue(true);
-  });
-
-  it('rejects when the enable-ai-refine flag is off', async () => {
-    setUpSupabase({ membershipFound: true });
-    jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
-    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
-    const service = new AiAssistService(
-      makeMessagesServiceMock('guardian'),
-      orgAiSettingsService,
-    );
-
-    await expect(
-      service.refineDraft('auth-user-1', 'token', {
-        orgId: ORG_ID,
-        channelId: CHANNEL_ID,
-        profileId: PROFILE_ID,
-        content: 'hello there',
-        instruction: 'proofread',
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(orgAiSettingsService.completeForOrg).not.toHaveBeenCalled();
   });
 
   it('rejects a profile kind that is not eligible (e.g. child)', async () => {
@@ -312,24 +282,6 @@ describe('AiAssistService.refineDraft', () => {
 describe('AiAssistService.suggestReplies', () => {
   beforeEach(() => {
     jest.mocked(createSupabaseServiceClient).mockReset();
-    jest.mocked(evaluateApiBooleanFlag).mockReset().mockResolvedValue(true);
-  });
-
-  it('rejects when the enable-ai-suggested-replies flag is off', async () => {
-    setUpSupabase({ membershipFound: true });
-    jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
-    const service = new AiAssistService(
-      makeMessagesServiceMock('guardian'),
-      makeOrgAiSettingsServiceMock(),
-    );
-
-    await expect(
-      service.suggestReplies('auth-user-1', 'token', {
-        orgId: ORG_ID,
-        channelId: CHANNEL_ID,
-        profileId: PROFILE_ID,
-      }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects an ineligible profile kind', async () => {
@@ -439,10 +391,9 @@ describe('AiAssistService.suggestReplies', () => {
 describe('AiAssistService.getEligibility', () => {
   beforeEach(() => {
     jest.mocked(createSupabaseServiceClient).mockReset();
-    jest.mocked(evaluateApiBooleanFlag).mockReset();
   });
 
-  it('reports both flags off for an ineligible profile kind, without evaluating PostHog', async () => {
+  it('reports both capabilities off for an ineligible profile kind', async () => {
     const orgAiSettingsService = makeOrgAiSettingsServiceMock();
     const service = new AiAssistService(
       makeMessagesServiceMock('child'),
@@ -455,11 +406,10 @@ describe('AiAssistService.getEligibility', () => {
     });
 
     expect(result).toEqual({ enableAiRefine: false, enableAiSuggestedReplies: false });
-    expect(evaluateApiBooleanFlag).not.toHaveBeenCalled();
     expect(orgAiSettingsService.isEnabledForOrg).not.toHaveBeenCalled();
   });
 
-  it('reports both flags off when the org has not enabled AI, without evaluating PostHog', async () => {
+  it('reports both capabilities off when the org has not enabled AI', async () => {
     const orgAiSettingsService = makeOrgAiSettingsServiceMock();
     orgAiSettingsService.isEnabledForOrg.mockResolvedValue(false);
     const service = new AiAssistService(
@@ -473,16 +423,13 @@ describe('AiAssistService.getEligibility', () => {
     });
 
     expect(result).toEqual({ enableAiRefine: false, enableAiSuggestedReplies: false });
-    expect(evaluateApiBooleanFlag).not.toHaveBeenCalled();
   });
 
-  it("evaluates each flag with the profile's id as the PostHog distinct id", async () => {
-    jest
-      .mocked(evaluateApiBooleanFlag)
-      .mockImplementation(async ({ flagKey }) => flagKey === 'enable-ai-refine');
+  it('reports both capabilities on for an eligible profile in an org with AI enabled', async () => {
+    const orgAiSettingsService = makeOrgAiSettingsServiceMock();
     const service = new AiAssistService(
       makeMessagesServiceMock('educator'),
-      makeOrgAiSettingsServiceMock(),
+      orgAiSettingsService,
     );
 
     const result = await service.getEligibility('auth-user-1', 'token', {
@@ -490,9 +437,7 @@ describe('AiAssistService.getEligibility', () => {
       profileId: PROFILE_ID,
     });
 
-    expect(result).toEqual({ enableAiRefine: true, enableAiSuggestedReplies: false });
-    expect(evaluateApiBooleanFlag).toHaveBeenCalledWith(
-      expect.objectContaining({ distinctId: PROFILE_ID }),
-    );
+    expect(result).toEqual({ enableAiRefine: true, enableAiSuggestedReplies: true });
+    expect(orgAiSettingsService.isEnabledForOrg).toHaveBeenCalledWith(ORG_ID);
   });
 });

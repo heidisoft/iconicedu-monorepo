@@ -47,7 +47,6 @@ interface DayViewProps {
   onMonthChange?: (date: Date) => void;
   canCancelSessions?: boolean;
   canEditSessions?: boolean;
-  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -69,7 +68,6 @@ export function DayView({
   onMonthChange,
   canCancelSessions = false,
   canEditSessions = false,
-  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: DayViewProps) {
@@ -200,7 +198,6 @@ export function DayView({
                         compact={isCompact}
                         canCancelSession={canCancelSessions}
                         canEditSession={canEditSessions}
-                        canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
                         onCancelSession={onCancelSession}
                         onEditSession={onEditSession}
                       />
@@ -246,9 +243,6 @@ export function DayView({
                                 event={hidden}
                                 canCancelSession={canCancelSessions}
                                 canEditSession={canEditSessions}
-                                canUseSeriesRescheduleScopes={
-                                  canUseSeriesRescheduleScopes
-                                }
                                 onCancelSession={onCancelSession}
                                 onEditSession={onEditSession}
                               />

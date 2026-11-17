@@ -103,8 +103,6 @@ export interface MessagesContainerProps {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  showAiRefine?: boolean;
-  showAiSuggestedReplies?: boolean;
   enableMessagePinning?: boolean;
   enableMessageSearch?: boolean;
   enableScheduledSend?: boolean;
@@ -119,14 +117,14 @@ export interface MessagesContainerProps {
     content?: string;
     threadId?: string | null;
     threadParentId?: string | null;
+    audienceProfileIds?: string[];
   }) => Promise<MessageVM[]>;
   joinLiveSession?: () => Promise<void>;
   /** Gates draft autosave/restore for the main channel composer. Default off. */
-  enableMessageDrafts?: boolean;
   /** Gates the "Edit message" action on the sender's own eligible text messages. Default off. */
-  enableMessageEdit?: boolean;
   /** Gates clientMessageId-based idempotent retry of failed sends. Default off. */
   enableMessageSendReliability?: boolean;
+  enableMessageAudience?: boolean;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>
@@ -406,8 +404,6 @@ export function MessagesContainer({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
-  showAiRefine = false,
-  showAiSuggestedReplies = false,
   enableMessagePinning = false,
   enableScheduledSend = false,
   enableMessageReplyReference = false,
@@ -416,9 +412,8 @@ export function MessagesContainer({
   messageWriteClient,
   uploadFileMessage,
   joinLiveSession,
-  enableMessageDrafts = false,
-  enableMessageEdit = false,
   enableMessageSendReliability = false,
+  enableMessageAudience = false,
 }: MessagesContainerProps) {
   const messageListRef = useRef<MessageListRef>(null);
   const messagesRef = useRef<MessageVM[]>([]);
@@ -430,6 +425,7 @@ export function MessagesContainer({
         mentions?: MessageMentionVM[];
         homework?: AssignmentSendInput;
         clientMessageId: string;
+        audienceProfileIds?: string[];
       }
     >
   >({});
@@ -608,7 +604,7 @@ export function MessagesContainer({
   const currentAccountId = resolvedCurrentUserProfile?.ids.accountId ?? '';
   const draftScope = useMemo(
     () =>
-      enableMessageDrafts && currentAccountId && currentUserId
+      currentAccountId && currentUserId
         ? {
             accountId: currentAccountId,
             profileId: currentUserId,
@@ -617,13 +613,7 @@ export function MessagesContainer({
             threadId: null,
           }
         : null,
-    [
-      enableMessageDrafts,
-      currentAccountId,
-      currentUserId,
-      channel.ids.orgId,
-      channel.ids.id,
-    ],
+    [currentAccountId, currentUserId, channel.ids.orgId, channel.ids.id],
   );
   const typingParticipants = useMemo(
     () =>
@@ -935,6 +925,7 @@ export function MessagesContainer({
       mentions?: MessageMentionVM[],
       homework?: AssignmentSendInput,
       clientMessageId?: string,
+      audienceProfileIds?: string[],
     ) => {
       if (readOnly) return;
       if (!senderProfile) return;
@@ -967,6 +958,9 @@ export function MessagesContainer({
                 homework,
                 replyToMessageId,
                 clientMessageId,
+                audience: audienceProfileIds?.length
+                  ? { profileIds: audienceProfileIds }
+                  : undefined,
               }),
             );
             clearFailedSend(optimisticMessage.ids.id);
@@ -998,6 +992,7 @@ export function MessagesContainer({
                   mentions,
                   homework,
                   clientMessageId,
+                  audienceProfileIds,
                 },
               }));
             } else {
@@ -1048,6 +1043,9 @@ export function MessagesContainer({
               mentions: failed.mentions,
               homework: failed.homework,
               clientMessageId: failed.clientMessageId,
+              audience: failed.audienceProfileIds?.length
+                ? { profileIds: failed.audienceProfileIds }
+                : undefined,
             }),
           );
           clearFailedSend(messageId);
@@ -1968,7 +1966,7 @@ export function MessagesContainer({
   ]);
 
   useEffect(() => {
-    if (readOnly || !enableMessageEdit) {
+    if (readOnly) {
       setEditTextMessage(async () => null);
       return;
     }
@@ -1985,7 +1983,6 @@ export function MessagesContainer({
     });
   }, [
     channel.ids.orgId,
-    enableMessageEdit,
     messageWriteClient,
     readOnly,
     setEditTextMessage,
@@ -2259,7 +2256,12 @@ export function MessagesContainer({
           ) : (
             <MessageInput
               onSend={handleSendMessage}
-              onAttachFiles={(attachments, content) => {
+              onAttachFiles={(
+                attachments,
+                content,
+                _clientMessageId,
+                audienceProfileIds,
+              ) => {
                 if (readOnly || !uploadFileMessage) {
                   return;
                 }
@@ -2268,6 +2270,7 @@ export function MessagesContainer({
                     uploadFileMessage({
                       attachments,
                       content,
+                      audienceProfileIds,
                     }),
                   );
                   createdMessages.forEach((created) => {
@@ -2322,11 +2325,18 @@ export function MessagesContainer({
               }}
               placeholder={getMessageInputPlaceholder(channel, resolvedCurrentUserId)}
               participants={participants}
+              audienceParticipants={
+                enableMessageAudience &&
+                channel.basics.kind === 'channel' &&
+                channel.basics.purpose !== 'support'
+                  ? participants
+                  : undefined
+              }
               currentUserId={resolvedCurrentUserId}
               channelId={channel.ids.id}
               showCreateMessageTypeButton={showCreateMessageTypeButton}
-              showAiRefine={showAiRefine}
-              showAiSuggestedReplies={showAiSuggestedReplies}
+              showAiRefine
+              showAiSuggestedReplies
               prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
@@ -2361,7 +2371,7 @@ export function MessagesContainer({
               enableMessageListFormatting={enableMessageListFormatting}
               replyTarget={enableMessageReplyReference ? replyTarget : null}
               onClearReply={clearReplyTo}
-              enableMessageDrafts={enableMessageDrafts}
+              enableMessageDrafts
               draftScope={draftScope}
               enableMessageSendReliability={enableMessageSendReliability}
             />

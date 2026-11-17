@@ -619,9 +619,7 @@ export function CompletedSessionsTable({
   rows: AdminSessionCompletionVM[];
   schedules: ScheduleOptionRow[];
   orgId: string;
-  /** Gated by the enableSessionCompletionVerifiedDuration flag (see flags.ts). */
   allowVerifiedDurationOverride?: boolean;
-  /** Gated by the enableSessionCompletionDisputeDetails flag (see flags.ts). */
   showDisputeDetails?: boolean;
 }) {
   const router = useRouter();

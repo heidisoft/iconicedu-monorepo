@@ -551,7 +551,7 @@ export class SessionCompletionsService {
         .select('status, archived_at')
         .eq('org_id', body.orgId)
         .eq('id', row.learning_space_id)
-        .is('deleted_at', null)
+        // Soft-deleted classes are archived too; apply the same rule.
         .maybeSingle<{ status: string | null; archived_at: string | null }>();
 
       if (classroomError) throw new InternalServerErrorException(classroomError.message);

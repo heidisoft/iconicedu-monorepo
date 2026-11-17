@@ -327,6 +327,7 @@ Required production checks:
 - `apps/api` and Supabase Edge Functions use the same `INTERNAL_REMINDERS_TOKEN`.
 - `events-dispatch` is deployed with `verify_jwt=false`.
 - `cron.job` includes `edge-function-events-dispatch`, `edge-function-reminders-dispatch`, and `edge-function-channel-read-state-repair`.
+- `cron.job` includes `notification-job-retention` (hourly, `41 * * * *`); see [Notification Job Retention](notification-retention.md).
 - `cron.job` does not include deprecated `edge-function-notifications-dispatch`, `edge-function-reminders-reconcile-dispatch`, `edge-function-activity-worker-dispatch`, or `edge-function-activity-projector-dispatch`.
 - `EXPO_ACCESS_TOKEN` is set in `apps/api` if push delivery should use Expo authenticated sends.
 - iOS release builds are signed with the production APNs entitlement, and a real-device notification delivery test succeeds after TestFlight/App Store signing.

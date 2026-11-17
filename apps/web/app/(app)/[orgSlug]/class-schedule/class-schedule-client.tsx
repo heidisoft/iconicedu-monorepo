@@ -27,10 +27,6 @@ type ClassScheduleClientProps = {
   orgSlug: string;
   canCancelSessions: boolean;
   canEditSessions: boolean;
-  /** enable-class-schedule-series-reschedule flag — gates the "This and
-   * following events"/"All events" quick-edit scopes. `canEditSessions`
-   * alone still allows today's per-occurrence edit regardless of this flag. */
-  canUseSeriesRescheduleScopes: boolean;
   timezone?: string | null;
 };
 
@@ -39,7 +35,6 @@ export function ClassScheduleClient({
   orgSlug,
   canCancelSessions,
   canEditSessions,
-  canUseSeriesRescheduleScopes,
   timezone,
 }: ClassScheduleClientProps) {
   const router = useRouter();
@@ -180,7 +175,6 @@ export function ClassScheduleClient({
           events={scheduleEvents}
           canCancelSessions={canCancelSessions}
           canEditSessions={canEditSessions}
-          canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
           editFullScheduleHref={canEditSessions ? `/${orgSlug}/admin/classrooms` : null}
           onCancelSession={handleCancelSession}
           onEditSession={handleEditSession}

@@ -21,7 +21,6 @@ interface EventDialogProps {
   children: React.ReactNode;
   canCancelSession?: boolean;
   canEditSession?: boolean;
-  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -39,7 +38,6 @@ export function EventDialog({
   children,
   canCancelSession = false,
   canEditSession = false,
-  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: EventDialogProps) {
@@ -56,7 +54,6 @@ export function EventDialog({
             onClose={() => onOpenChange(false)}
             canCancelSession={canCancelSession}
             canEditSession={canEditSession}
-            canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
             onCancelSession={onCancelSession}
             onEditSession={onEditSession}
           />

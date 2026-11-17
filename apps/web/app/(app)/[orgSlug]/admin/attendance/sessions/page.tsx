@@ -12,11 +12,6 @@ import {
   buildRecentCompletionMonthKeys,
   completionMonthKeyToUtcRange,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
-import {
-  enableAdminSessionAttendanceAnalytics,
-  enableSessionCompletionDisputeDetails,
-  enableSessionCompletionVerifiedDuration,
-} from '@iconicedu/web/flags';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import {
   listAdminSessionCompletions,
@@ -48,31 +43,17 @@ export default async function AdminCompletedSessionsPage({
   }
 
   const adminContext = await requireAdminOrgContext(org.id);
-  const analyticsEnabled =
-    adminContext.ok &&
-    (await enableAdminSessionAttendanceAnalytics.run({
-      identify: { profileId: adminContext.actorProfileId },
-    }));
-  const verifiedDurationEnabled =
-    adminContext.ok &&
-    (await enableSessionCompletionVerifiedDuration.run({
-      identify: { profileId: adminContext.actorProfileId },
-    }));
-  const disputeDetailsEnabled =
-    adminContext.ok &&
-    (await enableSessionCompletionDisputeDetails.run({
-      identify: { profileId: adminContext.actorProfileId },
-    }));
+  // Analytics, verified-duration overrides, and dispute details are admin tools;
+  // anyone else gets the plain completed-sessions table.
+  const isAdmin = adminContext.ok;
 
   // A rolling three-month interval can intersect four calendar months.
   // The API clamps both month requests and the default view to that interval.
   const monthOptions = buildRecentCompletionMonthKeys();
   const selectedMonth =
-    analyticsEnabled && month && monthOptions.includes(month)
-      ? month
-      : ALL_COMPLETION_MONTHS;
+    isAdmin && month && monthOptions.includes(month) ? month : ALL_COMPLETION_MONTHS;
 
-  if (!analyticsEnabled) {
+  if (!isAdmin) {
     const rows = await listAdminSessionCompletions(supabase, { orgId: org.id });
     const schedules = await listSchedules(supabase, { orgId: org.id });
     return (
@@ -85,8 +66,8 @@ export default async function AdminCompletedSessionsPage({
           rows={rows}
           schedules={schedules}
           orgId={org.id}
-          allowVerifiedDurationOverride={verifiedDurationEnabled}
-          showDisputeDetails={disputeDetailsEnabled}
+          allowVerifiedDurationOverride={isAdmin}
+          showDisputeDetails={isAdmin}
         />
       </AdminPageShell>
     );
@@ -126,8 +107,8 @@ export default async function AdminCompletedSessionsPage({
         selectedMonth={selectedMonth}
         monthOptions={monthOptions}
         orgId={org.id}
-        allowVerifiedDurationOverride={verifiedDurationEnabled}
-        showDisputeDetails={disputeDetailsEnabled}
+        allowVerifiedDurationOverride={isAdmin}
+        showDisputeDetails={isAdmin}
       />
     </AdminPageShell>
   );

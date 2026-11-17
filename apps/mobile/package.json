@@ -42,7 +42,8 @@
     "test:e2e:classroom:live": "maestro test .maestro/classroom-live.yaml",
     "test:e2e:classroom:host": "maestro test .maestro/classroom-live-host.yaml",
     "links:verify": "node scripts/verify-classroom-links.mjs",
-    "test:links:deployment": "node --test scripts/verify-classroom-links.test.mjs"
+    "test:links:deployment": "node --test scripts/verify-classroom-links.test.mjs",
+    "test:e2e:message-audiences": "maestro test .maestro/message-audiences.yaml"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "0.18.0",

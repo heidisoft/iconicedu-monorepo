@@ -9,10 +9,7 @@ import {
   MARKETING_LEAD_CONTAINER_CLASS,
   MARKETING_SECTION_CLASS,
 } from '@iconicedu/ui-web';
-import {
-  assertMarketingSitePagesEnabled,
-  resolveMarketingLoginHref,
-} from '../../_lib/marketing-site-pages';
+import { resolveMarketingLoginHref } from '../../_lib/marketing-site-pages';
 import {
   breadcrumbJsonLd,
   courseJsonLd,
@@ -50,7 +47,6 @@ export async function generateMetadata({ params }: ProgramPageProps): Promise<Me
 }
 
 export default async function ProgramPage({ params }: ProgramPageProps) {
-  await assertMarketingSitePagesEnabled();
   const { programSlug } = await params;
   const program = findProgramLandingPage(programSlug);
 

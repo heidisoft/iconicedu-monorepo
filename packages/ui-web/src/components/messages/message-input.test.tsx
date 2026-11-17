@@ -359,6 +359,34 @@ describe('message-input mention helpers', () => {
   });
 });
 
+describe('MessageInput audience selection', () => {
+  it('sends the resolved parent audience and resets to everyone', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    const parent = createParticipant({ ids: { id: 'parent-1' } });
+    render(
+      <MessageInput
+        onSend={onSend}
+        participants={[parent]}
+        audienceParticipants={[parent]}
+        currentUserId="staff-1"
+      />,
+    );
+
+    await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Parent' }));
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Welcome');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() =>
+      expect(onSend).toHaveBeenCalledWith('Welcome', [], null, undefined, ['parent-1']),
+    );
+    expect(
+      screen.getByRole('button', { name: /Everyone in this channel/i }),
+    ).toBeTruthy();
+  });
+});
+
 const draftScope = {
   accountId: 'account-1',
   profileId: 'user-1',

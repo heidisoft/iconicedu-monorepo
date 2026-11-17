@@ -9,6 +9,28 @@ function resolveDistinctId(profileId?: string | null) {
   return 'anonymous';
 }
 
+function isEnvFlagEnabled(value: string | undefined) {
+  const normalized = value?.trim().toLowerCase();
+  return normalized === 'true' || normalized === '1' || normalized === 'on';
+}
+
+function isProductionDeployment() {
+  return (
+    (process.env.VERCEL_ENV ?? process.env.NEXT_PUBLIC_VERCEL_ENV ?? '')
+      .trim()
+      .toLowerCase() === 'production'
+  );
+}
+
+// Local-only escape hatch so developers can exercise the feature without
+// PostHog targeting. Ignored on production deployments.
+function isChannelCommunicationsForcedOn() {
+  return (
+    !isProductionDeployment() &&
+    isEnvFlagEnabled(process.env.ENABLE_CHANNEL_COMMUNICATIONS)
+  );
+}
+
 async function evaluateWebBooleanFlag(input: {
   flagKey: string;
   profileId?: string | null;
@@ -22,7 +44,7 @@ async function evaluateWebBooleanFlag(input: {
 }
 
 export const enableChannelCommunications = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-channel-communications',
+  key: platformFeatureFlagKeys.enableChannelCommunications,
   description:
     'Enables channel-level communication features that are still behind rollout control.',
   options: [
@@ -31,6 +53,7 @@ export const enableChannelCommunications = flag<boolean, { profileId?: string | 
   ],
   defaultValue: false,
   async decide({ entities }) {
+    if (isChannelCommunicationsForcedOn()) return true;
     return evaluateWebBooleanFlag({
       flagKey: 'enable-channel-communications',
       profileId: entities?.profileId,
@@ -49,26 +72,6 @@ export const enableMessageTypeComposer = flag<boolean, { profileId?: string | nu
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: 'enable-message-type-composer',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableMobileDirectMessageStart = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.enableMobileDirectMessageStart,
-  description:
-    'Allows mobile users to start direct message conversations from profile previews and channel member rows.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableMobileDirectMessageStart,
       profileId: entities?.profileId,
     });
   },
@@ -106,43 +109,6 @@ export const enableMobileAppleSignIn = flag<boolean, { profileId?: string | null
   },
 });
 
-export const enableClassScheduleSeriesReschedule = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: 'enable-class-schedule-series-reschedule',
-  description:
-    'Shows the "This and following events"/"All events" quick-edit scopes on recurring class sessions and allows the corresponding split/whole-series reschedule server actions.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-class-schedule-series-reschedule',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableMarketingSitePages = flag<boolean, { profileId?: string | null }>({
-  key: 'enable-marketing-site-pages',
-  description:
-    'Enables standard marketing pages and regional microsite routes while content is staged.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'enable-marketing-site-pages',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableAssessments = flag<boolean, { profileId?: string | null }>({
   key: 'assessments-enabled',
   description:
@@ -155,79 +121,6 @@ export const enableAssessments = flag<boolean, { profileId?: string | null }>({
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: 'assessments-enabled',
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableSessionCompletionCarousel = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.sessionCompletionCarousel,
-  description: 'Shows actionable completed sessions on the web home dashboard.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.sessionCompletionCarousel,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableAiRefine = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableAiRefine,
-  description:
-    'Shows the "Refine with AI" composer affordance that rewrites a draft via the Anthropic API before sending.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableAiRefine,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableAiSuggestedReplies = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableAiSuggestedReplies,
-  description:
-    'Shows AI-generated suggested reply chips above the composer; suggestions are never auto-sent.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableAiSuggestedReplies,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableAdminSessionAttendanceAnalytics = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: 'admin-session-attendance-analytics',
-  description:
-    'Enables monthly completed-session analytics, confirmer breakdowns, and advanced filters in admin.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: 'admin-session-attendance-analytics',
       profileId: entities?.profileId,
     });
   },
@@ -351,40 +244,6 @@ export const enableMessageListFormatting = flag<boolean, { profileId?: string | 
   },
 });
 
-export const enableMessageDrafts = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableMessageDrafts,
-  description:
-    'Autosaves and restores in-progress message drafts (main and thread composers) on web and mobile.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableMessageDrafts,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableMessageEdit = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableMessageEdit,
-  description:
-    'Lets a sender edit their own eligible text message within the edit window, on web and mobile.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableMessageEdit,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMobileMessageComposerParity = flag<
   boolean,
   { profileId?: string | null }
@@ -417,63 +276,6 @@ export const enableMessageSendReliability = flag<boolean, { profileId?: string |
   async decide({ entities }) {
     return evaluateWebBooleanFlag({
       flagKey: platformFeatureFlagKeys.enableMessageSendReliability,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableSessionCompletionVerifiedDuration = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.enableSessionCompletionVerifiedDuration,
-  description:
-    'Lets staff confirm a completed session with a verified partial duration (and note) instead of only the full scheduled length, and use it to resolve an open dispute.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableSessionCompletionVerifiedDuration,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableSessionCompletionDisputeDetails = flag<
-  boolean,
-  { profileId?: string | null }
->({
-  key: platformFeatureFlagKeys.enableSessionCompletionDisputeDetails,
-  description:
-    'Shows the reported dispute category and reason under a disputed participant in the admin completed-sessions list.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableSessionCompletionDisputeDetails,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableOrgAiProviderSettings = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableOrgAiProviderSettings,
-  description:
-    'Shows the admin "Organization Settings → AI-assisted messaging" page for configuring a per-org AI provider, model, and API key.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableOrgAiProviderSettings,
       profileId: entities?.profileId,
     });
   },
@@ -536,13 +338,8 @@ export const webFlags = {
   enableClassroomCalls,
   enableClassroomWhiteboard,
   enableClassroomMeetingSettings,
-  enableAdminSessionAttendanceAnalytics,
-  enableAiRefine,
-  enableAiSuggestedReplies,
   enableAssessments,
   enableChannelCommunications,
-  enableClassScheduleSeriesReschedule,
-  enableMarketingSitePages,
   enableMessagePinning,
   enableMessageSearch,
   enableMessageTypeComposer,
@@ -551,17 +348,10 @@ export const webFlags = {
   enableMessageReplyReference,
   enableNotificationConversationControls,
   enableMessageListFormatting,
-  enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
-  enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
-  enableMessageDrafts,
-  enableMessageEdit,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
-  enableSessionCompletionVerifiedDuration,
-  enableSessionCompletionDisputeDetails,
-  enableOrgAiProviderSettings,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

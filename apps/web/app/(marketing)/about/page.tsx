@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import { MAIN_MENU_PAGE_CONTENT, MarketingMainMenuPage } from '@iconicedu/ui-web';
-import {
-  assertMarketingSitePagesEnabled,
-  resolveMarketingLoginHref,
-} from '../_lib/marketing-site-pages';
+import { resolveMarketingLoginHref } from '../_lib/marketing-site-pages';
 import {
   breadcrumbJsonLd,
   createMarketingMetadata,
@@ -17,7 +14,6 @@ const pageSeo = PUBLIC_MARKETING_PAGES.find((page) => page.path === '/about')!;
 export const metadata: Metadata = createMarketingMetadata(pageSeo);
 
 export default async function AboutPage() {
-  await assertMarketingSitePagesEnabled();
   const loginHref = await resolveMarketingLoginHref();
 
   return (

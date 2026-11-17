@@ -145,8 +145,6 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  showAiRefine?: boolean;
-  showAiSuggestedReplies?: boolean;
   enableMessagePinning?: boolean;
   enableMessageSearch?: boolean;
   enableScheduledSend?: boolean;
@@ -154,9 +152,8 @@ type MessagesShellClientProps = {
   enableMessageReplyReference?: boolean;
   enableNotificationConversationControls?: boolean;
   enableMessageListFormatting?: boolean;
-  enableMessageDrafts?: boolean;
-  enableMessageEdit?: boolean;
   enableMessageSendReliability?: boolean;
+  enableMessageAudience?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -189,8 +186,6 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
-  showAiRefine = false,
-  showAiSuggestedReplies = false,
   enableMessagePinning = false,
   enableMessageSearch = false,
   enableScheduledSend = false,
@@ -198,9 +193,8 @@ export function MessagesShellClient({
   enableMessageReplyReference = false,
   enableNotificationConversationControls = false,
   enableMessageListFormatting = false,
-  enableMessageDrafts = false,
-  enableMessageEdit = false,
   enableMessageSendReliability = false,
+  enableMessageAudience = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -242,6 +236,7 @@ export function MessagesShellClient({
         content?: string;
         threadId?: string | null;
         threadParentId?: string | null;
+        audienceProfileIds?: string[];
       }) => {
         if (!currentUserId) {
           throw new Error('Current user is required');
@@ -339,6 +334,9 @@ export function MessagesShellClient({
               content: input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         } else if (imageUploads.length > 1) {
@@ -357,6 +355,9 @@ export function MessagesShellClient({
               content: input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         }
@@ -374,6 +375,9 @@ export function MessagesShellClient({
               content: imageUploads.length ? undefined : input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         } else if (fileUploads.length > 1) {
@@ -391,6 +395,9 @@ export function MessagesShellClient({
               content: imageUploads.length ? undefined : input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         }
@@ -412,6 +419,9 @@ export function MessagesShellClient({
                   : input.content,
               threadId: input.threadId,
               threadParentId: input.threadParentId,
+              audience: input.audienceProfileIds?.length
+                ? { profileIds: input.audienceProfileIds }
+                : undefined,
             }),
           );
         }
@@ -536,8 +546,6 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
-        showAiRefine={showAiRefine}
-        showAiSuggestedReplies={showAiSuggestedReplies}
         enableMessagePinning={enableMessagePinning}
         enableMessageSearch={enableMessageSearch}
         enableScheduledSend={enableScheduledSend}
@@ -545,9 +553,8 @@ export function MessagesShellClient({
         enableMessageReplyReference={enableMessageReplyReference}
         enableNotificationConversationControls={enableNotificationConversationControls}
         enableMessageListFormatting={enableMessageListFormatting}
-        enableMessageDrafts={enableMessageDrafts}
-        enableMessageEdit={enableMessageEdit}
         enableMessageSendReliability={enableMessageSendReliability}
+        enableMessageAudience={enableMessageAudience}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

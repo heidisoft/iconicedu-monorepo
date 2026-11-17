@@ -132,6 +132,11 @@ jobs:
       - name: Guard Supabase access control
         run: pnpm guard:supabase-access-control
 
+      # Ratchets direct Supabase table reads in apps/web + apps/mobile toward zero
+      # (issue #248): new reads fail, migrated paths stay API-only.
+      - name: Guard frontend table access
+        run: pnpm guard:frontend-table-access
+
       # Temporarily disabled in GitHub Actions. Keep the local script in package.json
       # so the guard can be re-enabled here without reintroducing the implementation.
       # - name: Guard feature flags
@@ -195,6 +200,7 @@ jobs:
         run: |
           pnpm test:commitlint
           pnpm test:guard:supabase-access-control
+          pnpm test:guard:frontend-table-access
 
       # PRs: only affected packages. Push to main: all packages.
       - name: Test
@@ -1251,6 +1257,22 @@ jobs:
               if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
                 raise exception 'missing edge-function-channel-read-state-repair cron job';
               end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'notification-job-retention'
+                  and active and schedule = '41 * * * *'
+                  and command = 'select public.purge_notification_job_history();'
+              ) then
+                raise exception 'missing or misconfigured notification-job-retention cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'learning-space-archive-retention'
+                  and active and schedule = '23 3 * * *'
+                  and command = 'select public.purge_archived_learning_space_artifacts();'
+              ) then
+                raise exception 'missing or misconfigured learning-space-archive-retention cron job';
+              end if;
               if exists (
                 select 1
                 from cron.job
@@ -1960,6 +1982,22 @@ jobs:
               end if;
               if not exists (select 1 from cron.job where jobname = 'edge-function-channel-read-state-repair') then
                 raise exception 'missing edge-function-channel-read-state-repair cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'notification-job-retention'
+                  and active and schedule = '41 * * * *'
+                  and command = 'select public.purge_notification_job_history();'
+              ) then
+                raise exception 'missing or misconfigured notification-job-retention cron job';
+              end if;
+              if not exists (
+                select 1 from cron.job
+                where jobname = 'learning-space-archive-retention'
+                  and active and schedule = '23 3 * * *'
+                  and command = 'select public.purge_archived_learning_space_artifacts();'
+              ) then
+                raise exception 'missing or misconfigured learning-space-archive-retention cron job';
               end if;
               if exists (
                 select 1

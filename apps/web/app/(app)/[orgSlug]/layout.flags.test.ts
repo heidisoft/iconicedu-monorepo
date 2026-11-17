@@ -16,8 +16,6 @@ const {
   buildAdminMenuSectionsMock,
   enableClassroomCallsRunMock,
   enableAssessmentsRunMock,
-  enableMessageDraftsRunMock,
-  enableOrgAiProviderSettingsRunMock,
   shouldRedirectToAuthResumeMock,
   resolveOrgDashboardPathMock,
   redirectMock,
@@ -38,8 +36,6 @@ const {
   buildAdminMenuSectionsMock: vi.fn(),
   enableClassroomCallsRunMock: vi.fn(),
   enableAssessmentsRunMock: vi.fn(),
-  enableMessageDraftsRunMock: vi.fn(),
-  enableOrgAiProviderSettingsRunMock: vi.fn(),
   shouldRedirectToAuthResumeMock: vi.fn(),
   resolveOrgDashboardPathMock: vi.fn(),
   redirectMock: vi.fn(),
@@ -110,12 +106,6 @@ vi.mock('@iconicedu/web/flags', () => ({
   enableAssessments: {
     run: (...args: unknown[]) => enableAssessmentsRunMock(...args),
   },
-  enableMessageDrafts: {
-    run: (...args: unknown[]) => enableMessageDraftsRunMock(...args),
-  },
-  enableOrgAiProviderSettings: {
-    run: (...args: unknown[]) => enableOrgAiProviderSettingsRunMock(...args),
-  },
 }));
 
 vi.mock('@iconicedu/web/app/(app)/[orgSlug]/layout-auth-gate', () => ({
@@ -156,8 +146,6 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReset();
     buildAdminMenuSectionsMock.mockReset();
     enableAssessmentsRunMock.mockReset();
-    enableMessageDraftsRunMock.mockReset();
-    enableOrgAiProviderSettingsRunMock.mockReset();
     shouldRedirectToAuthResumeMock.mockReset();
     resolveOrgDashboardPathMock.mockReset();
     redirectMock.mockReset();
@@ -209,8 +197,6 @@ describe('org layout persona flags', () => {
     mapOrgSubjectRowsToOptionsMock.mockReturnValue([]);
     buildAdminMenuSectionsMock.mockReturnValue([]);
     enableAssessmentsRunMock.mockResolvedValue(false);
-    enableMessageDraftsRunMock.mockResolvedValue(false);
-    enableOrgAiProviderSettingsRunMock.mockResolvedValue(false);
     resolveOrgDashboardPathMock.mockResolvedValue('/iconic-academy');
   });
 
@@ -227,7 +213,6 @@ describe('org layout persona flags', () => {
     expect(buildAdminMenuSectionsMock).toHaveBeenCalledWith('/iconic-academy', {
       includeReports: false,
       includeAssessments: false,
-      includeOrgAiSettings: false,
     });
   });
 

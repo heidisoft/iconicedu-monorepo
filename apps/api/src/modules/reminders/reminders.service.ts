@@ -1323,6 +1323,9 @@ export class RemindersService {
           title: payload.title,
           learningSpaceTitle: payload.title,
           channelRouteKind: payload.channelRouteKind ?? 'space',
+          // Carried so the push provider can collapse repeat sends of this same
+          // reminder in the device tray instead of stacking them.
+          reminderDedupeKey: job.dedupe_key,
         },
         dedupeKey: `${job.dedupe_key}:activity`,
         refreshOnDedupe: true,
@@ -1401,12 +1404,13 @@ export class RemindersService {
     const learningSpaceId = payload.learningSpaceId ?? job.source_learning_space_id;
     if (!learningSpaceId) return false;
 
+    // Soft-deleted classes are included: delete also archives the class, so a
+    // job for one must be skipped rather than fail open.
     const response = await supabase
       .from('learning_spaces')
       .select('status, archived_at')
       .eq('org_id', job.org_id)
       .eq('id', learningSpaceId)
-      .is('deleted_at', null)
       .maybeSingle<{ status: string | null; archived_at: string | null }>();
 
     if (response.error) {

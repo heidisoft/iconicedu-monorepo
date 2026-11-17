@@ -1,7 +1,6 @@
 import { MessagesService } from '@iconicedu/api/modules/messages/messages.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
-import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import {
   BadRequestException,
   ForbiddenException,
@@ -15,11 +14,6 @@ jest.mock('@iconicedu/api/lib/supabase/service', () => ({
 
 jest.mock('@iconicedu/api/lib/supabase/session', () => ({
   createSupabaseSessionClient: jest.fn(),
-}));
-
-jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
-  apiFeatureFlagKeys: { enableMessageEdit: 'enable-message-edit' },
-  evaluateApiBooleanFlag: jest.fn(),
 }));
 
 /** A thenable, chainable stand-in for a Supabase PostgrestFilterBuilder. */
@@ -64,6 +58,8 @@ function setUpServiceClient(input: {
   senderAccountId?: string;
   /** Simulates the is_edited UPDATE matching zero rows (defaults to a single matching row). */
   messagesUpdateMatchedRows?: Array<{ id: string }>;
+  /** Status of the message's channel (defaults to active). */
+  channelStatus?: string;
 }) {
   const accountId = input.accountId ?? 'account-1';
   const senderAccountId = input.senderAccountId ?? accountId;
@@ -88,6 +84,10 @@ function setUpServiceClient(input: {
     error: null,
   });
   const familyLinksChain = makeChain({ data: null, error: null });
+  const channelsChain = makeChain({
+    data: { status: input.channelStatus ?? 'active', deleted_at: null },
+    error: null,
+  });
   const messageTextUpdateChain = makeChain({ data: null, error: null });
   const messagesUpdateChain = makeChain({
     data: input.messagesUpdateMatchedRows ?? [{ id: MESSAGE_ID }],
@@ -103,6 +103,7 @@ function setUpServiceClient(input: {
     if (table === 'accounts') return accountsChain;
     if (table === 'profiles') return profilesChain;
     if (table === 'family_links') return familyLinksChain;
+    if (table === 'channels') return channelsChain;
     if (table === 'message_text') return messageTextUpdateChain;
     throw new Error(`Unexpected table access in test: ${table}`);
   });
@@ -117,20 +118,22 @@ describe('MessagesService.editTextMessage', () => {
   beforeEach(() => {
     jest.mocked(createSupabaseServiceClient).mockReset();
     jest.mocked(createSupabaseSessionClient).mockReset();
-    jest.mocked(evaluateApiBooleanFlag).mockReset().mockResolvedValue(true);
   });
 
-  it('rejects when the enable-message-edit flag is off', async () => {
-    setUpServiceClient({ messageRow: baseMessageRow() });
-    jest.mocked(evaluateApiBooleanFlag).mockResolvedValue(false);
+  it('rejects edits in an archived conversation', async () => {
+    const { messageTextUpdateChain } = setUpServiceClient({
+      messageRow: baseMessageRow(),
+      channelStatus: 'archived',
+    });
 
     await expect(
       service.editTextMessage(AUTH_USER_ID, 'token', MESSAGE_ID, {
         orgId: ORG_ID,
         messageId: MESSAGE_ID,
-        content: 'nope',
+        content: 'too late',
       }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
+    ).rejects.toThrow('This conversation is archived and read-only');
+    expect(messageTextUpdateChain.update).not.toHaveBeenCalled();
   });
 
   it('updates the message_text payload and marks the message edited', async () => {

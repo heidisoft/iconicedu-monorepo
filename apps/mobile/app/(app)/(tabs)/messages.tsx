@@ -54,8 +54,6 @@ import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { useIsFocused } from '@react-navigation/native';
 import { useMessageDraftChannelIds } from '@/hooks/use-message-draft';
-import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
-import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 type Tab = 'all' | 'dms' | 'channels';
 type ClassroomStudentTab = 'all' | string;
@@ -980,9 +978,6 @@ export default function MessagesScreen() {
   const router = useRouter();
   const isFocused = useIsFocused();
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const enableMessageDrafts = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMessageDrafts,
-  );
 
   const orgId = account?.org_id ?? '';
   const accountId =
@@ -990,10 +985,7 @@ export default function MessagesScreen() {
   const myProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
   const { channelIds: draftChannelIds, refresh: refreshDraftChannelIds } =
-    useMessageDraftChannelIds(
-      { accountId, profileId: myProfileId, orgId },
-      enableMessageDrafts,
-    );
+    useMessageDraftChannelIds({ accountId, profileId: myProfileId, orgId }, true);
   // Re-read AsyncStorage whenever this tab regains focus — a draft saved on
   // the channel/DM screen should show up here as soon as the user backs out.
   React.useEffect(() => {
@@ -1340,7 +1332,7 @@ export default function MessagesScreen() {
           presenceByProfileId={presenceByProfileId}
           currentProfileName={currentProfileName}
           currentProfileKind={profileKind}
-          hasDraft={enableMessageDrafts && draftChannelIds.has(channel.id)}
+          hasDraft={draftChannelIds.has(channel.id)}
           s={s}
           colors={colors}
           onPress={() => {
@@ -1386,7 +1378,6 @@ export default function MessagesScreen() {
       presenceByProfileId,
       currentProfileName,
       profileKind,
-      enableMessageDrafts,
       draftChannelIds,
     ],
   );

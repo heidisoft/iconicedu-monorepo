@@ -185,7 +185,6 @@ describe('EventActions', () => {
         })}
         onClose={onClose}
         canEditSession
-        canUseSeriesRescheduleScopes
         onEditSession={onEditSession}
       />,
     );
@@ -225,38 +224,6 @@ describe('EventActions', () => {
         }),
       );
     });
-  });
-
-  it('hides series-wide scopes for an otherwise-eligible recurring event when the flag is off', async () => {
-    render(
-      <EventActions
-        event={buildEvent({
-          ids: { id: 'schedule-1__2030-04-03T15:00:00.000Z', orgId: 'org-1' },
-          startAt: '2030-04-03T15:00:00.000Z',
-          endAt: '2030-04-03T16:00:00.000Z',
-          timezone: 'UTC',
-          recurrence: {
-            ids: { id: 'recurrence-1', orgId: 'org-1' },
-            rule: { frequency: 'weekly', byWeekday: ['WE'] },
-          },
-        })}
-        onClose={vi.fn()}
-        canEditSession
-        // canUseSeriesRescheduleScopes omitted — defaults to false, matching
-        // the enable-class-schedule-series-reschedule flag's defaultValue.
-        onEditSession={vi.fn(async () => undefined)}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit this session' }));
-    const dialog = screen.getByRole('dialog');
-
-    expect(within(dialog).queryByLabelText('This event')).not.toBeInTheDocument();
-    expect(
-      within(dialog).queryByLabelText('This and following events'),
-    ).not.toBeInTheDocument();
-    expect(within(dialog).queryByLabelText('All events')).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText('Date')).toBeInTheDocument();
   });
 
   it('does not offer series-wide scopes for a non-recurring session', async () => {

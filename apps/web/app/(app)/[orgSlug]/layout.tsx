@@ -22,12 +22,7 @@ import {
   listActiveOrgSubjectCatalog,
   mapOrgSubjectRowsToOptions,
 } from '@iconicedu/web/lib/subjects/queries/org-subject-catalog.query';
-import {
-  enableClassroomCalls,
-  enableAssessments,
-  enableMessageDrafts,
-  enableOrgAiProviderSettings,
-} from '@iconicedu/web/flags';
+import { enableAssessments, enableClassroomCalls } from '@iconicedu/web/flags';
 
 export const metadata: Metadata = {
   title: {
@@ -103,12 +98,6 @@ export default async function Layout({
   const assessmentsEnabled = await enableAssessments.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
-  const messageDraftsEnabled = await enableMessageDrafts.run({
-    identify: { profileId: familyViewResolution.effectiveProfile.id },
-  });
-  const orgAiSettingsEnabled = await enableOrgAiProviderSettings.run({
-    identify: { profileId: familyViewResolution.effectiveProfile.id },
-  });
   const classroomCallsEnabled = await enableClassroomCalls.run({
     identify: { profileId: familyViewResolution.effectiveProfile.id },
   });
@@ -124,10 +113,8 @@ export default async function Layout({
         adminSections={buildAdminMenuSections(`/${orgSlug}`, {
           includeReports,
           includeAssessments: assessmentsEnabled,
-          includeOrgAiSettings: orgAiSettingsEnabled,
         })}
         subjectOptions={subjectOptions}
-        enableMessageDrafts={messageDraftsEnabled}
       >
         {classroomCallsEnabled && <IncomingClassCall />}
         {children}

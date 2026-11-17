@@ -7,16 +7,10 @@ vi.mock('@iconicedu/web/lib/flags/posthog-flags', () => ({
 }));
 
 import {
-  enableAdminSessionAttendanceAnalytics,
   enableChannelCommunications,
-  enableMarketingSitePages,
   enableMessageTypeComposer,
-  enableSessionCompletionCarousel,
   enableMobileAppleSignIn,
-  enableMobileDirectMessageStart,
   enableMobileGoogleSignIn,
-  enableSessionCompletionDisputeDetails,
-  enableSessionCompletionVerifiedDuration,
   getFlagsProviderData,
   isVercelFlagsSdkConfigured,
   webFlags,
@@ -31,6 +25,39 @@ describe('web flags', () => {
     delete process.env.NEXT_PUBLIC_POSTHOG_HOST;
     delete process.env.VERCEL_ENV;
     delete process.env.NEXT_PUBLIC_VERCEL_ENV;
+    delete process.env.ENABLE_CHANNEL_COMMUNICATIONS;
+  });
+
+  it('forces channel communications on from the local env override', async () => {
+    process.env.ENABLE_CHANNEL_COMMUNICATIONS = 'true';
+
+    await expect(
+      (
+        enableChannelCommunications as unknown as {
+          decide: (input: {
+            entities?: { profileId?: string | null };
+          }) => Promise<boolean>;
+        }
+      ).decide({ entities: { profileId: 'profile-1' } }),
+    ).resolves.toBe(true);
+    expect(evaluatePosthogBooleanFlag).not.toHaveBeenCalled();
+  });
+
+  it('ignores the channel communications env override in production', async () => {
+    process.env.ENABLE_CHANNEL_COMMUNICATIONS = 'true';
+    process.env.VERCEL_ENV = 'production';
+    evaluatePosthogBooleanFlag.mockResolvedValueOnce(false);
+
+    await expect(
+      (
+        enableChannelCommunications as unknown as {
+          decide: (input: {
+            entities?: { profileId?: string | null };
+          }) => Promise<boolean>;
+        }
+      ).decide({ entities: { profileId: 'profile-1' } }),
+    ).resolves.toBe(false);
+    expect(evaluatePosthogBooleanFlag).toHaveBeenCalled();
   });
 
   it('declares the channel communications flag with stable metadata', () => {
@@ -45,12 +72,6 @@ describe('web flags', () => {
     expect(webFlags.enableMessageTypeComposer).toBe(enableMessageTypeComposer);
   });
 
-  it('declares the mobile direct message start flag with stable metadata', () => {
-    expect(enableMobileDirectMessageStart.key).toBe('enable-mobile-direct-message-start');
-    expect(enableMobileDirectMessageStart.defaultValue).toBe(false);
-    expect(webFlags.enableMobileDirectMessageStart).toBe(enableMobileDirectMessageStart);
-  });
-
   it('declares the mobile social sign-in flags with stable metadata', () => {
     expect(enableMobileGoogleSignIn.key).toBe('enable-mobile-google-sign-in');
     expect(enableMobileGoogleSignIn.defaultValue).toBe(false);
@@ -59,50 +80,6 @@ describe('web flags', () => {
     expect(enableMobileAppleSignIn.key).toBe('enable-mobile-apple-sign-in');
     expect(enableMobileAppleSignIn.defaultValue).toBe(false);
     expect(webFlags.enableMobileAppleSignIn).toBe(enableMobileAppleSignIn);
-  });
-
-  it('declares the marketing site pages flag with stable metadata', () => {
-    expect(enableMarketingSitePages.key).toBe('enable-marketing-site-pages');
-    expect(enableMarketingSitePages.defaultValue).toBe(false);
-    expect(webFlags.enableMarketingSitePages).toBe(enableMarketingSitePages);
-  });
-
-  it('declares the session completion carousel flag off by default', () => {
-    expect(enableSessionCompletionCarousel.key).toBe('session-completion-carousel');
-    expect(enableSessionCompletionCarousel.defaultValue).toBe(false);
-    expect(webFlags.enableSessionCompletionCarousel).toBe(
-      enableSessionCompletionCarousel,
-    );
-  });
-
-  it('declares admin session attendance analytics off by default', () => {
-    expect(enableAdminSessionAttendanceAnalytics.key).toBe(
-      'admin-session-attendance-analytics',
-    );
-    expect(enableAdminSessionAttendanceAnalytics.defaultValue).toBe(false);
-    expect(webFlags.enableAdminSessionAttendanceAnalytics).toBe(
-      enableAdminSessionAttendanceAnalytics,
-    );
-  });
-
-  it('declares the session completion verified duration flag off by default', () => {
-    expect(enableSessionCompletionVerifiedDuration.key).toBe(
-      'enable-session-completion-verified-duration',
-    );
-    expect(enableSessionCompletionVerifiedDuration.defaultValue).toBe(false);
-    expect(webFlags.enableSessionCompletionVerifiedDuration).toBe(
-      enableSessionCompletionVerifiedDuration,
-    );
-  });
-
-  it('declares the session completion dispute details flag off by default', () => {
-    expect(enableSessionCompletionDisputeDetails.key).toBe(
-      'enable-session-completion-dispute-details',
-    );
-    expect(enableSessionCompletionDisputeDetails.defaultValue).toBe(false);
-    expect(webFlags.enableSessionCompletionDisputeDetails).toBe(
-      enableSessionCompletionDisputeDetails,
-    );
   });
 
   it('does not require FLAGS env to load the catalog', () => {
@@ -166,10 +143,6 @@ describe('web flags', () => {
 
     expect(providerData).toBeTruthy();
     expect(JSON.stringify(providerData)).toContain('enable-channel-communications');
-    expect(JSON.stringify(providerData)).toContain('enable-marketing-site-pages');
     expect(JSON.stringify(providerData)).toContain('enable-message-type-composer');
-    expect(JSON.stringify(providerData)).toContain('enable-mobile-direct-message-start');
-    expect(JSON.stringify(providerData)).toContain('session-completion-carousel');
-    expect(JSON.stringify(providerData)).toContain('admin-session-attendance-analytics');
   });
 });

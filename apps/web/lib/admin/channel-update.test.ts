@@ -4,13 +4,11 @@ const {
   createSupabaseServerClientMock,
   createSupabaseServiceClientMock,
   requireAdminAuthContextMock,
-  ensureSystemProfileIdMock,
   publishActivityEventMock,
 } = vi.hoisted(() => ({
   createSupabaseServerClientMock: vi.fn(),
   createSupabaseServiceClientMock: vi.fn(),
   requireAdminAuthContextMock: vi.fn(),
-  ensureSystemProfileIdMock: vi.fn(),
   publishActivityEventMock: vi.fn(),
 }));
 
@@ -24,10 +22,6 @@ vi.mock('@iconicedu/web/lib/supabase/service', () => ({
 
 vi.mock('@iconicedu/web/lib/admin/_auth-context', () => ({
   requireAdminAuthContext: requireAdminAuthContextMock,
-}));
-
-vi.mock('@iconicedu/web/lib/automation/system-profile', () => ({
-  ensureSystemProfileId: ensureSystemProfileIdMock,
 }));
 
 vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({

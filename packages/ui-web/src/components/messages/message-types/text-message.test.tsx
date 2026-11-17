@@ -57,25 +57,9 @@ describe('TextMessage edit flow', () => {
     expect(screen.queryByText('Edit message')).not.toBeInTheDocument();
   });
 
-  it('does not offer edit when enableMessageEdit is off', async () => {
-    useOptionalMessagesState.mockReturnValue({
-      currentUserId: 'profile-1',
-      enableMessageEdit: false,
-      channel: { collections: { participants: [] } },
-      editTextMessage: vi.fn(),
-    });
-    const user = userEvent.setup();
-
-    render(<TextMessage message={makeMessage()} {...baseBaseProps} />);
-
-    await user.click(screen.getByRole('button', { name: 'More actions' }));
-    expect(screen.queryByText('Edit message')).not.toBeInTheDocument();
-  });
-
   it("does not offer edit for someone else's message", async () => {
     useOptionalMessagesState.mockReturnValue({
       currentUserId: 'profile-2',
-      enableMessageEdit: true,
       channel: { collections: { participants: [] } },
       editTextMessage: vi.fn(),
     });
@@ -96,7 +80,6 @@ describe('TextMessage edit flow', () => {
   it('does not offer edit once the message is outside the edit window', async () => {
     useOptionalMessagesState.mockReturnValue({
       currentUserId: 'profile-1',
-      enableMessageEdit: true,
       channel: { collections: { participants: [] } },
       editTextMessage: vi.fn(),
     });
@@ -120,7 +103,6 @@ describe('TextMessage edit flow', () => {
       .mockResolvedValue(makeMessage({ content: { text: 'Updated text' } }));
     useOptionalMessagesState.mockReturnValue({
       currentUserId: 'profile-1',
-      enableMessageEdit: true,
       channel: { collections: { participants: [] } },
       editTextMessage,
     });
@@ -152,7 +134,6 @@ describe('TextMessage edit flow', () => {
       .mockRejectedValue(new Error('The edit window has passed'));
     useOptionalMessagesState.mockReturnValue({
       currentUserId: 'profile-1',
-      enableMessageEdit: true,
       channel: { collections: { participants: [] } },
       editTextMessage,
     });
@@ -180,7 +161,6 @@ describe('TextMessage edit flow', () => {
     const editTextMessage = vi.fn();
     useOptionalMessagesState.mockReturnValue({
       currentUserId: 'profile-1',
-      enableMessageEdit: true,
       channel: { collections: { participants: [] } },
       editTextMessage,
     });
@@ -203,7 +183,6 @@ describe('TextMessage edit flow', () => {
   it('shows an "(edited)" indicator when the message has been edited', () => {
     useOptionalMessagesState.mockReturnValue({
       currentUserId: 'profile-1',
-      enableMessageEdit: true,
       channel: { collections: { participants: [] } },
       editTextMessage: vi.fn(),
     });
@@ -221,7 +200,6 @@ describe('TextMessage edit flow', () => {
   it('does not show an "(edited)" indicator for an unedited message', () => {
     useOptionalMessagesState.mockReturnValue({
       currentUserId: 'profile-1',
-      enableMessageEdit: true,
       channel: { collections: { participants: [] } },
       editTextMessage: vi.fn(),
     });

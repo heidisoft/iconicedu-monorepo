@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/po
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -74,6 +75,7 @@ import {
   Sparkles,
   Lightbulb,
   Clock,
+  LockKeyhole,
   type LucideIcon,
 } from 'lucide-react';
 import {
@@ -184,11 +186,13 @@ interface MessageInputProps {
      * notes near `handleSend` below.
      */
     clientMessageId?: string,
+    audienceProfileIds?: string[],
   ) => void;
   onAttachFiles?: (
     attachments: Array<{ file: File; durationSeconds?: number }>,
     content?: string,
     clientMessageId?: string,
+    audienceProfileIds?: string[],
   ) => Promise<void> | void;
   placeholder?: string;
   sticky?: boolean;
@@ -218,6 +222,10 @@ interface MessageInputProps {
     timezone: string;
   }) => Promise<void> | void;
   enableMessageReplyReference?: boolean;
+  /** Eligible channel recipients for audience selection. Omit for DMs and managed support conversations. */
+  audienceParticipants?: UserProfileVM[];
+  /** Fixed audience description for a private thread reply composer. */
+  inheritedAudienceLabel?: string | null;
   enableMessageListFormatting?: boolean;
   replyTarget?: { senderName: string; snippet: string } | null;
   onClearReply?: () => void;
@@ -349,6 +357,8 @@ export function MessageInput({
   enableScheduledSend = false,
   onScheduleSend,
   enableMessageReplyReference = false,
+  audienceParticipants,
+  inheritedAudienceLabel,
   enableMessageListFormatting = false,
   replyTarget = null,
   onClearReply,
@@ -357,6 +367,7 @@ export function MessageInput({
   enableMessageSendReliability = false,
 }: MessageInputProps) {
   const [content, setContent] = React.useState('');
+  const [audienceProfileIds, setAudienceProfileIds] = React.useState<string[]>([]);
   const pendingAttachmentsClientMessageIdRef = React.useRef<{
     key: string;
     id: string;
@@ -773,23 +784,34 @@ export function MessageInput({
         try {
           setIsAttachingFile(true);
           setAttachmentError(null);
-          await onAttachFiles(
-            await Promise.all(
-              pendingAttachments.map(async (pendingAttachment) => ({
-                file: pendingAttachment.file,
-                durationSeconds:
-                  pendingAttachment.kind === 'audio'
-                    ? await resolveAudioDurationSeconds(
-                        pendingAttachment.file,
-                        pendingAttachment.durationSeconds,
-                      )
-                    : undefined,
-              })),
-            ),
-            trimmedContent || undefined,
-            attachmentClientMessageId,
+          const resolvedAttachments = await Promise.all(
+            pendingAttachments.map(async (pendingAttachment) => ({
+              file: pendingAttachment.file,
+              durationSeconds:
+                pendingAttachment.kind === 'audio'
+                  ? await resolveAudioDurationSeconds(
+                      pendingAttachment.file,
+                      pendingAttachment.durationSeconds,
+                    )
+                  : undefined,
+            })),
           );
+          if (audienceProfileIds.length) {
+            await onAttachFiles(
+              resolvedAttachments,
+              trimmedContent || undefined,
+              attachmentClientMessageId,
+              audienceProfileIds,
+            );
+          } else {
+            await onAttachFiles(
+              resolvedAttachments,
+              trimmedContent || undefined,
+              attachmentClientMessageId,
+            );
+          }
           resetComposer();
+          setAudienceProfileIds([]);
         } catch {
           // Keep the attachments + content in the composer so nothing is
           // lost; the user can inspect/retry (Send reuses the same
@@ -829,8 +851,19 @@ export function MessageInput({
       const sendText = async () => {
         try {
           setIsSendingText(true);
-          await Promise.resolve(onSend(trimmedContent, mentions, null, clientMessageId));
+          await Promise.resolve(
+            audienceProfileIds.length
+              ? onSend(
+                  trimmedContent,
+                  mentions,
+                  null,
+                  clientMessageId,
+                  audienceProfileIds,
+                )
+              : onSend(trimmedContent, mentions, null, clientMessageId),
+          );
           resetComposer();
+          setAudienceProfileIds([]);
         } catch {
           // Leave the composer content intact on failure so the draft (if
           // enabled) survives and the user doesn't lose what they typed.
@@ -845,6 +878,7 @@ export function MessageInput({
     }
   }, [
     content,
+    audienceProfileIds,
     currentUserId,
     enableMessageSendReliability,
     hasActiveRecording,
@@ -862,6 +896,10 @@ export function MessageInput({
       return;
     }
     const trimmedContent = content.trim();
+    if (audienceProfileIds.length) {
+      toast.error('Private channel messages must be sent now, not scheduled.');
+      return;
+    }
     if (!trimmedContent) {
       setScheduleError('Write a message before scheduling it.');
       return;
@@ -905,6 +943,7 @@ export function MessageInput({
     };
     void scheduleMessage();
   }, [
+    audienceProfileIds,
     content,
     currentUserId,
     hasActiveRecording,
@@ -1543,6 +1582,28 @@ export function MessageInput({
     [handleTyping, readOnly],
   );
 
+  const selectableAudienceParticipants = React.useMemo(
+    () =>
+      (audienceParticipants ?? []).filter(
+        (participant) => participant.ids.id !== currentUserId,
+      ),
+    [audienceParticipants, currentUserId],
+  );
+  const selectedAudienceNames = selectableAudienceParticipants
+    .filter((participant) => audienceProfileIds.includes(participant.ids.id))
+    .map((participant) => participant.profile.displayName);
+  const parentAudienceIds = selectableAudienceParticipants
+    .filter((participant) => participant.kind === 'guardian')
+    .map((participant) => participant.ids.id);
+  const tutorAudienceIds = selectableAudienceParticipants
+    .filter((participant) => participant.kind === 'educator')
+    .map((participant) => participant.ids.id);
+  const audienceButtonLabel = audienceProfileIds.length
+    ? selectedAudienceNames.length <= 2
+      ? selectedAudienceNames.join(', ')
+      : `${selectedAudienceNames.length} people`
+    : 'Everyone in this channel';
+
   return (
     <div
       className={
@@ -1552,6 +1613,82 @@ export function MessageInput({
       }
     >
       <div className="mx-auto w-full max-w-[960px]">
+        {inheritedAudienceLabel ? (
+          <div className="mb-2 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+            Replying privately · {inheritedAudienceLabel}
+          </div>
+        ) : selectableAudienceParticipants.length ? (
+          <div className="mb-2 flex items-center gap-2">
+            <span className="text-xs font-medium text-muted-foreground">To:</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 max-w-full gap-1.5 rounded-full px-2.5 text-xs"
+                  aria-label={`Message audience: ${audienceButtonLabel}`}
+                >
+                  {audienceProfileIds.length ? (
+                    <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : null}
+                  <span className="truncate">{audienceButtonLabel}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-72">
+                <DropdownMenuLabel>Who can see this message?</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={() => setAudienceProfileIds([])}>
+                  Everyone in this channel
+                </DropdownMenuItem>
+                {parentAudienceIds.length ? (
+                  <DropdownMenuItem
+                    onSelect={() => setAudienceProfileIds(parentAudienceIds)}
+                  >
+                    Parent{parentAudienceIds.length === 1 ? '' : 's'}
+                  </DropdownMenuItem>
+                ) : null}
+                {tutorAudienceIds.length ? (
+                  <DropdownMenuItem
+                    onSelect={() => setAudienceProfileIds(tutorAudienceIds)}
+                  >
+                    Tutor{tutorAudienceIds.length === 1 ? '' : 's'}
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Specific people</DropdownMenuLabel>
+                {selectableAudienceParticipants.map((participant) => (
+                  <DropdownMenuCheckboxItem
+                    key={participant.ids.id}
+                    checked={audienceProfileIds.includes(participant.ids.id)}
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={(checked) =>
+                      setAudienceProfileIds((current) =>
+                        checked
+                          ? Array.from(new Set([...current, participant.ids.id]))
+                          : current.filter((id) => id !== participant.ids.id),
+                      )
+                    }
+                  >
+                    <span className="truncate">{participant.profile.displayName}</span>
+                    <span className="ml-auto text-[10px] uppercase text-muted-foreground">
+                      {participant.kind === 'guardian'
+                        ? 'Parent'
+                        : participant.kind === 'educator'
+                          ? 'Tutor'
+                          : participant.kind}
+                    </span>
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {audienceProfileIds.length ? (
+              <span className="truncate text-xs text-muted-foreground">
+                Visible only to {selectedAudienceNames.join(', ')} and you
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         {showAiSuggestedReplies &&
         (isSuggestedRepliesLoading || suggestedReplies !== null) ? (
           <div className="mb-2 rounded-xl border border-border bg-muted/20 p-3">

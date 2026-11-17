@@ -3,23 +3,22 @@ import type { LearningSpaceDetail } from '@iconicedu/web/lib/admin/learning-spac
 import { toOccurrenceKeyInTimezone } from '@iconicedu/web/lib/admin/learning-space-schedule-hash';
 
 const createSupabaseServerClientMock = vi.fn();
-const createSupabaseServiceClientMock = vi.fn();
 const buildOrgBySlugMock = vi.fn();
 const getAccountByAuthUserIdInOrgMock = vi.fn();
 const getProfileByAccountIdMock = vi.fn();
 const getLearningSpaceDetailMock = vi.fn();
+const getClassScheduleSessionContextMock = vi.fn();
 const apiPostMock = vi.fn();
 const revalidatePathMock = vi.fn();
-const enableClassScheduleSeriesRescheduleRunMock = vi.fn();
 
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: (...args: unknown[]) =>
     createSupabaseServerClientMock(...args),
 }));
 
-vi.mock('@iconicedu/web/lib/supabase/service', () => ({
-  createSupabaseServiceClient: (...args: unknown[]) =>
-    createSupabaseServiceClientMock(...args),
+vi.mock('@iconicedu/web/lib/api/schedules', () => ({
+  getClassScheduleSessionContext: (...args: unknown[]) =>
+    getClassScheduleSessionContextMock(...args),
 }));
 
 vi.mock('@iconicedu/web/lib/org/builders/org.builder', () => ({
@@ -54,12 +53,6 @@ vi.mock('next/cache', () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
 }));
 
-vi.mock('@iconicedu/web/flags', () => ({
-  enableClassScheduleSeriesReschedule: {
-    run: (...args: unknown[]) => enableClassScheduleSeriesRescheduleRunMock(...args),
-  },
-}));
-
 import { updateClassScheduleSessionAction } from './update-class-schedule-session';
 
 function createServerSupabase() {
@@ -74,54 +67,26 @@ function createServerSupabase() {
   };
 }
 
-function createServiceSupabase() {
+function createSessionContext(
+  overrides?: Partial<{
+    scheduleId: string;
+    title: string;
+    startAt: string;
+    endAt: string;
+    timezone: string | null;
+    sourceLearningSpaceId: string | null;
+    sourceChannelId: string | null;
+  }>,
+) {
   return {
-    from: vi.fn((table: string) => {
-      if (table === 'class_schedules') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: {
-                      id: 'schedule-1',
-                      org_id: 'org-1',
-                      source_learning_space_id: 'space-1',
-                      source_channel_id: 'channel-1',
-                      timezone: 'America/New_York',
-                      title: 'Algebra',
-                      start_at: '2026-03-21T14:00:00.000Z',
-                      end_at: '2026-03-21T15:00:00.000Z',
-                    },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      if (table === 'learning_spaces') {
-        return {
-          select: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              eq: vi.fn(() => ({
-                is: vi.fn(() => ({
-                  maybeSingle: vi.fn(async () => ({
-                    data: { status: 'active', archived_at: null },
-                    error: null,
-                  })),
-                })),
-              })),
-            })),
-          })),
-        };
-      }
-
-      throw new Error(`Unexpected table ${table}`);
-    }),
+    scheduleId: 'schedule-1',
+    title: 'Algebra',
+    startAt: '2026-03-21T14:00:00.000Z',
+    endAt: '2026-03-21T15:00:00.000Z',
+    timezone: 'America/New_York',
+    sourceLearningSpaceId: 'space-1',
+    sourceChannelId: 'channel-1',
+    ...overrides,
   };
 }
 
@@ -179,17 +144,16 @@ function createLearningSpaceDetail(
 describe('updateClassScheduleSessionAction', () => {
   beforeEach(() => {
     createSupabaseServerClientMock.mockReset();
-    createSupabaseServiceClientMock.mockReset();
+    getClassScheduleSessionContextMock.mockReset();
     buildOrgBySlugMock.mockReset();
     getAccountByAuthUserIdInOrgMock.mockReset();
     getProfileByAccountIdMock.mockReset();
     getLearningSpaceDetailMock.mockReset();
     apiPostMock.mockReset();
     revalidatePathMock.mockReset();
-    enableClassScheduleSeriesRescheduleRunMock.mockReset();
 
     createSupabaseServerClientMock.mockResolvedValue(createServerSupabase());
-    createSupabaseServiceClientMock.mockReturnValue(createServiceSupabase());
+    getClassScheduleSessionContextMock.mockResolvedValue(createSessionContext());
     buildOrgBySlugMock.mockResolvedValue({ id: 'org-1', slug: 'iconic-academy' });
     getAccountByAuthUserIdInOrgMock.mockResolvedValue({
       data: { id: 'account-1', org_id: 'org-1', primary_role: 'owner' },
@@ -198,9 +162,6 @@ describe('updateClassScheduleSessionAction', () => {
       data: { id: 'profile-1' },
     });
     apiPostMock.mockResolvedValue({ success: true, mode: 'recurring' });
-    // ON by default in this suite so the existing scope:'all' tests exercise
-    // real behavior; the dedicated OFF test below overrides this per-case.
-    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(true);
   });
 
   it('delegates recurring reschedules to the API without rewriting exceptions', async () => {
@@ -436,12 +397,9 @@ describe('updateClassScheduleSessionAction', () => {
     ).rejects.toThrow('Only recurring sessions support editing the whole series.');
   });
 
-  it("scope 'all' rejects the request when enable-class-schedule-series-reschedule is off", async () => {
-    enableClassScheduleSeriesRescheduleRunMock.mockResolvedValue(false);
-    getLearningSpaceDetailMock.mockResolvedValue(
-      createLearningSpaceDetail({
-        rule: { frequency: 'weekly', timezone: 'America/New_York' },
-      }),
+  it('rejects edits when the API reports the classroom is archived', async () => {
+    getClassScheduleSessionContextMock.mockRejectedValue(
+      new Error('Archived classrooms cannot be changed.'),
     );
 
     await expect(
@@ -449,13 +407,71 @@ describe('updateClassScheduleSessionAction', () => {
         orgSlug: 'iconic-academy',
         scheduleId: 'schedule-1',
         occurrenceKey: '2026-03-21T14:00:00.000Z',
-        date: '2026-03-24',
-        startTime: '14:00',
-        endTime: '15:00',
+        date: '2026-03-22',
+        startTime: '11:30',
+        endTime: '12:45',
         timezone: 'America/New_York',
-        scope: 'all',
       }),
-    ).rejects.toThrow('This feature is not available yet.');
+    ).rejects.toThrow('Archived classrooms cannot be changed.');
+    expect(getLearningSpaceDetailMock).not.toHaveBeenCalled();
     expect(apiPostMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects edits when the API reports the schedule was not found', async () => {
+    getClassScheduleSessionContextMock.mockRejectedValue(new Error('Schedule not found'));
+
+    await expect(
+      updateClassScheduleSessionAction({
+        orgSlug: 'iconic-academy',
+        scheduleId: 'missing-schedule',
+        occurrenceKey: '2026-03-21T14:00:00.000Z',
+        date: '2026-03-22',
+        startTime: '11:30',
+        endTime: '12:45',
+        timezone: 'America/New_York',
+      }),
+    ).rejects.toThrow('Schedule not found');
+    expect(getLearningSpaceDetailMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects manual schedules with no classroom without touching the API mutation', async () => {
+    getClassScheduleSessionContextMock.mockResolvedValue(
+      createSessionContext({ sourceLearningSpaceId: null, sourceChannelId: null }),
+    );
+
+    await expect(
+      updateClassScheduleSessionAction({
+        orgSlug: 'iconic-academy',
+        scheduleId: 'schedule-1',
+        occurrenceKey: '2026-03-21T14:00:00.000Z',
+        date: '2026-03-22',
+        startTime: '11:30',
+        endTime: '12:45',
+        timezone: 'America/New_York',
+      }),
+    ).rejects.toThrow('Session not found.');
+    expect(getLearningSpaceDetailMock).not.toHaveBeenCalled();
+    expect(apiPostMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('asks the API for the edit context scoped to the resolved org', async () => {
+    getLearningSpaceDetailMock.mockResolvedValue(createLearningSpaceDetail());
+    apiPostMock.mockResolvedValue({ success: true, mode: 'recurring' });
+
+    await updateClassScheduleSessionAction({
+      orgSlug: 'iconic-academy',
+      scheduleId: 'schedule-1',
+      occurrenceKey: '2026-03-21T14:00:00.000Z',
+      date: '2026-03-22',
+      startTime: '11:30',
+      endTime: '12:45',
+      timezone: 'America/New_York',
+    });
+
+    expect(getClassScheduleSessionContextMock).toHaveBeenCalledWith(expect.anything(), {
+      orgId: 'org-1',
+      scheduleId: 'schedule-1',
+    });
   });
 });

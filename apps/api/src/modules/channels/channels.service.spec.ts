@@ -1,8 +1,10 @@
 import { ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
-import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
+import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
+
+const mockEvaluateApiBooleanFlag = evaluateApiBooleanFlag as jest.Mock;
 
 /** A thenable, chainable stand-in for a directly-awaited (no .maybeSingle()) query. */
 function makeThenableChain(result: { data: unknown; error: null }) {
@@ -21,12 +23,21 @@ function makeThenableChain(result: { data: unknown; error: null }) {
 
 const mockRpc = jest.fn();
 const mockMaybeSingle = jest.fn();
-const mockEvaluateApiBooleanFlag = evaluateApiBooleanFlag as jest.Mock;
 
 // Build a fluent chain that returns `mockMaybeSingle` at the leaf.
 function makeChain() {
   const chain: Record<string, jest.Mock> = {};
-  const methods = ['from', 'select', 'eq', 'in', 'is', 'order', 'limit', 'insert'];
+  const methods = [
+    'from',
+    'select',
+    'eq',
+    'in',
+    'is',
+    'order',
+    'limit',
+    'insert',
+    'update',
+  ];
   for (const m of methods) {
     chain[m] = jest.fn().mockReturnValue(chain);
   }
@@ -55,10 +66,9 @@ jest.mock('@iconicedu/api/lib/supabase/service', () => ({
 }));
 jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
   apiFeatureFlagKeys: {
-    enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
     enableClassroomCalls: 'classroom-calls',
   },
-  evaluateApiBooleanFlag: jest.fn(),
+  evaluateApiBooleanFlag: jest.fn(async () => true),
 }));
 
 // PrismaService is injected but not used by markRead.
@@ -211,13 +221,14 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
       'order',
       'limit',
       'insert',
+      'update',
     ];
     for (const m of serviceMethods) {
       (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
         mockServiceClient,
       );
     }
-    mockEvaluateApiBooleanFlag.mockResolvedValue(true);
+    mockRpc.mockResolvedValue({ data: true, error: null });
   });
 
   it('loads the target profile through the service client when creating a DM', async () => {
@@ -407,6 +418,189 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
       channelId: 'dm-channel-1',
       topic: 'Ms Barbara',
     });
+    expect(mockServiceClient.insert).not.toHaveBeenCalled();
+  });
+
+  it('does not create a tutor DM when no active class connects the pair', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'student-auth-user-1' } },
+      error: null,
+    });
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+          kind: 'child',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'educator-profile-1', org_id: 'org-1', kind: 'educator' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'student-account-1' }, error: null });
+    mockRpc.mockResolvedValueOnce({ data: false, error: null });
+
+    const result = await svc.ensureDirectMessageChannel('student-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toBeNull();
+    expect(mockRpc).toHaveBeenCalledWith('tutor_contact_has_active_class', {
+      p_org_id: 'org-1',
+      p_educator_profile_id: 'educator-profile-1',
+      p_contact_profile_id: 'student-profile-1',
+    });
+    expect(mockServiceClient.insert).not.toHaveBeenCalled();
+  });
+
+  it('does not apply the class check to staff DMs', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'staff-auth-user-1' } },
+      error: null,
+    });
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'staff-profile-1',
+          org_id: 'org-1',
+          account_id: 'staff-account-1',
+          kind: 'staff',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'student-profile-1', org_id: 'org-1', kind: 'child' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'staff-account-1' }, error: null });
+    mockServiceClient.insert
+      .mockResolvedValueOnce({ error: null })
+      .mockResolvedValueOnce({ error: null });
+
+    await svc.ensureDirectMessageChannel('staff-token', {
+      orgId: 'org-1',
+      profileId: 'staff-profile-1',
+      otherProfileId: 'student-profile-1',
+    });
+
+    expect(mockRpc).not.toHaveBeenCalled();
+    expect(mockServiceClient.insert).toHaveBeenCalledTimes(2);
+  });
+
+  it('reopens a tutor DM that was archived with its class once the pair is connected again', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'student-auth-user-1' } },
+      error: null,
+    });
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+          kind: 'child',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'educator-profile-1', org_id: 'org-1', kind: 'educator' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'student-account-1' }, error: null });
+    let isCallCount = 0;
+    mockServiceClient.is.mockImplementation(() => {
+      isCallCount += 1;
+      if (isCallCount === 4 || isCallCount === 5) {
+        return Promise.resolve({ data: [{ channel_id: 'dm-channel-1' }], error: null });
+      }
+      return mockServiceClient;
+    });
+    mockServiceClient.limit.mockResolvedValueOnce({
+      data: [
+        { id: 'dm-channel-1', status: 'archived', updated_at: '2026-11-13T00:00:00Z' },
+      ],
+      error: null,
+    });
+    mockRpc
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: true, error: null });
+
+    const result = await svc.ensureDirectMessageChannel('student-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toMatchObject({ channelId: 'dm-channel-1' });
+    expect(mockRpc).toHaveBeenCalledWith('reopen_class_lifecycle_dm', {
+      p_org_id: 'org-1',
+      p_channel_id: 'dm-channel-1',
+      p_actor_profile_id: 'student-profile-1',
+    });
+    expect(mockServiceClient.update).not.toHaveBeenCalled();
+    expect(mockServiceClient.insert).not.toHaveBeenCalled();
+  });
+
+  it('keeps a hand-archived tutor DM archived and returns it as read-only history', async () => {
+    const svc = makeService();
+    mockAuthGetUser.mockResolvedValueOnce({
+      data: { user: { id: 'student-auth-user-1' } },
+      error: null,
+    });
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: {
+          id: 'student-profile-1',
+          org_id: 'org-1',
+          account_id: 'student-account-1',
+          kind: 'child',
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'educator-profile-1', org_id: 'org-1', kind: 'educator' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { id: 'student-account-1' }, error: null });
+    let isCallCount = 0;
+    mockServiceClient.is.mockImplementation(() => {
+      isCallCount += 1;
+      if (isCallCount === 4 || isCallCount === 5) {
+        return Promise.resolve({ data: [{ channel_id: 'dm-channel-1' }], error: null });
+      }
+      return mockServiceClient;
+    });
+    mockServiceClient.limit.mockResolvedValueOnce({
+      data: [
+        { id: 'dm-channel-1', status: 'archived', updated_at: '2026-11-13T00:00:00Z' },
+      ],
+      error: null,
+    });
+    mockRpc
+      .mockResolvedValueOnce({ data: true, error: null })
+      .mockResolvedValueOnce({ data: false, error: null });
+
+    const result = await svc.ensureDirectMessageChannel('student-token', {
+      orgId: 'org-1',
+      profileId: 'student-profile-1',
+      otherProfileId: 'educator-profile-1',
+    });
+
+    expect(result).toMatchObject({ channelId: 'dm-channel-1' });
+    expect(mockRpc).toHaveBeenCalledWith('reopen_class_lifecycle_dm', {
+      p_org_id: 'org-1',
+      p_channel_id: 'dm-channel-1',
+      p_actor_profile_id: 'student-profile-1',
+    });
+    expect(mockServiceClient.update).not.toHaveBeenCalled();
     expect(mockServiceClient.insert).not.toHaveBeenCalled();
   });
 });
@@ -842,11 +1036,71 @@ describe('ChannelsService.getDirectMessages', () => {
       is_manually_unread: true,
     });
   });
+
+  function makeDmClient(channelStatus: string) {
+    const channelsChain = makeThenableChain({
+      data: [
+        {
+          id: 'channel-1',
+          org_id: 'org-1',
+          topic: 'Tutor DM',
+          description: null,
+          kind: 'dm',
+          status: channelStatus,
+          updated_at: '2026-01-01T00:00:00.000Z',
+          ui_defaults: null,
+        },
+      ],
+      error: null,
+    });
+    const membersChain = makeThenableChain({
+      data: [{ channel_id: 'channel-1', profile_id: 'my-profile', profile: null }],
+      error: null,
+    });
+    const emptyChain = makeThenableChain({ data: [], error: null });
+    const client = {
+      from: jest.fn((table: string) => {
+        if (table === 'channel_members') return membersChain;
+        if (table === 'channels') return channelsChain;
+        if (table === 'channel_read_state') return emptyChain;
+        throw new Error(`Unexpected table: ${table}`);
+      }),
+    };
+    return { client, channelsChain };
+  }
+
+  it('lists active DMs only', async () => {
+    const { client, channelsChain } = makeDmClient('active');
+    (createSupabaseSessionClient as jest.Mock).mockReturnValueOnce(client);
+
+    await makeService().getDirectMessages('token', {
+      orgId: 'org-1',
+      profileId: 'my-profile',
+      accountId: 'my-account',
+    });
+
+    expect(channelsChain.in).toHaveBeenCalledWith('status', ['active']);
+  });
+
+  it('opens an archived DM by id as read-only history', async () => {
+    const { client, channelsChain } = makeDmClient('archived');
+    (createSupabaseSessionClient as jest.Mock).mockReturnValueOnce(client);
+
+    const result = await makeService().getDirectMessageChannelMeta('token', {
+      orgId: 'org-1',
+      profileId: 'my-profile',
+      accountId: 'my-account',
+      channelId: 'channel-1',
+    });
+
+    expect(channelsChain.in).toHaveBeenCalledWith('status', ['active', 'archived']);
+    expect(result).toMatchObject({ id: 'channel-1', is_archived: true });
+  });
 });
 
-it('keeps classroom-call contact and general DM creation behind their respective server permissions', async () => {
+it('keeps classroom-call contact behind the classroom-calls server flag', async () => {
   jest.clearAllMocks();
-  mockEvaluateApiBooleanFlag.mockResolvedValue(false);
+  mockEvaluateApiBooleanFlag.mockResolvedValueOnce(false);
   await expect(
     makeService().ensureDirectMessageChannel(
       'token',
@@ -854,17 +1108,8 @@ it('keeps classroom-call contact and general DM creation behind their respective
       { classroomCallId: 'call' },
     ),
   ).resolves.toBeNull();
+  expect(mockEvaluateApiBooleanFlag).toHaveBeenCalledTimes(1);
   expect(mockEvaluateApiBooleanFlag).toHaveBeenLastCalledWith(
     expect.objectContaining({ flagKey: 'classroom-calls' }),
-  );
-  await expect(
-    makeService().ensureDirectMessageChannel('token', {
-      orgId: 'org',
-      profileId: 'recipient',
-      otherProfileId: 'tutor',
-    }),
-  ).resolves.toBeNull();
-  expect(mockEvaluateApiBooleanFlag).toHaveBeenLastCalledWith(
-    expect.objectContaining({ flagKey: 'enable-mobile-direct-message-start' }),
   );
 });
