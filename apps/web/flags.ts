@@ -126,40 +126,6 @@ export const enableAssessments = flag<boolean, { profileId?: string | null }>({
   },
 });
 
-export const enableAiRefine = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableAiRefine,
-  description:
-    'Shows the "Refine with AI" composer affordance that rewrites a draft via the Anthropic API before sending.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableAiRefine,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
-export const enableAiSuggestedReplies = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableAiSuggestedReplies,
-  description:
-    'Shows AI-generated suggested reply chips above the composer; suggestions are never auto-sent.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableAiSuggestedReplies,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableMessagePinning = flag<boolean, { profileId?: string | null }>({
   key: platformFeatureFlagKeys.enableMessagePinning,
   description: 'Allows staff and educators to pin messages within a channel.',
@@ -389,8 +355,6 @@ export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | nu
 export const webFlags = {
   enableClassroomWhiteboard,
   enableClassroomMeetingSettings,
-  enableAiRefine,
-  enableAiSuggestedReplies,
   enableAssessments,
   enableChannelCommunications,
   enableMessagePinning,

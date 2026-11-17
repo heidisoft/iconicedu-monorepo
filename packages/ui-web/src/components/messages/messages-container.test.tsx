@@ -199,6 +199,14 @@ describe('MessagesContainer', () => {
     expect(message.core.sender.ids.id).toBe('profile-2');
   });
 
+  it('enables AI refine and suggested replies on the main composer', async () => {
+    render(<MessagesContainer channel={channel} currentUserId="profile-1" />);
+
+    await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+    expect(latestMessageInputProps.current?.showAiRefine).toBe(true);
+    expect(latestMessageInputProps.current?.showAiSuggestedReplies).toBe(true);
+  });
+
   it('offers audience selection to a non-staff channel sender', async () => {
     render(
       <MessagesContainer

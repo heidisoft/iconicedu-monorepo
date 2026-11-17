@@ -103,8 +103,6 @@ export interface MessagesContainerProps {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  showAiRefine?: boolean;
-  showAiSuggestedReplies?: boolean;
   enableMessagePinning?: boolean;
   enableMessageSearch?: boolean;
   enableScheduledSend?: boolean;
@@ -408,8 +406,6 @@ export function MessagesContainer({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
-  showAiRefine = false,
-  showAiSuggestedReplies = false,
   enableMessagePinning = false,
   enableScheduledSend = false,
   enableMessageReplyReference = false,
@@ -2350,8 +2346,8 @@ export function MessagesContainer({
               currentUserId={resolvedCurrentUserId}
               channelId={channel.ids.id}
               showCreateMessageTypeButton={showCreateMessageTypeButton}
-              showAiRefine={showAiRefine}
-              showAiSuggestedReplies={showAiSuggestedReplies}
+              showAiRefine
+              showAiSuggestedReplies
               prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}

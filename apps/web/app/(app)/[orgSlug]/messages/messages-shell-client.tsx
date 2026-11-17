@@ -145,8 +145,6 @@ type MessagesShellClientProps = {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  showAiRefine?: boolean;
-  showAiSuggestedReplies?: boolean;
   enableMessagePinning?: boolean;
   enableMessageSearch?: boolean;
   enableScheduledSend?: boolean;
@@ -190,8 +188,6 @@ export function MessagesShellClient({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
-  showAiRefine = false,
-  showAiSuggestedReplies = false,
   enableMessagePinning = false,
   enableMessageSearch = false,
   enableScheduledSend = false,
@@ -554,8 +550,6 @@ export function MessagesShellClient({
         currentUserProfile={currentUserProfile}
         readOnly={readOnly}
         showCreateMessageTypeButton={showCreateMessageTypeButton}
-        showAiRefine={showAiRefine}
-        showAiSuggestedReplies={showAiSuggestedReplies}
         enableMessagePinning={enableMessagePinning}
         enableMessageSearch={enableMessageSearch}
         enableScheduledSend={enableScheduledSend}
