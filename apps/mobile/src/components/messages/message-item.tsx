@@ -36,6 +36,10 @@ import type {
   ReactionVM,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
+import {
+  getMessageVisibilityCopy,
+  type MessageAudienceParticipant,
+} from './message-visibility';
 import type { PresenceDisplayStatus } from '@/hooks/use-online-profile-ids';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { openMessageLink, splitMessageTextByLinks } from '@/lib/messages/link-opening';
@@ -939,30 +943,31 @@ function InlineUnreadDivider({ count, colors }: { count?: number; colors: AppCol
   );
 }
 
-function getVisibilityLabel(message: MessageVM): string | null {
-  const visibility = message.core.visibility;
-  if (visibility.type === 'all') return null;
-  if (visibility.type === 'sender-only') return 'Only visible to you';
-  if (visibility.type === 'recipient-only') return 'Only visible to recipient';
-  if (visibility.type === 'specific-users') {
-    return 'Only visible to selected people';
-  }
-  return 'Private';
-}
-
 export function VisibilityBadge({
   message,
   colors,
+  currentProfileId,
+  audienceParticipants,
 }: {
   message: MessageVM;
   colors: AppColors;
+  currentProfileId?: string;
+  audienceParticipants?: MessageAudienceParticipant[];
 }) {
-  const label = getVisibilityLabel(message);
-  if (!label) return null;
+  const copy = getMessageVisibilityCopy({
+    visibility: message.core.visibility,
+    currentProfileId,
+    participants: audienceParticipants,
+  });
+  if (!copy) return null;
 
   return (
     <Tooltip delayDuration={0}>
-      <TooltipTrigger accessibilityRole="button" accessibilityLabel={label} hitSlop={8}>
+      <TooltipTrigger
+        accessibilityRole="button"
+        accessibilityLabel={`${copy.summary}. Tap to show names`}
+        hitSlop={8}
+      >
         <View
           testID="message-visibility-badge"
           style={[
@@ -974,13 +979,33 @@ export function VisibilityBadge({
           ]}
         >
           <EyeOff size={10} color={colors.textMuted} />
-          <Text style={[visibilityBadgeStyles.label, { color: colors.textMuted }]}>
-            {label}
+          <Text
+            style={[visibilityBadgeStyles.label, { color: colors.textMuted }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {copy.summary}
           </Text>
         </View>
       </TooltipTrigger>
-      <TooltipContent sideOffset={6} className="rounded-full px-2.5 py-1">
-        <Text style={{ fontSize: 12, fontWeight: '600', color: '#f8fafc' }}>{label}</Text>
+      <TooltipContent
+        sideOffset={6}
+        className="rounded-xl px-3 py-2"
+        style={visibilityBadgeStyles.tooltip}
+      >
+        <View style={{ gap: 3 }}>
+          <Text style={{ fontSize: 12, fontWeight: '700', color: '#f8fafc' }}>
+            Visible to
+          </Text>
+          {copy.audienceNames.map((name, index) => (
+            <Text
+              key={`${name}:${index}`}
+              style={{ fontSize: 12, fontWeight: '500', color: '#f8fafc' }}
+            >
+              {name}
+            </Text>
+          ))}
+        </View>
       </TooltipContent>
     </Tooltip>
   );
@@ -990,6 +1015,8 @@ const visibilityBadgeStyles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
+    maxWidth: 190,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 999,
     paddingHorizontal: 6,
@@ -997,8 +1024,13 @@ const visibilityBadgeStyles = StyleSheet.create({
     gap: 4,
   },
   label: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '600',
+  },
+  tooltip: {
+    maxWidth: 280,
+    borderRadius: 12,
   },
 });
 
@@ -1782,7 +1814,13 @@ function makeStyles(colors: AppColors) {
     contentColOwn: { alignItems: 'flex-end' },
 
     // ── Name + time row (inside bubble) ──────────────────────────────────────
-    nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 2 },
+    nameRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'baseline',
+      gap: 6,
+      marginBottom: 2,
+    },
     nameRowOwn: { justifyContent: 'flex-end' },
     senderName: { fontSize: 15, fontWeight: '700' },
     msgTime: { fontSize: 12, color: colors.textFaint },
@@ -2171,6 +2209,7 @@ export type MessageItemProps = {
   onProfilePress?: (user: MessageVM['core']['sender']) => void;
   currentProfileId?: string;
   currentAccountId?: string;
+  audienceParticipants?: MessageAudienceParticipant[];
   isReadOnly?: boolean;
   isThreadMessage?: boolean;
   showActionControls?: boolean;
@@ -2196,6 +2235,7 @@ export const MessageItem: React.FC<MessageItemProps> = ({
   onProfilePress,
   currentProfileId,
   currentAccountId,
+  audienceParticipants,
   isReadOnly,
   isThreadMessage = false,
   showActionControls = true,
@@ -2989,7 +3029,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <View style={[s.nameRow, ownInChannel && s.nameRowOwn]}>
               {ownInChannel ? (
                 <>
-                  <VisibilityBadge message={message} colors={colors} />
+                  <VisibilityBadge
+                    message={message}
+                    colors={colors}
+                    currentProfileId={currentProfileId}
+                    audienceParticipants={audienceParticipants}
+                  />
                   <Text style={s.msgTime}>{time}</Text>
                   <RoleNameIndicator
                     name="You"
@@ -3010,7 +3055,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 </Pressable>
               )}
               {!ownInChannel && !isThreadMessage && (
-                <VisibilityBadge message={message} colors={colors} />
+                <VisibilityBadge
+                  message={message}
+                  colors={colors}
+                  currentProfileId={currentProfileId}
+                  audienceParticipants={audienceParticipants}
+                />
               )}
               {!ownInChannel && <Text style={s.msgTime}>{time}</Text>}
               {isPinned && <PinnedIndicator colors={colors} />}
@@ -3172,7 +3222,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
             <View style={[s.nameRow, ownInChannel && s.nameRowOwn]}>
               {ownInChannel ? (
                 <>
-                  <VisibilityBadge message={message} colors={colors} />
+                  <VisibilityBadge
+                    message={message}
+                    colors={colors}
+                    currentProfileId={currentProfileId}
+                    audienceParticipants={audienceParticipants}
+                  />
                   <Text style={s.msgTime}>{time}</Text>
                   <RoleNameIndicator
                     name="You"
@@ -3193,7 +3248,12 @@ export const MessageItem: React.FC<MessageItemProps> = ({
                 </Pressable>
               )}
               {!ownInChannel && !isThreadMessage && (
-                <VisibilityBadge message={message} colors={colors} />
+                <VisibilityBadge
+                  message={message}
+                  colors={colors}
+                  currentProfileId={currentProfileId}
+                  audienceParticipants={audienceParticipants}
+                />
               )}
               {!ownInChannel && <Text style={s.msgTime}>{time}</Text>}
               {isPinned && <PinnedIndicator colors={colors} />}

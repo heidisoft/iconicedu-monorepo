@@ -957,6 +957,7 @@ export default function ChannelConversationScreen() {
             channelId={channelId ?? ''}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            audienceParticipants={channelMembers}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}

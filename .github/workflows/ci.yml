@@ -590,7 +590,26 @@ jobs:
           EXISTING_STATUS=$(echo "$BRANCH_DATA" | jq -r '.status // ""')
 
           if [[ -n "$EXISTING_ID" && "$EXISTING_STATUS" == "MIGRATIONS_FAILED" ]]; then
-            echo "::warning::Supabase hosted migrations report MIGRATIONS_FAILED; retaining the branch because explicit repository migrations are authoritative."
+            echo "::warning::Supabase hosted migrations report MIGRATIONS_FAILED; recreating the disposable PR preview branch."
+            supabase branches delete "$EXISTING_ID" \
+              --project-ref "$SUPABASE_PROJECT_REF" \
+              --experimental \
+              --yes
+
+            for i in $(seq 1 30); do
+              BRANCH_DATA=$(get_branch_data)
+              DELETED_ID=$(echo "$BRANCH_DATA" | jq -r '.id // ""')
+              if [[ -z "$DELETED_ID" ]]; then
+                break
+              fi
+              if [[ $i -eq 30 ]]; then
+                echo "::error::Timed out waiting for failed Supabase preview branch deletion"
+                exit 1
+              fi
+              sleep 2
+            done
+
+            create_branch
           fi
 
           BRANCH_DATA=$(get_branch_data)
@@ -598,7 +617,7 @@ jobs:
 
           if [[ -n "$EXISTING_ID" ]]; then
             echo "Branch $SUPABASE_BRANCH already exists — skipping create and seed"
-          else
+          elif [[ "$BRANCH_NEW" != "true" ]]; then
             create_branch
           fi
           echo "branch_new=$BRANCH_NEW" >> "$GITHUB_OUTPUT"

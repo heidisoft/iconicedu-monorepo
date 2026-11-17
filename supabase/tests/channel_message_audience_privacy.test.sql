@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(10);
+select plan(12);
 
 select has_function('public', 'can_access_thread', array['uuid'], 'Thread access follows its parent message');
 select has_function('public', 'can_access_channel_file_object', array['text'], 'Storage access follows message audience');
@@ -41,6 +41,11 @@ insert into public.channels(id, org_id, kind, topic, visibility, purpose) values
   ('a5000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'channel', 'Support', 'private', 'support'),
   ('a5000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000001', 'channel', 'Classroom', 'private', 'learning-space');
 
+insert into public.channel_members(id, org_id, channel_id, profile_id) values
+  ('a7000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'a5000000-0000-4000-8000-000000000002', 'a4000000-0000-4000-8000-000000000001'),
+  ('a7000000-0000-4000-8000-000000000002', 'a1000000-0000-4000-8000-000000000001', 'a5000000-0000-4000-8000-000000000002', 'a4000000-0000-4000-8000-000000000002'),
+  ('a7000000-0000-4000-8000-000000000003', 'a1000000-0000-4000-8000-000000000001', 'a5000000-0000-4000-8000-000000000002', 'a4000000-0000-4000-8000-000000000003');
+
 insert into public.messages(id, org_id, channel_id, sender_profile_id, type, visibility_type, visibility_user_ids)
 values
   ('a6000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'a5000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000001', 'text', 'specific-users', array['a4000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000002']::uuid[]),
@@ -56,6 +61,16 @@ select ok((select 'a4000000-0000-4000-8000-000000000003'::uuid = any(visibility_
 select ok((select not ('a4000000-0000-4000-8000-000000000001'::uuid = any(visibility_user_ids)) from public.messages where id = 'a6000000-0000-4000-8000-000000000003'), 'Support reply does not inherit stale staff audience');
 select is((select visibility_type::text from public.messages where id = 'a6000000-0000-4000-8000-000000000004'), 'specific-users', 'Non-support thread reply inherits parent visibility');
 select is((select visibility_user_ids from public.messages where id = 'a6000000-0000-4000-8000-000000000004'), array['a4000000-0000-4000-8000-000000000001', 'a4000000-0000-4000-8000-000000000002']::uuid[], 'Non-support thread reply inherits parent audience');
+select is(
+  (select unread_count from public.channel_read_state where channel_id = 'a5000000-0000-4000-8000-000000000002' and account_id = 'a3000000-0000-4000-8000-000000000002' and thread_id is null),
+  1,
+  'Visible restricted channel message increments unread count'
+);
+select is(
+  (select unread_count from public.channel_read_state where channel_id = 'a5000000-0000-4000-8000-000000000002' and account_id = 'a3000000-0000-4000-8000-000000000003' and thread_id is null),
+  0,
+  'Hidden restricted channel message does not increment unread count'
+);
 
 select * from finish();
 rollback;

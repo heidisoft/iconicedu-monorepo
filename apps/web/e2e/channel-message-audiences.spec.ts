@@ -48,6 +48,9 @@ test.describe('channel message audiences', () => {
       await staff.page.getByText(/^Parent(s)?$/).click();
       await send(staff.page, parentText);
       await expect(staff.page.getByText(/Only visible to/).last()).toBeVisible();
+      await staff.page.getByTestId('message-visibility-badge').last().click();
+      await expect(staff.page.getByText('Visible to', { exact: true })).toBeVisible();
+      await staff.page.getByTestId('message-visibility-badge').last().click();
 
       await parent.page.reload();
       await expect(parent.page.getByText(publicText, { exact: true })).toBeVisible();
