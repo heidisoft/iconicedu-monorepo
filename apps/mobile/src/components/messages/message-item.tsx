@@ -979,12 +979,20 @@ export function VisibilityBadge({
           ]}
         >
           <EyeOff size={10} color={colors.textMuted} />
-          <Text style={[visibilityBadgeStyles.label, { color: colors.textMuted }]}>
+          <Text
+            style={[visibilityBadgeStyles.label, { color: colors.textMuted }]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
             {copy.summary}
           </Text>
         </View>
       </TooltipTrigger>
-      <TooltipContent sideOffset={6} className="rounded-full px-2.5 py-1">
+      <TooltipContent
+        sideOffset={6}
+        className="rounded-xl px-3 py-2"
+        style={visibilityBadgeStyles.tooltip}
+      >
         <View style={{ gap: 3 }}>
           <Text style={{ fontSize: 12, fontWeight: '700', color: '#f8fafc' }}>
             Visible to
@@ -1007,6 +1015,8 @@ const visibilityBadgeStyles = StyleSheet.create({
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
+    maxWidth: 190,
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 999,
     paddingHorizontal: 6,
@@ -1014,8 +1024,13 @@ const visibilityBadgeStyles = StyleSheet.create({
     gap: 4,
   },
   label: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '600',
+  },
+  tooltip: {
+    maxWidth: 280,
+    borderRadius: 12,
   },
 });
 
@@ -1799,7 +1814,13 @@ function makeStyles(colors: AppColors) {
     contentColOwn: { alignItems: 'flex-end' },
 
     // ── Name + time row (inside bubble) ──────────────────────────────────────
-    nameRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 2 },
+    nameRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'baseline',
+      gap: 6,
+      marginBottom: 2,
+    },
     nameRowOwn: { justifyContent: 'flex-end' },
     senderName: { fontSize: 15, fontWeight: '700' },
     msgTime: { fontSize: 12, color: colors.textFaint },

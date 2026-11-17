@@ -475,7 +475,10 @@ describe('MessageItem', () => {
     expect(
       screen.getByLabelText('Only visible to you + 1 other. Tap to show names'),
     ).toBeTruthy();
-    expect(screen.getByText('Only visible to you + 1 other')).toBeTruthy();
+    expect(screen.getByText('Only visible to you + 1 other')).toHaveProp(
+      'numberOfLines',
+      1,
+    );
   });
 
   it('shows the pinned indicator when isPinned is true (issue #264 P2)', () => {

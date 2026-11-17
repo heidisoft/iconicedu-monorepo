@@ -11,6 +11,8 @@ interface VisibilityBadgeProps {
   message: MessageVM;
 }
 
+// flag-exempt: privacy/readability maintenance for the existing restricted-message indicator.
+
 export function getVisibilityCopy(
   visibility: MessageVM['core']['visibility'],
   participantNames: Map<string, string>,

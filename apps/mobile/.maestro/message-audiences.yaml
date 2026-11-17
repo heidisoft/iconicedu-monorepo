@@ -16,7 +16,9 @@ name: Channel member message audiences
 - assertVisible: 'Only visible to you.*other.*'
 - tapOn: 'Only visible to you.*other.*'
 - assertVisible: 'Visible to'
-- tapOn: 'Only visible to you.*other.*'
+- tapOn:
+    point: '5%,5%'
+- assertNotVisible: 'Visible to'
 - tapOn: 'Tutors'
 - tapOn:
     id: message-input

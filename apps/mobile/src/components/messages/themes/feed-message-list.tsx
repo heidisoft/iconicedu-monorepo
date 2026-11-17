@@ -2042,6 +2042,7 @@ const makeStyles = (C: FeedColors) =>
       minWidth: 0,
     },
     headerRight: {
+      maxWidth: '58%',
       flexShrink: 0,
       alignItems: 'flex-end',
       gap: 4,
@@ -2052,6 +2053,7 @@ const makeStyles = (C: FeedColors) =>
       gap: 6,
     },
     visibilityBadgeSlot: {
+      maxWidth: '100%',
       minHeight: 18,
       alignItems: 'flex-end',
     },
