@@ -7,10 +7,6 @@ import {
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
-import {
-  apiFeatureFlagKeys,
-  evaluateApiBooleanFlag,
-} from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 
 type DmParticipant = {
@@ -804,16 +800,6 @@ export class ChannelsService {
     ) {
       return null;
     }
-
-    const canCreateDirectMessage = await evaluateApiBooleanFlag({
-      flagKey: apiFeatureFlagKeys.enableMobileDirectMessageStart,
-      distinctId: input.profileId,
-      personProperties: {
-        profileId: input.profileId,
-        orgId: input.orgId,
-      },
-    });
-    if (!canCreateDirectMessage) return null;
 
     const supabase = createSupabaseSessionClient(accessToken);
     const writeSupabase = createSupabaseServiceClient();

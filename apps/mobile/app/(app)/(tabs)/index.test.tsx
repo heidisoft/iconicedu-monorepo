@@ -9,6 +9,7 @@ const mockRefetchLearningSpaces = jest.fn(() => Promise.resolve());
 const mockRefetchSupportChannel = jest.fn(() => Promise.resolve());
 const mockRefetchOrgSchedules = jest.fn(() => Promise.resolve());
 const mockRouterPush = jest.fn();
+const mockRefetchCompletedSessions = jest.fn(() => Promise.resolve());
 
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
@@ -110,6 +111,23 @@ jest.mock('@/hooks/use-upcoming-sessions', () => ({
   }),
 }));
 
+jest.mock('@/hooks/use-completed-sessions', () => ({
+  useCompletedSessions: () => ({
+    sessions: [{ id: 'completion-1' }],
+    summary: { completed: 7, pending: 2 },
+    isOrgAdminView: false,
+    isPending: false,
+    refetch: mockRefetchCompletedSessions,
+  }),
+}));
+
+jest.mock('@/components/sessions/session-completed-carousel', () => ({
+  SessionCompletedCarousel: ({ sessions }: { sessions: unknown[] }) => {
+    const { Text } = require('react-native');
+    return <Text>{`completed-carousel:${sessions.length}`}</Text>;
+  },
+}));
+
 jest.mock('@/hooks/use-family-links', () => ({
   useFamilyLinks: () => ({
     childProfiles: [],
@@ -198,8 +216,22 @@ describe('HomeScreen', () => {
     expect(mockRefetchLearningSpaces).toHaveBeenCalledTimes(1);
     expect(mockRefetchSupportChannel).toHaveBeenCalledTimes(1);
     expect(mockRefetchOrgSchedules).toHaveBeenCalledTimes(1);
+    expect(mockRefetchCompletedSessions).toHaveBeenCalledTimes(1);
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ['familyLinks', 'org-1', 'account-1'],
     });
+  });
+
+  it('shows the session completion summary tile and the recently completed carousel', () => {
+    const screen = render(<HomeScreen />);
+
+    expect(screen.getByText('Sessions completed')).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        'Session completion summary. 7 sessions completed, 2 awaiting confirmation.',
+      ),
+    ).toBeTruthy();
+    expect(screen.getByText('completed-carousel:1')).toBeTruthy();
+    expect(screen.queryByText('Completed Classes')).toBeNull();
   });
 });

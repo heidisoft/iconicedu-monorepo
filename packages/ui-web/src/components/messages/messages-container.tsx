@@ -103,8 +103,6 @@ export interface MessagesContainerProps {
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  showAiRefine?: boolean;
-  showAiSuggestedReplies?: boolean;
   enableMessagePinning?: boolean;
   enableMessageSearch?: boolean;
   enableScheduledSend?: boolean;
@@ -123,9 +121,7 @@ export interface MessagesContainerProps {
   }) => Promise<MessageVM[]>;
   joinLiveSession?: () => Promise<void>;
   /** Gates draft autosave/restore for the main channel composer. Default off. */
-  enableMessageDrafts?: boolean;
   /** Gates the "Edit message" action on the sender's own eligible text messages. Default off. */
-  enableMessageEdit?: boolean;
   /** Gates clientMessageId-based idempotent retry of failed sends. Default off. */
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
@@ -408,8 +404,6 @@ export function MessagesContainer({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
-  showAiRefine = false,
-  showAiSuggestedReplies = false,
   enableMessagePinning = false,
   enableScheduledSend = false,
   enableMessageReplyReference = false,
@@ -418,8 +412,6 @@ export function MessagesContainer({
   messageWriteClient,
   uploadFileMessage,
   joinLiveSession,
-  enableMessageDrafts = false,
-  enableMessageEdit = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
 }: MessagesContainerProps) {
@@ -612,7 +604,7 @@ export function MessagesContainer({
   const currentAccountId = resolvedCurrentUserProfile?.ids.accountId ?? '';
   const draftScope = useMemo(
     () =>
-      enableMessageDrafts && currentAccountId && currentUserId
+      currentAccountId && currentUserId
         ? {
             accountId: currentAccountId,
             profileId: currentUserId,
@@ -621,13 +613,7 @@ export function MessagesContainer({
             threadId: null,
           }
         : null,
-    [
-      enableMessageDrafts,
-      currentAccountId,
-      currentUserId,
-      channel.ids.orgId,
-      channel.ids.id,
-    ],
+    [currentAccountId, currentUserId, channel.ids.orgId, channel.ids.id],
   );
   const typingParticipants = useMemo(
     () =>
@@ -1980,7 +1966,7 @@ export function MessagesContainer({
   ]);
 
   useEffect(() => {
-    if (readOnly || !enableMessageEdit) {
+    if (readOnly) {
       setEditTextMessage(async () => null);
       return;
     }
@@ -1997,7 +1983,6 @@ export function MessagesContainer({
     });
   }, [
     channel.ids.orgId,
-    enableMessageEdit,
     messageWriteClient,
     readOnly,
     setEditTextMessage,
@@ -2350,8 +2335,8 @@ export function MessagesContainer({
               currentUserId={resolvedCurrentUserId}
               channelId={channel.ids.id}
               showCreateMessageTypeButton={showCreateMessageTypeButton}
-              showAiRefine={showAiRefine}
-              showAiSuggestedReplies={showAiSuggestedReplies}
+              showAiRefine
+              showAiSuggestedReplies
               prefillRequest={composerPrefillRequest}
               onTypingStart={handleTypingStart}
               onTypingStop={handleTypingStop}
@@ -2386,7 +2371,7 @@ export function MessagesContainer({
               enableMessageListFormatting={enableMessageListFormatting}
               replyTarget={enableMessageReplyReference ? replyTarget : null}
               onClearReply={clearReplyTo}
-              enableMessageDrafts={enableMessageDrafts}
+              enableMessageDrafts
               draftScope={draftScope}
               enableMessageSendReliability={enableMessageSendReliability}
             />

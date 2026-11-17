@@ -215,29 +215,12 @@ describe('isMessageEditEligible', () => {
 });
 
 describe('MessageActionsSheet — Edit row', () => {
-  it('does not show Edit when enableEdit is false, even for the sender’s own message', () => {
-    render(
-      <MessageActionsSheet
-        visible
-        message={makeTextMessage()}
-        isOwn
-        enableEdit={false}
-        onClose={noop}
-        onReact={noop}
-        onThread={noop}
-        onDelete={noop}
-      />,
-    );
-    expect(screen.queryByText('Edit message')).toBeNull();
-  });
-
-  it('does not show Edit for someone else’s message even when enableEdit is true', () => {
+  it('does not show Edit for someone else’s message', () => {
     render(
       <MessageActionsSheet
         visible
         message={makeTextMessage()}
         isOwn={false}
-        enableEdit
         onClose={noop}
         onReact={noop}
         onThread={noop}
@@ -257,7 +240,6 @@ describe('MessageActionsSheet — Edit row', () => {
         visible
         message={message}
         isOwn
-        enableEdit
         onClose={onClose}
         onReact={noop}
         onThread={noop}
@@ -278,7 +260,6 @@ describe('MessageActionsSheet — Edit row', () => {
         message={makeTextMessage()}
         isOwn
         isReadOnly
-        enableEdit
         onClose={noop}
         onReact={noop}
         onThread={noop}

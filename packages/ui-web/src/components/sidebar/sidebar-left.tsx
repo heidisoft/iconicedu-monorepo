@@ -271,14 +271,12 @@ export function SidebarLeft({
   isPersonaSwitchEnabled,
   isPersonaAddEnabled,
   adminSections,
-  enableMessageDrafts = false,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   data: SidebarLeftDataVM;
   subjectOptions?: string[];
   activePath?: string | null;
   /** Gates the "Draft" label on DM/classroom rows with a saved composer draft. Default off. */
-  enableMessageDrafts?: boolean;
   onLogout?: () => Promise<void> | void;
   onboardingStatus?: UserOnboardingStatusVM | null;
   onProfileSave?: (input: ProfileSaveInput) => Promise<void> | void;
@@ -520,7 +518,7 @@ export function SidebarLeft({
     [ownDirectMessages, visibleLearningSpaces],
   );
   const draftChannelIds = useDraftChannelIds({
-    enabled: enableMessageDrafts,
+    enabled: true,
     accountId: userProfile.ids.accountId,
     profileId: userProfile.ids.id,
     channels: draftIndicatorChannels,

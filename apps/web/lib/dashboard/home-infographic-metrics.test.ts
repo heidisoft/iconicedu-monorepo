@@ -166,38 +166,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     vi.clearAllMocks();
   });
 
-  it('keeps the completed-session carousel/summary off when its rollout flag is disabled, but still reads completions for the Completed Classes fallback count', async () => {
-    mockApi([], []);
-
-    const result = await buildDashboardHomeInfographicMetrics({
-      supabase: {} as never,
-      orgId: 'org-1',
-      orgSlug: 'iconic-academy',
-      now: NOW,
-      currentUserProfile: {
-        kind: 'child',
-        ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
-      } as never,
-      sessionCompletionCarouselEnabled: false,
-    });
-
-    expect(result.completedSessionsPending).toEqual([]);
-    expect(result.sessionCompletionSummary).toBeNull();
-    // Still fetched (unflagged) so the "Completed Classes" elapsed-time fallback
-    // can tell a confirmed/disputed occurrence apart from a merely-elapsed one —
-    // see completionLookup/disputedLookup in buildActiveRoleMetrics.
-    expect(apiGetMock).toHaveBeenCalledWith('/session-completions', {
-      orgId: 'org-1',
-      profileId: 'child-1',
-      limit: 50,
-    });
-    expect(apiGetMock).not.toHaveBeenCalledWith(
-      '/session-completions/summary',
-      expect.anything(),
-    );
-  });
-
-  it('returns only actionable completions when the rollout flag is enabled', async () => {
+  it('returns only actionable completions and the per-profile summary for non-staff viewers', async () => {
     const baseCompletion = {
       id: 'completion-pending',
       orgId: 'org-1',
@@ -252,7 +221,6 @@ describe('buildDashboardHomeInfographicMetrics', () => {
         kind: 'child',
         ids: { id: 'child-1', orgId: 'org-1', accountId: 'account-c1' },
       } as never,
-      sessionCompletionCarouselEnabled: true,
     });
 
     expect(result.completedSessionsPending.map((item) => item.id)).toEqual([
@@ -616,7 +584,7 @@ describe('buildDashboardHomeInfographicMetrics', () => {
     );
   });
 
-  it('feeds the staff "Sessions completed" tile from the org-wide summary even with the carousel flag off', async () => {
+  it('feeds the staff "Sessions completed" tile from the org-wide summary', async () => {
     mockApi(
       [],
       [],
@@ -635,7 +603,6 @@ describe('buildDashboardHomeInfographicMetrics', () => {
         kind: 'staff',
         ids: { id: 'staff-1', orgId: 'org-1', accountId: 'account-staff' },
       } as never,
-      sessionCompletionCarouselEnabled: false,
     });
 
     expect(result.sessionCompletionSummary).toEqual({ completed: 318, pending: 12 });
@@ -667,7 +634,6 @@ describe('buildDashboardHomeInfographicMetrics', () => {
         kind: 'educator',
         ids: { id: 'educator-admin-1', orgId: 'org-1', accountId: 'account-ea1' },
       } as never,
-      sessionCompletionCarouselEnabled: false,
       isOrgAdminView: true,
     });
 

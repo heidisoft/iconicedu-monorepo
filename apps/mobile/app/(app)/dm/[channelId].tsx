@@ -101,19 +101,12 @@ export default function DmConversationScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
-  const enableMobileDirectMessageStart = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-  );
   const enableMessageReplyReference = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageReplyReference,
   );
   const enableMessageMarkUnread = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
-  const enableMessageDrafts = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMessageDrafts,
-  );
-  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
   const enableMobileMessageComposerParity = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileMessageComposerParity,
   );
@@ -298,13 +291,7 @@ export default function DmConversationScreen() {
 
   const handleProfileMessagePress = useCallback(
     async (user: UserProfileVM) => {
-      if (
-        !enableMobileDirectMessageStart ||
-        !orgId ||
-        !profileId ||
-        !user.ids.id ||
-        user.ids.id === profileId
-      ) {
+      if (!orgId || !profileId || !user.ids.id || user.ids.id === profileId) {
         return;
       }
 
@@ -341,7 +328,7 @@ export default function DmConversationScreen() {
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [enableMobileDirectMessageStart, orgId, profileId, queryClient, router],
+    [orgId, profileId, queryClient, router],
   );
 
   // ── Long-press actions sheet state ──
@@ -1024,7 +1011,7 @@ export default function DmConversationScreen() {
             onScheduleSend={p2.scheduleSend}
             quoteReplyTo={quoteReplyTarget}
             onCancelQuoteReply={() => setQuoteReplyTarget(null)}
-            enableDrafts={enableMessageDrafts}
+            enableDrafts
             draftScope={
               orgId && profileId && accountId && channelId
                 ? { accountId, profileId, orgId, channelId }
@@ -1113,9 +1100,7 @@ export default function DmConversationScreen() {
         user={profileUser}
         onClose={() => setProfileUser(null)}
         onMessagePress={
-          enableMobileDirectMessageStart &&
-          profileUser &&
-          profileUser.ids.id !== profileId
+          profileUser && profileUser.ids.id !== profileId
             ? () => handleProfileMessagePress(profileUser)
             : undefined
         }
@@ -1137,7 +1122,6 @@ export default function DmConversationScreen() {
         onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
         onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
         isChannelUnread={isChannelUnread}
-        enableEdit={enableMessageEdit}
         onEdit={handleEditMessage}
       />
 

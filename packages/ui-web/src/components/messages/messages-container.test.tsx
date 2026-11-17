@@ -199,6 +199,14 @@ describe('MessagesContainer', () => {
     expect(message.core.sender.ids.id).toBe('profile-2');
   });
 
+  it('enables AI refine and suggested replies on the main composer', async () => {
+    render(<MessagesContainer channel={channel} currentUserId="profile-1" />);
+
+    await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+    expect(latestMessageInputProps.current?.showAiRefine).toBe(true);
+    expect(latestMessageInputProps.current?.showAiSuggestedReplies).toBe(true);
+  });
+
   it('offers audience selection to a non-staff channel sender', async () => {
     render(
       <MessagesContainer
@@ -955,14 +963,13 @@ describe('MessagesContainer', () => {
     });
   });
 
-  describe('message drafts flag plumbing', () => {
-    it('passes a draftScope and the flag through to MessageInput when enabled', async () => {
+  describe('message drafts plumbing', () => {
+    it('always enables drafts on the main composer with a draftScope', async () => {
       render(
         <MessagesContainer
           channel={channel}
           currentUserId="profile-1"
           currentUserProfile={channel.collections.participants[0]}
-          enableMessageDrafts
         />,
       );
 
@@ -978,19 +985,12 @@ describe('MessagesContainer', () => {
       });
     });
 
-    it('never builds a draftScope when the flag is off, even with a resolvable profile', async () => {
-      render(
-        <MessagesContainer
-          channel={channel}
-          currentUserId="profile-1"
-          currentUserProfile={channel.collections.participants[0]}
-        />,
-      );
+    it('skips the draftScope when the sender profile cannot be resolved', async () => {
+      render(<MessagesContainer channel={channel} currentUserId="unknown-profile" />);
 
       await waitFor(() => {
         expect(latestMessageInputProps.current).not.toBeNull();
       });
-      expect(latestMessageInputProps.current?.enableMessageDrafts).toBe(false);
       expect(latestMessageInputProps.current?.draftScope).toBeNull();
     });
   });

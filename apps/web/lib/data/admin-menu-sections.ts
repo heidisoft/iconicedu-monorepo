@@ -5,7 +5,6 @@ export function buildAdminMenuSections(
   options: {
     includeReports?: boolean;
     includeAssessments?: boolean;
-    includeOrgAiSettings?: boolean;
   } = {},
 ): AdminMenuSectionVM[] {
   const activityLinks = [
@@ -71,6 +70,7 @@ export function buildAdminMenuSections(
       title: 'Settings',
       iconKey: 'system',
       links: [
+        { title: 'General', url: `${basePath}/admin/settings/general` },
         { title: 'Subjects', url: `${basePath}/admin/settings/subjects` },
         { title: 'Activity controls', url: `${basePath}/admin/settings/activity` },
         { title: 'Roles & policies', url: `${basePath}/admin/settings/roles` },
@@ -78,14 +78,6 @@ export function buildAdminMenuSections(
       ],
     },
   ];
-
-  if (options.includeOrgAiSettings) {
-    const settingsSection = sections.find((section) => section.title === 'Settings');
-    settingsSection?.links.unshift({
-      title: 'General',
-      url: `${basePath}/admin/settings/general`,
-    });
-  }
 
   if (options.includeAssessments) {
     sections.splice(1, 0, {

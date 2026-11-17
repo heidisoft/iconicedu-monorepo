@@ -5,10 +5,7 @@ import {
   findMarketingRegion,
 } from '@iconicedu/ui-web';
 import { notFound } from 'next/navigation';
-import {
-  assertMarketingSitePagesEnabled,
-  resolveMarketingLoginHref,
-} from '../../_lib/marketing-site-pages';
+import { resolveMarketingLoginHref } from '../../_lib/marketing-site-pages';
 import { breadcrumbJsonLd, createMarketingMetadata, webPageJsonLd } from '../../seo';
 import { StructuredData } from '../../structured-data';
 
@@ -44,7 +41,6 @@ export async function generateMetadata({ params }: RegionalPageProps): Promise<M
 }
 
 export default async function RegionalPage({ params }: RegionalPageProps) {
-  await assertMarketingSitePagesEnabled();
   const { regionSlug } = await params;
   const region = findMarketingRegion(regionSlug);
 

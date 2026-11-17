@@ -77,19 +77,12 @@ export default function ChannelConversationScreen() {
   const { data: account } = useAccount();
   const { data: profile } = useProfile();
   const { colors } = useTheme();
-  const enableMobileDirectMessageStart = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-  );
   const enableMessageReplyReference = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageReplyReference,
   );
   const enableMessageMarkUnread = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageMarkUnread,
   );
-  const enableMessageDrafts = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableMessageDrafts,
-  );
-  const enableMessageEdit = useMobileFeatureFlag(mobileFeatureFlagKeys.enableMessageEdit);
   const enableMobileMessageComposerParity = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMobileMessageComposerParity,
   );
@@ -844,13 +837,7 @@ export default function ChannelConversationScreen() {
   const handleUnreadViewed = markChannelRead;
   const handleProfileMessagePress = useCallback(
     async (user: UserProfileVM) => {
-      if (
-        !enableMobileDirectMessageStart ||
-        !orgId ||
-        !profileId ||
-        !user.ids.id ||
-        user.ids.id === profileId
-      ) {
+      if (!orgId || !profileId || !user.ids.id || user.ids.id === profileId) {
         return;
       }
 
@@ -887,7 +874,7 @@ export default function ChannelConversationScreen() {
         Alert.alert('Unable to open direct message', 'Please try again.');
       }
     },
-    [enableMobileDirectMessageStart, orgId, profileId, queryClient, router],
+    [orgId, profileId, queryClient, router],
   );
   const emptyStateCopy = buildMobileChannelEmptyStateCopy({
     channelKind: isSpaceChannel
@@ -1016,7 +1003,7 @@ export default function ChannelConversationScreen() {
             profileId={profileId}
             enableScheduledSend={p2.enableScheduledSend}
             onScheduleSend={p2.scheduleSend}
-            enableDrafts={enableMessageDrafts}
+            enableDrafts
             draftScope={
               orgId && profileId && accountId && channelId
                 ? { accountId, profileId, orgId, channelId }
@@ -1108,9 +1095,7 @@ export default function ChannelConversationScreen() {
         user={profileUser}
         onClose={() => setProfileUser(null)}
         onMessagePress={
-          enableMobileDirectMessageStart &&
-          profileUser &&
-          profileUser.ids.id !== profileId
+          profileUser && profileUser.ids.id !== profileId
             ? () => handleProfileMessagePress(profileUser)
             : undefined
         }
@@ -1132,7 +1117,6 @@ export default function ChannelConversationScreen() {
         onQuoteReply={enableMessageReplyReference ? handleQuoteReply : undefined}
         onMarkUnread={enableMessageMarkUnread ? handleMarkUnread : undefined}
         isChannelUnread={isChannelUnread}
-        enableEdit={enableMessageEdit}
         onEdit={handleEditMessage}
       />
 

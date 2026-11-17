@@ -86,7 +86,7 @@ rating below their name; staff and child confirmations are not listed there.
 Recipient records are supplemented with the current schedule roster and family
 links when a tutor or parent has no response record.
 
-The existing `admin-session-attendance-analytics` flag still controls the dashboard.
+The attendance analytics dashboard is available to every org admin.
 `flag-exempt: maintenance of existing attendance reporting date limits, confirmation
 accuracy, and table presentation` covers the shared table and API corrections.
 Deploy the API before the web app to include pending tutors and individual ratings.

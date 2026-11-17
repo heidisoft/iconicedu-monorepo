@@ -126,6 +126,7 @@ describe('buildAdminMenuSections', () => {
       '/admin/channels',
       '/admin/classrooms',
       '/admin/settings/activity',
+      '/admin/settings/general',
       '/admin/settings/roles',
       '/admin/settings/subjects',
       '/admin/tools',
@@ -140,18 +141,11 @@ describe('buildAdminMenuSections', () => {
     expect(links).toHaveLength(implementedAdminPaths.size);
   });
 
-  it('only shows General settings (AI provider config) behind includeOrgAiSettings', () => {
-    const withoutFlag = buildAdminMenuSections('/iconic-academy');
-    const settingsWithoutFlag = withoutFlag.find(
+  it('lists General settings (AI provider config) first in the Settings section', () => {
+    const settings = buildAdminMenuSections('/iconic-academy').find(
       (section) => section.title === 'Settings',
     );
-    expect(settingsWithoutFlag?.links.map((link) => link.title)).not.toContain('General');
-
-    const withFlag = buildAdminMenuSections('/iconic-academy', {
-      includeOrgAiSettings: true,
-    });
-    const settingsWithFlag = withFlag.find((section) => section.title === 'Settings');
-    expect(settingsWithFlag?.links).toContainEqual({
+    expect(settings?.links[0]).toEqual({
       title: 'General',
       url: '/iconic-academy/admin/settings/general',
     });

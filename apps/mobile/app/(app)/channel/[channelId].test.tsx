@@ -1,8 +1,10 @@
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 const mockUseLocalSearchParams = jest.fn();
-const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
+const mockRouterPush = jest.fn();
+const mockUseRouter = jest.fn(() => ({ back: jest.fn(), push: mockRouterPush }));
+const mockEnsureDirectMessageChannelForProfiles = jest.fn();
 const mockUseIsFocused = jest.fn(() => true);
 const mockFetchIsChannelMember = jest.fn();
 const mockConversationHeader = jest.fn(() => null);
@@ -90,6 +92,11 @@ jest.mock('@/lib/api/queries', () => ({
       orgId,
       accountId,
     ],
+    directMessages: (orgId: string, profileId: string) => [
+      'directMessages',
+      orgId,
+      profileId,
+    ],
     channelMembership: (orgId: string, channelId: string, profileId: string) => [
       'channelMembership',
       orgId,
@@ -103,6 +110,8 @@ jest.mock('@/lib/api/queries', () => ({
     unreadCount: 0,
   })),
   fetchIsChannelMember: (...args: unknown[]) => mockFetchIsChannelMember(...args),
+  ensureDirectMessageChannelForProfiles: (...args: unknown[]) =>
+    mockEnsureDirectMessageChannelForProfiles(...args),
   markChannelReadState: jest.fn(),
   sendTextMessage: jest.fn(),
   sendFileMessage: jest.fn(),
@@ -154,7 +163,31 @@ jest.mock('@/components/messages/message-actions-sheet', () => ({
 }));
 
 jest.mock('@/components/messages/channel-info-sheet', () => ({
-  ChannelInfoSheet: () => null,
+  ChannelInfoSheet: ({
+    onProfilePress,
+  }: {
+    onProfilePress: (user: { ids: { id: string } }) => void;
+  }) => {
+    const { Text } = require('react-native');
+    return (
+      <Text onPress={() => onProfilePress({ ids: { id: 'prof-2' } })}>open-profile</Text>
+    );
+  },
+}));
+
+jest.mock('@/components/messages/profile-sheet', () => ({
+  ProfileSheet: ({
+    visible,
+    onMessagePress,
+  }: {
+    visible: boolean;
+    onMessagePress?: () => void;
+  }) => {
+    const { Text } = require('react-native');
+    return visible && onMessagePress ? (
+      <Text onPress={onMessagePress}>message-user</Text>
+    ) : null;
+  },
 }));
 
 jest.mock('@/components/messages/space-sessions-tab', () => ({
@@ -282,6 +315,40 @@ describe('ChannelConversationScreen', () => {
     expect(mockConversationHeader).toHaveBeenCalledWith(
       expect.objectContaining({ isReadOnly: false }),
     );
+  });
+
+  it('opens a direct message from a member profile preview', async () => {
+    mockUseLocalSearchParams.mockReturnValue({
+      channelId: 'channel-1',
+      topic: 'Biology',
+      isLearningSpace: '0',
+    });
+    mockFetchIsChannelMember.mockReturnValue(true);
+    mockEnsureDirectMessageChannelForProfiles.mockResolvedValue({
+      channelId: 'dm-1',
+      topic: 'Parent One',
+    });
+
+    renderScreen();
+
+    fireEvent.press(screen.getByText('open-profile'));
+    fireEvent.press(screen.getByText('message-user'));
+
+    await waitFor(() => {
+      expect(mockEnsureDirectMessageChannelForProfiles).toHaveBeenCalledWith(
+        'org-1',
+        'prof-1',
+        'prof-2',
+      );
+    });
+    await waitFor(() => {
+      expect(mockRouterPush).toHaveBeenCalledWith(
+        expect.objectContaining({
+          pathname: '/(app)/dm/[channelId]',
+          params: expect.objectContaining({ channelId: 'dm-1', topic: 'Parent One' }),
+        }),
+      );
+    });
   });
 
   it('refetches messages when the screen is focused', () => {

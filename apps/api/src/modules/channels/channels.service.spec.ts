@@ -1,7 +1,6 @@
 import { ForbiddenException, InternalServerErrorException } from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
-import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 
 /** A thenable, chainable stand-in for a directly-awaited (no .maybeSingle()) query. */
@@ -21,7 +20,6 @@ function makeThenableChain(result: { data: unknown; error: null }) {
 
 const mockRpc = jest.fn();
 const mockMaybeSingle = jest.fn();
-const mockEvaluateApiBooleanFlag = evaluateApiBooleanFlag as jest.Mock;
 
 // Build a fluent chain that returns `mockMaybeSingle` at the leaf.
 function makeChain() {
@@ -63,13 +61,6 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(() => mockServiceClient),
 }));
-jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
-  apiFeatureFlagKeys: {
-    enableMobileDirectMessageStart: 'enable-mobile-direct-message-start',
-  },
-  evaluateApiBooleanFlag: jest.fn(),
-}));
-
 // PrismaService is injected but not used by markRead.
 jest.mock('@iconicedu/api/prisma/prisma.service', () => ({
   PrismaService: jest.fn(),
@@ -227,7 +218,6 @@ describe('ChannelsService.ensureDirectMessageChannel', () => {
         mockServiceClient,
       );
     }
-    mockEvaluateApiBooleanFlag.mockResolvedValue(true);
     mockRpc.mockResolvedValue({ data: true, error: null });
   });
 

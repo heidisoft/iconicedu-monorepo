@@ -29,32 +29,12 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     );
   }
 
-  if (key === mobileFeatureFlagKeys.enableMobileDirectMessageStart) {
-    return parseBooleanFeatureFlag(
-      process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START,
-    );
-  }
-
   if (key === mobileFeatureFlagKeys.enableMobileGoogleSignIn) {
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_GOOGLE_SIGN_IN);
   }
 
   if (key === mobileFeatureFlagKeys.enableMobileAppleSignIn) {
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MOBILE_APPLE_SIGN_IN);
-  }
-
-  if (key === mobileFeatureFlagKeys.sessionCompletionCarousel) {
-    return parseBooleanFeatureFlag(
-      process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL,
-    );
-  }
-
-  if (key === mobileFeatureFlagKeys.enableAiRefine) {
-    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_AI_REFINE);
-  }
-
-  if (key === mobileFeatureFlagKeys.enableAiSuggestedReplies) {
-    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_AI_SUGGESTED_REPLIES);
   }
 
   if (key === mobileFeatureFlagKeys.enableMessagePinning) {
@@ -93,14 +73,6 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     return parseBooleanFeatureFlag(
       process.env.EXPO_PUBLIC_ENABLE_MESSAGE_LIST_FORMATTING,
     );
-  }
-
-  if (key === mobileFeatureFlagKeys.enableMessageDrafts) {
-    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS);
-  }
-
-  if (key === mobileFeatureFlagKeys.enableMessageEdit) {
-    return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT);
   }
 
   if (key === mobileFeatureFlagKeys.enableMobileMessageComposerParity) {

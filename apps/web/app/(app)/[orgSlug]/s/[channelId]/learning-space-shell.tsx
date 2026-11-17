@@ -21,8 +21,6 @@ export function LearningSpaceShell({
   currentUserProfile,
   readOnly = false,
   showCreateMessageTypeButton = true,
-  showAiRefine = false,
-  showAiSuggestedReplies = false,
   enableMessagePinning = false,
   enableMessageSearch = false,
   enableScheduledSend = false,
@@ -30,8 +28,6 @@ export function LearningSpaceShell({
   enableMessageReplyReference = false,
   enableNotificationConversationControls = false,
   enableMessageListFormatting = false,
-  enableMessageDrafts = false,
-  enableMessageEdit = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
   sendTextMessage,
@@ -50,8 +46,6 @@ export function LearningSpaceShell({
   currentUserProfile?: UserProfileVM | null;
   readOnly?: boolean;
   showCreateMessageTypeButton?: boolean;
-  showAiRefine?: boolean;
-  showAiSuggestedReplies?: boolean;
   enableMessagePinning?: boolean;
   enableMessageSearch?: boolean;
   enableScheduledSend?: boolean;
@@ -59,8 +53,6 @@ export function LearningSpaceShell({
   enableMessageReplyReference?: boolean;
   enableNotificationConversationControls?: boolean;
   enableMessageListFormatting?: boolean;
-  enableMessageDrafts?: boolean;
-  enableMessageEdit?: boolean;
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
@@ -92,8 +84,6 @@ export function LearningSpaceShell({
       currentUserProfile={currentUserProfile}
       readOnly={readOnly}
       showCreateMessageTypeButton={showCreateMessageTypeButton}
-      showAiRefine={showAiRefine}
-      showAiSuggestedReplies={showAiSuggestedReplies}
       enableMessagePinning={enableMessagePinning}
       enableMessageSearch={enableMessageSearch}
       enableScheduledSend={enableScheduledSend}
@@ -101,8 +91,6 @@ export function LearningSpaceShell({
       enableMessageReplyReference={enableMessageReplyReference}
       enableNotificationConversationControls={enableNotificationConversationControls}
       enableMessageListFormatting={enableMessageListFormatting}
-      enableMessageDrafts={enableMessageDrafts}
-      enableMessageEdit={enableMessageEdit}
       enableMessageSendReliability={enableMessageSendReliability}
       enableMessageAudience={enableMessageAudience}
       panelRegistry={{

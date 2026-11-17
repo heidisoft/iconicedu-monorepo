@@ -23,46 +23,6 @@ describe('mobile feature flags', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_CHANNEL_COMMUNICATIONS;
   });
 
-  it('defaults direct message start rollout to off', async () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START;
-    delete process.env.EXPO_PUBLIC_APP_ENV;
-
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(false);
-  });
-
-  it('enables direct message start rollout from an Expo public env flag', async () => {
-    delete process.env.EXPO_PUBLIC_APP_ENV;
-    process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START = 'true';
-
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(true);
-  });
-
-  it('does not force direct message start on in local or preview app envs', () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_DIRECT_MESSAGE_START;
-
-    process.env.EXPO_PUBLIC_APP_ENV = 'local';
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(false);
-
-    process.env.EXPO_PUBLIC_APP_ENV = 'preview';
-    expect(
-      getLocalMobileFeatureFlagFallback(
-        mobileFeatureFlagKeys.enableMobileDirectMessageStart,
-      ),
-    ).toBe(false);
-  });
-
   it('defaults onboarding address search rollout to off', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_ONBOARDING_ADDRESS_SEARCH;
     process.env.EXPO_PUBLIC_APP_ENV = 'local';
@@ -118,18 +78,10 @@ describe('mobile feature flags', () => {
     expect(parseBooleanFeatureFlag('')).toBe(false);
   });
 
-  it('keeps the four messaging P0 flags off by default', () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS;
-    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT;
+  it('keeps the remaining messaging P0 flags off by default', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY;
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY;
 
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageDrafts),
-    ).toBe(false);
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageEdit),
-    ).toBe(false);
     expect(
       getLocalMobileFeatureFlagFallback(
         mobileFeatureFlagKeys.enableMobileMessageComposerParity,
@@ -142,19 +94,11 @@ describe('mobile feature flags', () => {
     ).toBe(false);
   });
 
-  it('enables the four messaging P0 flags from their Expo public env flags', () => {
-    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS = 'true';
-    process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT = 'true';
+  it('enables the remaining messaging P0 flags from their Expo public env flags', () => {
     process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY = 'true';
     process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY = 'true';
 
     expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageDrafts),
-    ).toBe(true);
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableMessageEdit),
-    ).toBe(true);
-    expect(
       getLocalMobileFeatureFlagFallback(
         mobileFeatureFlagKeys.enableMobileMessageComposerParity,
       ),
@@ -165,22 +109,8 @@ describe('mobile feature flags', () => {
       ),
     ).toBe(true);
 
-    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_DRAFTS;
-    delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_EDIT;
     delete process.env.EXPO_PUBLIC_ENABLE_MOBILE_MESSAGE_COMPOSER_PARITY;
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_SEND_RELIABILITY;
-  });
-
-  it('keeps the session completion carousel off unless explicitly enabled', () => {
-    delete process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL;
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.sessionCompletionCarousel),
-    ).toBe(false);
-
-    process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_CAROUSEL = 'true';
-    expect(
-      getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.sessionCompletionCarousel),
-    ).toBe(true);
   });
 
   it('keeps message pinning, search, and scheduled send off by default', () => {

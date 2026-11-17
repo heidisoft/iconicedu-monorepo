@@ -32,7 +32,6 @@ interface WeekViewProps {
   onSwitchToDay?: () => void;
   canCancelSessions?: boolean;
   canEditSessions?: boolean;
-  canUseSeriesRescheduleScopes?: boolean;
   onCancelSession?: (
     event: DisplayClassScheduleVM,
     input: CancelSessionActionInput,
@@ -50,7 +49,6 @@ export function WeekView({
   onSwitchToDay,
   canCancelSessions = false,
   canEditSessions = false,
-  canUseSeriesRescheduleScopes = false,
   onCancelSession,
   onEditSession,
 }: WeekViewProps) {
@@ -246,7 +244,6 @@ export function WeekView({
                             compact={isCompact}
                             canCancelSession={canCancelSessions}
                             canEditSession={canEditSessions}
-                            canUseSeriesRescheduleScopes={canUseSeriesRescheduleScopes}
                             onCancelSession={onCancelSession}
                             onEditSession={onEditSession}
                           />
@@ -292,9 +289,6 @@ export function WeekView({
                                     event={hidden}
                                     canCancelSession={canCancelSessions}
                                     canEditSession={canEditSessions}
-                                    canUseSeriesRescheduleScopes={
-                                      canUseSeriesRescheduleScopes
-                                    }
                                     onCancelSession={onCancelSession}
                                     onEditSession={onEditSession}
                                   />

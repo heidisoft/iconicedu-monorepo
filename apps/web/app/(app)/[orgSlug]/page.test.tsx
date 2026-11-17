@@ -67,12 +67,6 @@ vi.mock('@iconicedu/web/lib/profile/queries/roles.query', () => ({
   getUserRoles: (...args: unknown[]) => getUserRolesMock(...args),
 }));
 
-vi.mock('@iconicedu/web/flags', () => ({
-  enableSessionCompletionCarousel: {
-    run: vi.fn(async () => false),
-  },
-}));
-
 describe('d home page', () => {
   it('loads dashboard infographic metrics and renders infographic component', async () => {
     buildDashboardHomeInfographicMetricsMock.mockResolvedValueOnce({

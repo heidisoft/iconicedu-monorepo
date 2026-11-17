@@ -166,7 +166,6 @@ export function SidebarShell({
   isPersonaAddEnabled,
   adminSections,
   subjectOptions,
-  enableMessageDrafts,
 }: {
   children: ReactNode;
   data: SidebarLeftDataVM;
@@ -175,7 +174,6 @@ export function SidebarShell({
   isPersonaAddEnabled?: boolean;
   adminSections?: AdminMenuSectionVM[] | null;
   subjectOptions?: string[];
-  enableMessageDrafts?: boolean;
 }) {
   const pathname = usePathname();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
@@ -2629,7 +2627,6 @@ export function SidebarShell({
         onPersonaAdd={handlePersonaAdd}
         isPersonaSwitchEnabled={Boolean(isPersonaSwitchEnabled)}
         isPersonaAddEnabled={Boolean(isPersonaAddEnabled)}
-        enableMessageDrafts={Boolean(enableMessageDrafts)}
         adminSections={adminSections ?? undefined}
       />
       <SidebarInset>

@@ -35,7 +35,6 @@ export const TextMessage = memo(function TextMessage(props: TextMessageProps) {
   const isOwnMessage = messagesState?.currentUserId === message.core.sender.ids.id;
   const canEdit =
     Boolean(messagesState) &&
-    Boolean(messagesState?.enableMessageEdit) &&
     isOwnMessage &&
     !message.state?.isHidden &&
     isWithinEditWindow(message.core.createdAt);

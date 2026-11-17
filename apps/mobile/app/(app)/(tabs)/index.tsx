@@ -33,7 +33,6 @@ import { useAccount } from '@/hooks/use-account';
 import { useProfile } from '@/hooks/use-profile';
 import { useUpcomingSessions } from '@/hooks/use-upcoming-sessions';
 import { useCompletedSessions } from '@/hooks/use-completed-sessions';
-import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { useFamilyLinks } from '@/hooks/use-family-links';
 import { useLearningSpaces } from '@/hooks/use-learning-spaces';
 import { useSupportChannel } from '@/hooks/use-support-channel';
@@ -57,7 +56,6 @@ import {
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
-import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 
 // ---------------------------------------------------------------------------
 // Avatar color helpers — ui_theme_key → hex, fallback to seed palette
@@ -761,9 +759,6 @@ function makeStyles(C: AppColors) {
 
 export default function HomeScreen() {
   const { user } = useAuth();
-  const sessionCompletionCarouselEnabled = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.sessionCompletionCarousel,
-  );
   const scrollRef = useRef<ScrollView>(null);
   const queryClient = useQueryClient();
   const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
@@ -781,13 +776,9 @@ export default function HomeScreen() {
   const {
     sessions: completedSessions,
     summary: sessionCompletionSummary,
-    isOrgAdminView: isCompletionOrgView,
     isPending: completedSessionsLoading,
     refetch: refetchCompletedSessions,
   } = useCompletedSessions();
-  // Staff/admins get the org-wide summary tile even when the carousel rollout
-  // flag is off for them.
-  const showCompletionSummary = sessionCompletionCarouselEnabled || isCompletionOrgView;
   const {
     data: account,
     isPending: accountLoading,
@@ -959,9 +950,7 @@ export default function HomeScreen() {
   // refresh is in flight (only when there was something to refresh — no phantom
   // section for people who have no recently completed sessions).
   const showRecentlyCompletedSkeleton =
-    sessionCompletionCarouselEnabled &&
-    (refreshing || completedSessionsLoading) &&
-    completedSessions.length > 0;
+    (refreshing || completedSessionsLoading) && completedSessions.length > 0;
   const showTodaySection = sessionsLoading || refreshing || todaySessions.length > 0;
   const showThisWeekSection =
     sessionsLoading || refreshing || thisWeekSessions.length > 0;
@@ -991,7 +980,7 @@ export default function HomeScreen() {
         refetchAccount(),
         refetchProfile(),
         refetchSessions(),
-        ...(showCompletionSummary ? [refetchCompletedSessions()] : []),
+        refetchCompletedSessions(),
         refetchLearningSpaces(),
         refetchSupportChannel(),
         refetchOrgSchedules(),
@@ -1022,7 +1011,6 @@ export default function HomeScreen() {
       refetchProfile,
       refetchSessions,
       refetchSupportChannel,
-      showCompletionSummary,
     ],
   );
   const onRefresh = useCallback(() => {
@@ -1302,48 +1290,29 @@ export default function HomeScreen() {
               </TouchableOpacity>
 
               <View
-                accessibilityLabel={
-                  showCompletionSummary
-                    ? `Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} awaiting confirmation.`
-                    : undefined
-                }
+                accessibilityLabel={`Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} awaiting confirmation.`}
                 style={[
                   s.metricCard,
                   { width: metricCardWidth, backgroundColor: colors.primarySubtle },
                 ]}
               >
                 <View style={s.metricHeader}>
-                  <Text style={s.metricTitle}>
-                    {showCompletionSummary ? 'Sessions completed' : 'Completed Classes'}
-                  </Text>
+                  <Text style={s.metricTitle}>Sessions completed</Text>
                   <View style={s.metricIconWrap}>
                     <CalendarCheck size={18} color={colors.primary} />
                   </View>
                 </View>
-                {showCompletionSummary ? (
-                  <View style={s.metricBody}>
-                    <Text style={s.metricValue}>
-                      {sessionCompletionSummary.completed}
-                    </Text>
-                    <View style={s.metricPendingRow}>
-                      <Text style={s.metricLabel}>
-                        <Text style={s.metricPendingCount}>
-                          {sessionCompletionSummary.pending}
-                        </Text>{' '}
-                        awaiting confirmation
-                      </Text>
-                    </View>
-                  </View>
-                ) : (
-                  <View style={s.metricBody}>
-                    <Text style={s.metricValue}>
-                      {topMetrics.completedClassesThisMonth}
-                    </Text>
-                    <Text style={[s.metricLabel, { color: colors.primary }]}>
-                      This month
+                <View style={s.metricBody}>
+                  <Text style={s.metricValue}>{sessionCompletionSummary.completed}</Text>
+                  <View style={s.metricPendingRow}>
+                    <Text style={s.metricLabel}>
+                      <Text style={s.metricPendingCount}>
+                        {sessionCompletionSummary.pending}
+                      </Text>{' '}
+                      awaiting confirmation
                     </Text>
                   </View>
-                )}
+                </View>
               </View>
 
               <View
@@ -1369,28 +1338,26 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {sessionCompletionCarouselEnabled ? (
-          showRecentlyCompletedSkeleton ? (
-            <View style={{ gap: 10 }}>
-              <View style={s.activityHeader}>
-                <Text style={s.sectionLabel}>Recently completed</Text>
-                <PulseBox width={22} height={20} radius={999} />
-              </View>
-              <View style={s.completedSkeletonCard}>
-                <View style={s.completedSkeletonHeader}>
-                  <PulseBox width={46} height={44} radius={10} />
-                  <View style={s.completedSkeletonBody}>
-                    <PulseBox width={150} height={13} radius={4} />
-                    <PulseBox width={110} height={11} radius={4} />
-                  </View>
-                </View>
-                <PulseBox width={220} height={36} radius={10} />
-              </View>
+        {showRecentlyCompletedSkeleton ? (
+          <View style={{ gap: 10 }}>
+            <View style={s.activityHeader}>
+              <Text style={s.sectionLabel}>Recently completed</Text>
+              <PulseBox width={22} height={20} radius={999} />
             </View>
-          ) : (
-            <SessionCompletedCarousel sessions={completedSessions} colors={colors} />
-          )
-        ) : null}
+            <View style={s.completedSkeletonCard}>
+              <View style={s.completedSkeletonHeader}>
+                <PulseBox width={46} height={44} radius={10} />
+                <View style={s.completedSkeletonBody}>
+                  <PulseBox width={150} height={13} radius={4} />
+                  <PulseBox width={110} height={11} radius={4} />
+                </View>
+              </View>
+              <PulseBox width={220} height={36} radius={10} />
+            </View>
+          </View>
+        ) : (
+          <SessionCompletedCarousel sessions={completedSessions} colors={colors} />
+        )}
 
         {/* Upcoming sessions */}
         {showTodaySection && (

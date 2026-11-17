@@ -15,10 +15,6 @@ import type {
   MessageVM,
 } from '@iconicedu/shared-types';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
-import {
-  apiFeatureFlagKeys,
-  evaluateApiBooleanFlag,
-} from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { OrgAiSettingsService } from '@iconicedu/api/lib/ai/org-ai-settings.service';
 import { checkFactPreservation } from '@iconicedu/api/lib/ai/fact-preservation';
 import {
@@ -93,36 +89,11 @@ export class AiAssistService {
     return actor;
   }
 
-  private async isFlagEnabled(
-    flagKey: 'enableAiRefine' | 'enableAiSuggestedReplies',
-    profileId: string,
-  ): Promise<boolean> {
-    return evaluateApiBooleanFlag({
-      flagKey: apiFeatureFlagKeys[flagKey],
-      distinctId: profileId,
-    });
-  }
-
-  /** Server-side rollout gate — mirrors the client-visible flag but is enforced independently of it. */
-  private async requireFlagEnabled(
-    flagKey: 'enableAiRefine' | 'enableAiSuggestedReplies',
-    profileId: string,
-  ) {
-    const enabled = await this.isFlagEnabled(flagKey, profileId);
-    if (!enabled) {
-      throw new ForbiddenException('AI assist is not available for this profile');
-    }
-  }
-
   /**
    * What the composer should show, computed server-side with the same
-   * profile-kind eligibility and PostHog evaluation (keyed by `profileId`)
-   * that the real refine/suggested-replies calls enforce. Mobile clients
-   * identify their PostHog session with the auth user id (see
-   * auth-provider.tsx), which can differ from `profileId` — evaluating
-   * these flags client-side against that identity can show/hide the
-   * composer affordance inconsistently with what the API will actually
-   * allow. Never throws: any ineligibility just reads as "off".
+   * profile-kind eligibility and org AI settings check that the real
+   * refine/suggested-replies calls enforce. Never throws: any ineligibility
+   * just reads as "off".
    */
   async getEligibility(
     authUserId: string,
@@ -140,19 +111,9 @@ export class AiAssistService {
       return { enableAiRefine: false, enableAiSuggestedReplies: false };
     }
 
-    // The org admin's on/off switch and provider key gate everything below —
-    // no point evaluating the rollout flags for an org that hasn't set one up.
+    // The org admin's on/off switch and provider key gate both capabilities.
     const orgEnabled = await this.orgAiSettingsService.isEnabledForOrg(input.orgId);
-    if (!orgEnabled) {
-      return { enableAiRefine: false, enableAiSuggestedReplies: false };
-    }
-
-    const [enableAiRefine, enableAiSuggestedReplies] = await Promise.all([
-      this.isFlagEnabled('enableAiRefine', input.profileId),
-      this.isFlagEnabled('enableAiSuggestedReplies', input.profileId),
-    ]);
-
-    return { enableAiRefine, enableAiSuggestedReplies };
+    return { enableAiRefine: orgEnabled, enableAiSuggestedReplies: orgEnabled };
   }
 
   /** Throws when the org hasn't configured and enabled an AI provider — checked before any rate-limit reservation or provider call. */
@@ -246,7 +207,6 @@ export class AiAssistService {
       orgId: input.orgId,
       profileId: input.profileId,
     });
-    await this.requireFlagEnabled('enableAiRefine', input.profileId);
     // Re-verify the channel is one this profile actually belongs to — the
     // draft never leaves the client otherwise, but the channel context
     // still needs authorization the same as any other message action.
@@ -300,7 +260,6 @@ export class AiAssistService {
       orgId: input.orgId,
       profileId: input.profileId,
     });
-    await this.requireFlagEnabled('enableAiSuggestedReplies', input.profileId);
     await this.requireChannelMembership(input.orgId, input.channelId, input.profileId);
     await this.requireOrgAiEnabled(input.orgId);
     await this.reserveRateLimit({
