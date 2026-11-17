@@ -17,7 +17,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
 import { useTheme } from '@/providers/theme-provider';
-import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { AppColors } from '@/lib/theme';
 import type { MessageMentionVM, MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
@@ -63,6 +62,7 @@ import {
   rankMentionCandidates,
   type MentionCandidate,
 } from '@/lib/messages/message-mentions';
+import type { MessageAudienceParticipant } from './message-visibility';
 
 // Minimum non-whitespace characters typed before "Refine with AI" appears —
 // picked within the 10-20 char range called out in issue #264 so the
@@ -114,11 +114,7 @@ export type MessageSendMeta = {
   audienceProfileIds?: string[];
 };
 
-export type MessageAudienceParticipant = {
-  id: string;
-  name: string;
-  role: string | null;
-};
+export type { MessageAudienceParticipant } from './message-visibility';
 
 /** Message currently being edited — drives the composer's edit mode. */
 export type EditingMessageContext = {
@@ -209,35 +205,49 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 8,
+      paddingVertical: 7,
       backgroundColor: C.bg,
       borderTopWidth: 1,
       borderTopColor: C.border,
-      gap: 10,
+      gap: 8,
     },
     replyAccent: {
       width: 3,
       borderRadius: 2,
       alignSelf: 'stretch',
-      minHeight: 28,
+      minHeight: 24,
       backgroundColor: C.teal,
     },
     replyInfo: { flex: 1 },
-    replyKindLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
-      color: C.textFaint,
+    replyHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       marginBottom: 2,
+    },
+    replyKindLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.textFaint,
+    },
+    replyAudience: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: C.teal,
     },
     replySender: {
       fontSize: 13,
       fontWeight: '600',
       color: C.teal,
-      marginBottom: 1,
+    },
+    replyMessageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minWidth: 0,
+      gap: 4,
     },
     replyText: {
+      flex: 1,
       fontSize: 13,
       color: C.textMuted,
     },
@@ -1297,24 +1307,23 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View style={s.replyPreview}>
           <View style={s.replyAccent} />
           <View style={s.replyInfo}>
-            <Text style={s.replyKindLabel}>
-              {quoteReplyTo ? 'Replying to' : 'Reply in thread'}
-            </Text>
-            {!quoteReplyTo && replyTo?.core.visibility.type === 'specific-users' ? (
+            <View style={s.replyHeaderRow}>
               <Text style={s.replyKindLabel}>
-                Private · same {replyTo.core.visibility.userIds.length}-person audience
+                {quoteReplyTo ? 'Replying to' : 'Reply in thread'}
               </Text>
-            ) : null}
-            <RoleNameIndicator
-              name={(quoteReplyTo ?? replyTo)!.core.sender.profile.displayName}
-              role={(quoteReplyTo ?? replyTo)!.core.sender.kind}
-              textStyle={s.replySender}
-              numberOfLines={1}
-              iconSize={12}
-            />
-            <Text style={s.replyText} numberOfLines={1}>
-              {getMessagePreviewText((quoteReplyTo ?? replyTo)!)}
-            </Text>
+              {!quoteReplyTo && replyTo?.core.visibility.type === 'specific-users' ? (
+                <Text style={s.replyAudience}>· Private audience</Text>
+              ) : null}
+            </View>
+            <View style={s.replyMessageRow}>
+              <Text style={s.replySender} numberOfLines={1}>
+                {(quoteReplyTo ?? replyTo)!.core.sender.profile.displayName}
+              </Text>
+              <Text style={s.replyText}>:</Text>
+              <Text style={s.replyText} numberOfLines={1}>
+                {getMessagePreviewText((quoteReplyTo ?? replyTo)!)}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity
             onPress={quoteReplyTo ? onCancelQuoteReply : onCancelReply}

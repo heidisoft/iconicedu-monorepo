@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { GraduationCap, LifeBuoy, MessageSquare } from 'lucide-react-native';
 import type { MessageVM } from '@iconicedu/shared-types';
+import type { MessageAudienceParticipant } from './message-visibility';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { MessageItem } from './message-item';
@@ -439,6 +440,7 @@ export type MessageListProps = {
   channelId?: string;
   currentProfileId: string;
   currentAccountId?: string;
+  audienceParticipants?: MessageAudienceParticipant[];
   onLoadMore?: () => boolean | void | Promise<boolean | void>;
   loading?: boolean;
   refreshing?: boolean;
@@ -485,6 +487,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   channelId,
   currentProfileId,
   currentAccountId,
+  audienceParticipants,
   onLoadMore,
   loading = false,
   refreshing = false,
@@ -745,6 +748,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           onProfilePress={onProfilePress}
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
+          audienceParticipants={audienceParticipants}
           isReadOnly={isReadOnly}
           onSendAnnotation={onSendAnnotation}
           messageUiThemeKey={messageUiThemeKey}
@@ -760,6 +764,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     [
       currentProfileId,
       currentAccountId,
+      audienceParticipants,
       channelId,
       listData,
       colors,

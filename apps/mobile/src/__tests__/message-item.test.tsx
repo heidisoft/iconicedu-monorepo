@@ -453,7 +453,7 @@ describe('MessageItem', () => {
     );
 
     expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
-    expect(screen.getByLabelText('Only visible to you')).toBeTruthy();
+    expect(screen.getByLabelText('Only visible to you. Tap to show names')).toBeTruthy();
   });
 
   it('renders the visibility badge for specific-users messages', () => {
@@ -463,12 +463,19 @@ describe('MessageItem', () => {
         isOwn={false}
         isGroupStart
         colors={colors}
+        currentProfileId="user-1"
+        audienceParticipants={[
+          { id: 'user-1', name: 'John Doe', role: 'educator' },
+          { id: 'user-2', name: 'Marc F', role: 'staff' },
+        ]}
       />,
     );
 
     expect(screen.getByTestId('message-visibility-badge')).toBeTruthy();
-    expect(screen.getByLabelText('Only visible to selected people')).toBeTruthy();
-    expect(screen.getByText('Only visible to selected people')).toBeTruthy();
+    expect(
+      screen.getByLabelText('Only visible to you + 1 other. Tap to show names'),
+    ).toBeTruthy();
+    expect(screen.getByText('Only visible to you + 1 other')).toBeTruthy();
   });
 
   it('shows the pinned indicator when isPinned is true (issue #264 P2)', () => {
