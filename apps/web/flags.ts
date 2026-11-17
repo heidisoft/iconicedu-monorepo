@@ -369,23 +369,6 @@ export const enableMessageSendReliability = flag<boolean, { profileId?: string |
   },
 });
 
-export const enableOrgAiProviderSettings = flag<boolean, { profileId?: string | null }>({
-  key: platformFeatureFlagKeys.enableOrgAiProviderSettings,
-  description:
-    'Shows the admin "Organization Settings → AI-assisted messaging" page for configuring a per-org AI provider, model, and API key.',
-  options: [
-    { label: 'Off', value: false },
-    { label: 'On', value: true },
-  ],
-  defaultValue: false,
-  async decide({ entities }) {
-    return evaluateWebBooleanFlag({
-      flagKey: platformFeatureFlagKeys.enableOrgAiProviderSettings,
-      profileId: entities?.profileId,
-    });
-  },
-});
-
 export const enableClassroomMeetingSettings = flag<
   boolean,
   { profileId?: string | null }
@@ -445,7 +428,6 @@ export const webFlags = {
   enableMessageEdit,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
-  enableOrgAiProviderSettings,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

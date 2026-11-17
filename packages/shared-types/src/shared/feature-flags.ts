@@ -20,7 +20,6 @@ export const platformFeatureFlagKeys = {
   enableMobileMessageComposerParity: 'enable-mobile-message-composer-parity',
   enableMessageSendReliability: 'enable-message-send-reliability',
   enableChannelCommunications: 'enable-channel-communications',
-  enableOrgAiProviderSettings: 'enable-org-ai-provider-settings',
   mobileMinAppVersion: 'mobile-min-app-version',
 } as const;
 
