@@ -1,7 +1,7 @@
 -- Run with `supabase test db` after applying migrations. All fixtures roll back.
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(13);
+select plan(18);
 
 insert into public.orgs (id, name, slug) values
   ('00000000-0000-4000-8000-00000000ce01', 'Schedule reconciliation test', 'codex-schedule-reconciliation-test');
@@ -85,6 +85,60 @@ where job_kind = 'reminder.reconcile'
   and source_id = '00000000-0000-4000-8000-00000000ce10';
 select is(public.enqueue_stale_schedule_reconciliation(50), 0,
   'repair pass ignores cancelled schedules');
+
+-- ─── Repair pass never loops on finished or recently reconciled schedules ────
+-- ce20: one-off session that ended 5 days ago (still 'scheduled').
+-- ce21: weekly series whose recurrence ended 5 days ago.
+-- ce24: one-off session that ended yesterday: still inside the reconciler's
+--       3-day look-back, so a missing completion check can be recovered.
+-- ce22: future session reconciled 1 hour ago (inside the 6-hour cooldown).
+-- ce23: future session last reconciled 7 hours ago (cooldown expired).
+insert into public.class_schedules (id, org_id, title, start_at, end_at, timezone, status, visibility, source_kind)
+values
+  ('00000000-0000-4000-8000-00000000ce20', '00000000-0000-4000-8000-00000000ce01', 'Ended one-off',
+   now() - interval '5 days', now() - interval '5 days' + interval '1 hour', 'UTC', 'scheduled', 'private', 'class_session'),
+  ('00000000-0000-4000-8000-00000000ce21', '00000000-0000-4000-8000-00000000ce01', 'Ended series',
+   now() - interval '60 days', now() - interval '60 days' + interval '1 hour', 'UTC', 'scheduled', 'private', 'class_session'),
+  ('00000000-0000-4000-8000-00000000ce22', '00000000-0000-4000-8000-00000000ce01', 'Recently reconciled',
+   now() + interval '2 days', now() + interval '2 days' + interval '1 hour', 'UTC', 'scheduled', 'private', 'class_session'),
+  ('00000000-0000-4000-8000-00000000ce23', '00000000-0000-4000-8000-00000000ce01', 'Cooldown expired',
+   now() + interval '2 days', now() + interval '2 days' + interval '1 hour', 'UTC', 'scheduled', 'private', 'class_session'),
+  ('00000000-0000-4000-8000-00000000ce24', '00000000-0000-4000-8000-00000000ce01', 'Ended yesterday',
+   now() - interval '1 day', now() - interval '1 day' + interval '1 hour', 'UTC', 'scheduled', 'private', 'class_session');
+
+insert into public.class_schedule_recurrence (org_id, schedule_id, frequency, interval, until)
+values ('00000000-0000-4000-8000-00000000ce01', '00000000-0000-4000-8000-00000000ce21', 'weekly', 1, now() - interval '5 days');
+
+-- Replace the trigger-enqueued jobs with worked-off history.
+delete from public.event_pipeline_jobs
+where job_kind = 'reminder.reconcile'
+  and source_id in ('00000000-0000-4000-8000-00000000ce20', '00000000-0000-4000-8000-00000000ce21',
+                    '00000000-0000-4000-8000-00000000ce22', '00000000-0000-4000-8000-00000000ce23',
+                    '00000000-0000-4000-8000-00000000ce24');
+insert into public.event_pipeline_jobs (org_id, job_kind, dedupe_key, status, run_at, source_id, created_at, updated_at)
+values
+  ('00000000-0000-4000-8000-00000000ce01', 'reminder.reconcile', 'schedule:recent', 'succeeded',
+   now() - interval '1 hour', '00000000-0000-4000-8000-00000000ce22', now() - interval '1 hour', now() - interval '1 hour'),
+  ('00000000-0000-4000-8000-00000000ce01', 'reminder.reconcile', 'schedule:older', 'succeeded',
+   now() - interval '7 hours', '00000000-0000-4000-8000-00000000ce23', now() - interval '7 hours', now() - interval '7 hours');
+
+select lives_ok($$select public.enqueue_stale_schedule_reconciliation(200)$$, 'repair pass runs');
+select is((select count(*)::integer from public.event_pipeline_jobs
+  where job_kind = 'reminder.reconcile' and status = 'pending'
+    and source_id in ('00000000-0000-4000-8000-00000000ce20', '00000000-0000-4000-8000-00000000ce21')), 0,
+  'repair pass skips ended one-off sessions and ended series');
+select is((select count(*)::integer from public.event_pipeline_jobs
+  where job_kind = 'reminder.reconcile' and status = 'pending'
+    and source_id = '00000000-0000-4000-8000-00000000ce22'), 0,
+  'repair pass skips a schedule reconciled inside the 6-hour cooldown');
+select is((select count(*)::integer from public.event_pipeline_jobs
+  where job_kind = 'reminder.reconcile' and status = 'pending'
+    and source_id = '00000000-0000-4000-8000-00000000ce23'), 1,
+  'repair pass re-enqueues a stale schedule once the cooldown has expired');
+select is((select count(*)::integer from public.event_pipeline_jobs
+  where job_kind = 'reminder.reconcile' and status = 'pending'
+    and source_id = '00000000-0000-4000-8000-00000000ce24'), 1,
+  'repair pass still recovers a session that ended inside the 3-day look-back');
 
 -- Cron registration is part of the deployment contract, including fresh projects.
 select public.configure_edge_function_cron('https://schedule-recon-test.invalid');
