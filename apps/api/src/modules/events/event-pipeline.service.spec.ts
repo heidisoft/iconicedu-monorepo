@@ -119,14 +119,8 @@ describe('EventPipelineService', () => {
         lease_until: null,
       }),
     );
-    expect(inserts).toContainEqual(
-      expect.objectContaining({
-        org_id: 'org-1',
-        job_id: 'job-1',
-        job_kind: 'activity.project',
-        result: 'succeeded',
-      }),
-    );
+    expect(inserts).toEqual([]);
+    expect(from).not.toHaveBeenCalledWith('event_pipeline_logs');
     expect(result).toEqual(
       expect.objectContaining({ claimed: 1, succeeded: 1, failed: 0 }),
     );

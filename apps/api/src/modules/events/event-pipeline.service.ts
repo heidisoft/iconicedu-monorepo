@@ -93,7 +93,7 @@ export class EventPipelineService {
           await this.markSuppressed(supabase, job, result.details);
           suppressed += 1;
         } else {
-          await this.markSucceeded(supabase, job, result?.details);
+          await this.markSucceeded(supabase, job);
           succeeded += 1;
         }
       } catch (error) {
@@ -238,11 +238,11 @@ export class EventPipelineService {
     }
   }
 
-  private async markSucceeded(
-    supabase: SupabaseServiceClient,
-    job: EventPipelineJobRow,
-    details?: Record<string, unknown>,
-  ) {
+  // Success writes no event_pipeline_logs row: the job row already records the
+  // outcome, nothing reads success logs, and one log per success (mostly
+  // reminder.reconcile) grew the table to ~1.8M rows. Failures, dead letters,
+  // and suppressions are still logged.
+  private async markSucceeded(supabase: SupabaseServiceClient, job: EventPipelineJobRow) {
     const now = new Date().toISOString();
     const response = await supabase
       .from('event_pipeline_jobs')
@@ -260,7 +260,6 @@ export class EventPipelineService {
     if (response.error) {
       throw new Error(response.error.message);
     }
-    await this.log(supabase, job, 'succeeded', details ?? {});
   }
 
   private async markSuppressed(
@@ -353,12 +352,7 @@ export class EventPipelineService {
   private async log(
     supabase: SupabaseServiceClient,
     job: EventPipelineJobRow,
-    result:
-      | 'succeeded'
-      | 'suppressed'
-      | 'retryable_failure'
-      | 'fatal_failure'
-      | 'canceled',
+    result: 'suppressed' | 'retryable_failure' | 'fatal_failure' | 'canceled',
     details: Record<string, unknown>,
   ) {
     const now = new Date().toISOString();
