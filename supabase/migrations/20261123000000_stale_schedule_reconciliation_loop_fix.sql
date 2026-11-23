@@ -5,9 +5,12 @@
 -- two guards:
 --
 -- 1. Finished schedules are not eligible. A one-off session that ended more
---    than a day ago, or a series whose recurrence `until` passed more than a
---    day ago, can never gain new reminder or completion jobs, so "no active
---    jobs" is its normal end state, not staleness. Before this guard every
+--    than 3 days ago, or a series whose recurrence `until` passed more than 3
+--    days ago, can never gain new reminder or completion jobs: the reconciler
+--    only expands occurrences from now() - 3 days. "No active jobs" is its
+--    normal end state, not staleness. Inside that 3-day look-back the repair
+--    pass still runs, so a lost completion check (feedback prompt) for a
+--    session that just ended is still recovered, exactly as before. Before this guard every
 --    such schedule left in status 'scheduled' was re-enqueued on every pass,
 --    which produced ~1.8M succeeded reminder.reconcile jobs (and as many
 --    event_pipeline_logs rows) in production.
@@ -52,7 +55,7 @@ begin
         -- Guard 1: skip schedules with no possible future occurrence.
         and not (
           (
-            cs.end_at < v_now - interval '1 day'
+            cs.end_at < v_now - interval '3 days'
             and not exists (
               select 1
               from public.class_schedule_recurrence r
@@ -66,7 +69,7 @@ begin
             where r.schedule_id = cs.id
               and r.deleted_at is null
               and r.until is not null
-              and r.until < v_now - interval '1 day'
+              and r.until < v_now - interval '3 days'
           )
         )
     ),
