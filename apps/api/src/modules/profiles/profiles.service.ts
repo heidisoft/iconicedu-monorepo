@@ -1,4 +1,7 @@
+import { normalizeProfileLocation } from './profile-location';
+import type { ProfileLocationInput } from '@iconicedu/shared-types';
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -158,21 +161,53 @@ export class ProfilesService {
     return data ?? [];
   }
 
+  async updateLocation(
+    accessToken: string,
+    profileId: string,
+    input: ProfileLocationInput,
+  ) {
+    const values = normalizeProfileLocation(input);
+    const supabase = createSupabaseSessionClient(accessToken);
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ ...values, updated_at: new Date().toISOString() })
+      .eq('id', profileId)
+      .is('deleted_at', null)
+      .select('id')
+      .single();
+    if (error)
+      throw new InternalServerErrorException(
+        'Could not save your location. Please try again.',
+      );
+    return data;
+  }
+
   async update(
     accessToken: string,
     profileId: string,
     body: {
       displayName?: string;
+      firstName?: string;
+      lastName?: string;
       timezone?: string;
       location?: string;
       avatarUrl?: string;
     },
   ) {
+    for (const field of ['firstName', 'lastName', 'displayName'] as const) {
+      if (body[field] !== undefined) {
+        if (typeof body[field] !== 'string' || !body[field].trim()) {
+          throw new BadRequestException(`${field} must be a non-empty string.`);
+        }
+      }
+    }
     const supabase = createSupabaseSessionClient(accessToken);
     const { data, error } = await supabase
       .from('profiles')
       .update({
-        display_name: body.displayName,
+        first_name: body.firstName?.trim(),
+        last_name: body.lastName?.trim(),
+        display_name: body.displayName?.trim(),
         timezone: body.timezone,
         location_label: body.location,
         avatar_url: body.avatarUrl,

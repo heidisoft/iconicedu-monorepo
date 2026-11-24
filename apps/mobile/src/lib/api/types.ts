@@ -76,6 +76,7 @@ export type OnboardingStatus = {
     hasAvailability: boolean;
   };
   prefill: {
+    displayName?: string;
     firstName: string;
     lastName: string;
     phone: string;

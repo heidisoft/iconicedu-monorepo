@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client';
-import { apiGet, apiPost } from '@/lib/api/http-client';
-import type { ChildProfileVM } from '@iconicedu/shared-types';
+import { apiGet, apiPost, apiPut } from '@/lib/api/http-client';
+import type { ChildProfileVM, LocationSuggestion } from '@iconicedu/shared-types';
 import type { DayAvailability, OnboardingStatus } from '@/lib/api/types';
 
 export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
@@ -60,17 +60,13 @@ export async function saveNameStep(
   profileId: string,
   firstName: string,
   lastName: string,
+  displayName: string,
 ) {
-  const displayName = `${firstName.trim()} ${lastName.trim()}`.trim();
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      display_name: displayName,
-    })
-    .eq('id', profileId);
-  if (error) throw error;
+  await apiPut(`/profiles/${profileId}`, {
+    firstName: firstName.trim(),
+    lastName: lastName.trim(),
+    displayName: displayName.trim(),
+  });
 }
 
 export async function savePhoneStep(accountId: string, phone: string) {
@@ -119,16 +115,12 @@ export async function saveLocationStep(
   postalCode: string,
   countryCode: string,
 ) {
-  const { error } = await supabase
-    .from('profiles')
-    .update({
-      city: city.trim() || null,
-      region: region.trim() || null,
-      postal_code: postalCode.trim() || null,
-      country_code: countryCode || null,
-    } as Record<string, unknown>)
-    .eq('id', profileId);
-  if (error) throw error;
+  await apiPut(`/profiles/${profileId}/location`, {
+    city: city.trim() || null,
+    region: region.trim() || null,
+    postalCode: postalCode.trim() || null,
+    countryCode,
+  });
 }
 
 export async function saveEducatorProfileStep(
@@ -194,4 +186,10 @@ export async function completeOnboarding(accountId: string) {
     .eq('id', accountId)
     .is('onboarding_completed_at', null);
   if (error) throw error;
+}
+
+export function fetchTimezoneLocationHint(
+  timezone: string,
+): Promise<LocationSuggestion | null> {
+  return apiGet(`/profiles/location-hint?timezone=${encodeURIComponent(timezone)}`);
 }

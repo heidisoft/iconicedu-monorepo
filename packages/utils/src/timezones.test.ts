@@ -24,3 +24,25 @@ describe('timezone utilities', () => {
     expect(countryCodeToEmoji(null)).toBeNull();
   });
 });
+
+it('suggests the named timezone city and its unambiguous country without guessing an address', async () => {
+  const { getTimezoneLocationHint } = await import('./timezones');
+  expect(getTimezoneLocationHint('America/New_York')).toEqual({
+    city: 'New York',
+    countryCode: 'US',
+  });
+  expect(getTimezoneLocationHint('Asia/Colombo')).toEqual({
+    city: 'Colombo',
+    countryCode: 'LK',
+  });
+  expect(getTimezoneLocationHint('America/Argentina/Buenos_Aires')).toEqual({
+    city: 'Buenos Aires',
+    countryCode: 'AR',
+  });
+  expect(getTimezoneLocationHint('UTC')).toBeNull();
+  expect(getTimezoneLocationHint('invalid')).toBeNull();
+  expect(getTimezoneLocationHint('Europe/Paris')).toEqual({
+    city: 'Paris',
+    countryCode: 'FR',
+  });
+});

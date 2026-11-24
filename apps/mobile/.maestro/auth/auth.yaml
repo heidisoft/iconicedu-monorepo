@@ -1,0 +1,265 @@
+appId: ${APP_ID}
+name: Local signup, login, invalid OTP, and persisted session
+---
+- launchApp:
+    stopApp: false
+    permissions:
+      location: never
+- openLink:
+    link: ${DEV_CLIENT_URL}
+    autoVerify: true
+- runFlow:
+    when:
+      visible: '^Open$'
+    commands:
+      - tapOn: '^Open$'
+- extendedWaitUntil:
+    visible:
+      id: auth-email-input
+    timeout: 90000
+- extendedWaitUntil:
+    visible:
+      id: auth-email-input
+    timeout: 30000
+- runScript: verify-runtime.js
+- tapOn:
+    id: auth-email-input
+- inputText: not-an-email
+- assertVisible:
+    id: auth-submit
+    enabled: false
+- eraseText
+- inputText: ${TEST_EMAIL}
+- hideKeyboard
+- runFlow:
+    when:
+      visible:
+        id: auth-submit
+        enabled: true
+    commands:
+      - tapOn:
+          id: auth-submit
+- extendedWaitUntil:
+    visible:
+      id: auth-otp-input
+    timeout: 30000
+- retry:
+    maxRetries: 5
+    commands:
+      - runScript: read-otp.js
+- tapOn:
+    id: auth-otp-input
+- inputText: ${output.invalidOtp}
+- extendedWaitUntil:
+    visible:
+      id: auth-otp-error
+    timeout: 30000
+- tapOn:
+    id: auth-otp-input
+- eraseText
+- inputText: ${output.otp}
+- extendedWaitUntil:
+    visible: 'Your name'
+    timeout: 45000
+- tapOn:
+    id: onboarding-first-name
+- inputText: Maestro
+- tapOn: Your name
+- scrollUntilVisible:
+    element:
+      id: onboarding-last-name
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding-last-name
+- inputText: Family
+- tapOn: Last Name
+- scrollUntilVisible:
+    element:
+      id: onboarding-display-name
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: onboarding-display-name
+    text: 'Maestro F'
+- tapOn:
+    id: onboarding-display-name
+- eraseText
+- inputText: E2E Parent
+- tapOn: Display Name
+- tapOn:
+    id: onboarding-next
+- assertVisible: Your phone number
+- tapOn:
+    id: onboarding-phone
+- inputText: '2025550123'
+- tapOn: Phone Number
+- tapOn:
+    id: onboarding-next
+- extendedWaitUntil:
+    visible: '(Your time zone|Choose time zone)'
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible: Choose time zone
+    commands:
+      - tapOn:
+          id: onboarding-timezone-select
+- tapOn: Search city or time zone
+- inputText: New York
+- tapOn:
+    id: selection-option-America/New_York
+- tapOn:
+    id: onboarding-next
+- assertVisible: Your location
+- assertVisible:
+    id: onboarding-city
+    text: New York
+- tapOn:
+    id: onboarding-region
+- tapOn: Search state
+- inputText: New York
+- tapOn:
+    id: selection-option-NY
+- scrollUntilVisible:
+    element:
+      id: onboarding-postal
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding-postal
+- eraseText
+- inputText: invalid
+- tapOn:
+    text: ZIP code
+    index: 0
+- tapOn:
+    id: onboarding-next
+- extendedWaitUntil:
+    visible: '.*valid zip code.*'
+    timeout: 30000
+- tapOn:
+    id: onboarding-postal
+- eraseText
+- inputText: '10001'
+- tapOn:
+    text: ZIP code
+    index: 0
+- tapOn:
+    id: onboarding-next
+- assertVisible: Add your first child
+- tapOn:
+    id: onboarding-child-first-name
+- inputText: Student
+- tapOn: Add your first child
+- scrollUntilVisible:
+    element:
+      id: onboarding-child-last-name
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding-child-last-name
+- inputText: Family
+- tapOn: Child Last Name
+- scrollUntilVisible:
+    element:
+      id: onboarding-birth-year
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding-birth-year
+- tapOn: Search year
+- inputText: ${BIRTH_YEAR}
+- tapOn:
+    id: selection-option-${BIRTH_YEAR}
+- scrollUntilVisible:
+    element:
+      id: onboarding-grade
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: onboarding-grade
+- tapOn: Search grade level
+- inputText: Grade 5
+- tapOn:
+    id: selection-option-grade_5
+- tapOn:
+    id: onboarding-next
+- runFlow:
+    when:
+      visible: Stay in the loop
+    commands:
+      - tapOn: Maybe later
+- extendedWaitUntil:
+    visible:
+      id: auth-home-screen
+    timeout: 45000
+# Relaunch without clearing data to verify SecureStore session persistence.
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: auth-home-screen
+    timeout: 45000
+- assertNotVisible: Get Started
+- tapOn: Account.*
+- scrollUntilVisible:
+    element: Sign out
+    direction: DOWN
+    centerElement: true
+- tapOn: Sign out
+- assertVisible: Are you sure you want to sign out?
+- tapOn:
+    text: Sign out
+    rightOf: Cancel
+    below: Are you sure you want to sign out?
+    point: '75%,75%'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible:
+      id: auth-email-input
+    timeout: 30000
+# The same verified, onboarded account must now sign in without onboarding again.
+- tapOn:
+    id: auth-email-input
+- inputText: ${TEST_EMAIL}
+- hideKeyboard
+- runFlow:
+    when:
+      visible:
+        id: auth-submit
+        enabled: true
+    commands:
+      - tapOn:
+          id: auth-submit
+- extendedWaitUntil:
+    visible:
+      id: auth-otp-input
+    timeout: 30000
+- retry:
+    maxRetries: 5
+    commands:
+      - runScript: read-otp.js
+- tapOn:
+    id: auth-otp-input
+- inputText: ${output.otp}
+- extendedWaitUntil:
+    visible:
+      id: auth-home-screen
+    timeout: 45000
+- assertNotVisible: Your name
+- tapOn: Account.*
+- scrollUntilVisible:
+    element: Sign out
+    direction: DOWN
+    centerElement: true
+- tapOn: Sign out
+- assertVisible: Are you sure you want to sign out?
+- tapOn:
+    text: Sign out
+    rightOf: Cancel
+    below: Are you sure you want to sign out?
+    point: '75%,75%'
+    retryTapIfNoChange: true
+- extendedWaitUntil:
+    visible: Get Started
+    timeout: 30000

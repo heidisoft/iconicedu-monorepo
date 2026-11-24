@@ -15,7 +15,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint app src --ext .ts,.tsx",
     "lint:fix": "eslint app src --ext .ts,.tsx --fix",
-    "test": "jest --passWithNoTests --watchman=false",
+    "test": "node --test scripts/auth-e2e.test.mjs && jest --passWithNoTests --watchman=false",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage --passWithNoTests",
     "clean": "rm -rf .expo dist android ios",
@@ -35,7 +35,8 @@
     "eas:update:production": "eas update --channel production",
     "eas:update:preview": "eas update --channel preview",
     "export:bundle": "EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist",
-    "test:e2e:message-audiences": "maestro test .maestro/message-audiences.yaml"
+    "test:e2e:message-audiences": "maestro test .maestro/message-audiences.yaml",
+    "test:e2e:auth": "node scripts/auth-e2e.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "^55.0.6",

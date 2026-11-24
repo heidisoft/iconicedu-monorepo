@@ -1104,7 +1104,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView style={s.safe} edges={['top']}>
+    <SafeAreaView testID="auth-home-screen" style={s.safe} edges={['top']}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={s.scroll}

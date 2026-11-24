@@ -1,3 +1,5 @@
+import { TimezoneLocationService } from './timezone-location.service';
+import { UpdateProfileLocationDto } from './dto/update-profile-location.dto';
 import {
   Body,
   Controller,
@@ -18,7 +20,18 @@ import {
 
 @Controller('profiles')
 export class ProfilesController {
-  constructor(private readonly profilesService: ProfilesService) {}
+  constructor(
+    private readonly profilesService: ProfilesService,
+    private readonly timezoneLocationService: TimezoneLocationService,
+  ) {}
+
+  @Get('location-hint')
+  @UseGuards(AuthGuard)
+  locationHint(@Query('timezone') timezone: string | undefined) {
+    return this.timezoneLocationService.lookup(
+      typeof timezone === 'string' ? timezone : '',
+    );
+  }
 
   @Get('me')
   @UseGuards(AuthGuard)
@@ -111,6 +124,20 @@ export class ProfilesController {
     return this.profilesService.get(extractBearerToken(req.headers.authorization), id);
   }
 
+  @Put(':id/location')
+  @UseGuards(AuthGuard)
+  updateLocation(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: UpdateProfileLocationDto,
+  ) {
+    return this.profilesService.updateLocation(
+      extractBearerToken(req.headers.authorization),
+      id,
+      body,
+    );
+  }
+
   @Put(':id')
   @UseGuards(AuthGuard)
   update(
@@ -119,6 +146,8 @@ export class ProfilesController {
     @Body()
     body: {
       displayName?: string;
+      firstName?: string;
+      lastName?: string;
       timezone?: string;
       location?: string;
       avatarUrl?: string;

@@ -185,6 +185,7 @@ export default function OtpScreen() {
           <View style={s.field}>
             <Text style={s.label}>Verification code</Text>
             <TextInput
+              testID="auth-otp-input"
               style={[s.codeInput, error ? s.codeInputErr : undefined]}
               value={code}
               onChangeText={(text) => {
@@ -202,7 +203,11 @@ export default function OtpScreen() {
               placeholderTextColor={colors.textFaint}
               accessibilityLabel="Verification code"
             />
-            {error && <Text style={s.errorTxt}>{error}</Text>}
+            {error && (
+              <Text testID="auth-otp-error" style={s.errorTxt}>
+                {error}
+              </Text>
+            )}
           </View>
 
           {/* Verify CTA */}
