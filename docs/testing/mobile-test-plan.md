@@ -21,6 +21,7 @@ Check off each item as it is verified. Mark with **FAIL** and a note if somethin
 - [ ] Session expiry message is shown after returning to login with an expired session
 - [ ] Successful OTP routes to Profile Setup if onboarding is incomplete
 - [ ] Successful OTP routes directly to Home if onboarding is already complete
+- [ ] Profile Setup shows editable Display Name alongside First Name and Last Name; Jane Smith defaults to Jane S, name edits update the suggestion, and a custom display name is preserved and saved. Blank display names cannot continue.
 
 ### 1.2 Google OAuth
 
@@ -31,10 +32,12 @@ Check off each item as it is verified. Mark with **FAIL** and a note if somethin
 ### 1.3 Profile Setup (New Users)
 
 - [ ] Name step saves first/last name and advances
-- [ ] Phone number step is optional and advances
-- [ ] Timezone picker shows 25+ options and persists selection
-- [ ] Country picker shows countries with flags and persists selection
-- [ ] Grade level step shows all grade options (Pre-K through Grade 6+)
+- [ ] Phone country defaults to United States (+1), regardless of device region. The selector shows the country name and calling code above the number. It opens a sheet with alphabetical rows, search by country or calling code (including +), a selected checkmark, a no-results message, and Close. Selecting a country preserves the typed number; dismissing preserves the selection. Verify keyboard scrolling and light/dark appearance.
+- [ ] Phone number step is optional for children and advances
+- [ ] Denying location opens a searchable time-zone sheet with alphabetical city names (for example New York), region and current UTC offset, selected checkmark, Close, and a no-results message. Search supports city names and time-zone IDs. Selection closes the sheet and persists the original IANA time-zone ID. Manual selection is also available without requesting location. GPS prefills all returned address fields; selecting a time-zone city suggests its city and unambiguous country. Suggestions stay editable, preserve manual edits, and never guess a postal code or state.
+- [ ] Your location country picker matches the time-zone sheet: alphabetical searchable country names, selected checkmark, no-results message, and Close. Selecting a country updates the address labels and preserves typed city, state/region, and postal code; dismissing preserves the country.
+- [ ] Country-specific location fields follow the country address metadata: US city/state/ZIP are required (5 digits or ZIP+4, leading zeroes preserved); Canada requires province/postal code; UK requires postcode without county; Singapore requires its 6-digit postal code without city/region; UAE requires emirate without postal code; Sri Lankan postal code is optional. Invalid postal codes return a field-specific API error. Switching countries updates labels, visibility, and required status.
+- [ ] Student and first-child grade selectors use the shared searchable sheet, with country-specific labels, education ordering (Grade 2 before Grade 10), selected checkmark, no-results message, and Close. Selecting saves the grade ID; dismissal preserves it.
 - [ ] Educator-specific availability step appears for educator role
 - [ ] Back navigation between steps works
 - [ ] Completing all steps routes to Home
@@ -316,3 +319,15 @@ The following automated tests already exist; run `pnpm test:mobile` from the rep
 | ---- | ---- | ---- | ------ |
 | QA   |      |      |        |
 | Dev  |      |      |        |
+
+### Location prefill and administrative areas
+
+- [ ] Device location prefills all available country, city, state/province, and postal details; a GPS region abbreviation such as NY selects New York.
+- [ ] Selecting a timezone city prefills country/city immediately and then available region/postal hints. Unavailable or ambiguous values remain editable. Choosing a different timezone or device location prevents stale lookup results from overwriting the latest selection.
+- [ ] Countries with administrative-area data show a searchable, selected-state list; switching countries changes that list and resets the old region. Existing saved country/region pairs restore together correctly.
+
+- [ ] All country, time-zone, and state/province selection sheets give the title and Close button comfortable clearance below the rounded top edge; title and search field remain horizontally aligned.
+
+- [ ] Student and first-child birth years use the shared searchable sheet, with newest years first, no guessed default, selected checkmark, and Close. The range runs from the current device calendar year back 120 years and refreshes on opening or app resume, including after New Year. Selection returns the year; dismissal leaves the existing value unchanged.
+
+- [ ] Use my current location keeps the detected device time zone if only GPS/address lookup fails; it shows an inline explanation instead of reopening the time-zone sheet. Confirmed permission denial offers manual selection and an Open location settings button when the OS cannot prompt again. A stale initial permission check must not reopen the sheet after detection starts.

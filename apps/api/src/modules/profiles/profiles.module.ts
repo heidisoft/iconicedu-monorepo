@@ -1,3 +1,4 @@
+import { TimezoneLocationService } from './timezone-location.service';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { NotificationPreferencesModule } from '@iconicedu/api/modules/notification-preferences/notification-preferences.module';
@@ -7,6 +8,6 @@ import { ProfilesService } from '@iconicedu/api/modules/profiles/profiles.servic
 @Module({
   imports: [AuthModule, NotificationPreferencesModule],
   controllers: [ProfilesController],
-  providers: [ProfilesService],
+  providers: [ProfilesService, TimezoneLocationService],
 })
 export class ProfilesModule {}

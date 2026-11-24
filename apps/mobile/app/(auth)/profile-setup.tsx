@@ -1,7 +1,12 @@
+import { BirthYearSelect } from '@/components/auth/birth-year-select';
+import { GradeLevelSelect, type GradeOption } from '@/components/auth/grade-level-select';
+import { fetchTimezoneLocationHint } from '@/lib/api/onboarding/queries';
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { isValidPhoneNumber, type CountryCode } from 'libphonenumber-js';
 import {
   View,
+  Keyboard,
+  Linking,
   Text,
   TextInput,
   TouchableOpacity,
@@ -13,22 +18,28 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import * as Location from 'expo-location';
+import { ChevronDown } from 'lucide-react-native';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { CountryPickerSheet } from '@iconicedu/ui-native/components/country-picker-sheet';
+import { LocationAddressFields } from '@/components/auth/location-address-fields';
+import { LocationCountryField } from '@/components/auth/location-country-field';
+import { TimezoneStep } from '@/components/auth/timezone-step';
+import { useOnboardingLocation } from '@/hooks/use-onboarding-location';
+import { useSignupName } from '@/hooks/use-signup-name';
 import { useAuth } from '@/providers/auth-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { useAnalytics } from '@/providers/analytics-provider';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { queryKeys } from '@/lib/api/query-keys';
-import { AnalyticsEvent } from '@iconicedu/utils';
+import { AnalyticsEvent, getTimezoneLocationHint } from '@iconicedu/utils';
 import {
+  getCountryAddressFields,
   normalizeCountryCode,
   optionsForCountry,
-  type GradeLevel,
 } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import {
@@ -56,581 +67,8 @@ import {
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
-// Comprehensive canonical IANA timezone IDs — used as fallback when
-// Intl.supportedValuesOf('timeZone') is unavailable (older Hermes builds).
-// Labels are always generated dynamically via Intl.DateTimeFormat.
-const TIMEZONE_IDS_FALLBACK: readonly string[] = [
-  'Africa/Abidjan',
-  'Africa/Accra',
-  'Africa/Addis_Ababa',
-  'Africa/Algiers',
-  'Africa/Asmara',
-  'Africa/Bamako',
-  'Africa/Bangui',
-  'Africa/Banjul',
-  'Africa/Bissau',
-  'Africa/Blantyre',
-  'Africa/Brazzaville',
-  'Africa/Bujumbura',
-  'Africa/Cairo',
-  'Africa/Casablanca',
-  'Africa/Ceuta',
-  'Africa/Conakry',
-  'Africa/Dakar',
-  'Africa/Dar_es_Salaam',
-  'Africa/Djibouti',
-  'Africa/Douala',
-  'Africa/El_Aaiun',
-  'Africa/Freetown',
-  'Africa/Gaborone',
-  'Africa/Harare',
-  'Africa/Johannesburg',
-  'Africa/Juba',
-  'Africa/Kampala',
-  'Africa/Khartoum',
-  'Africa/Kigali',
-  'Africa/Kinshasa',
-  'Africa/Lagos',
-  'Africa/Libreville',
-  'Africa/Lome',
-  'Africa/Luanda',
-  'Africa/Lubumbashi',
-  'Africa/Lusaka',
-  'Africa/Malabo',
-  'Africa/Maputo',
-  'Africa/Maseru',
-  'Africa/Mbabane',
-  'Africa/Mogadishu',
-  'Africa/Monrovia',
-  'Africa/Nairobi',
-  'Africa/Ndjamena',
-  'Africa/Niamey',
-  'Africa/Nouakchott',
-  'Africa/Ouagadougou',
-  'Africa/Porto-Novo',
-  'Africa/Sao_Tome',
-  'Africa/Tripoli',
-  'Africa/Tunis',
-  'Africa/Windhoek',
-  'America/Adak',
-  'America/Anchorage',
-  'America/Anguilla',
-  'America/Antigua',
-  'America/Araguaina',
-  'America/Argentina/Buenos_Aires',
-  'America/Argentina/Catamarca',
-  'America/Argentina/Cordoba',
-  'America/Argentina/Jujuy',
-  'America/Argentina/La_Rioja',
-  'America/Argentina/Mendoza',
-  'America/Argentina/Rio_Gallegos',
-  'America/Argentina/Salta',
-  'America/Argentina/San_Juan',
-  'America/Argentina/San_Luis',
-  'America/Argentina/Tucuman',
-  'America/Argentina/Ushuaia',
-  'America/Aruba',
-  'America/Asuncion',
-  'America/Atikokan',
-  'America/Bahia',
-  'America/Bahia_Banderas',
-  'America/Barbados',
-  'America/Belem',
-  'America/Belize',
-  'America/Blanc-Sablon',
-  'America/Boa_Vista',
-  'America/Bogota',
-  'America/Boise',
-  'America/Cambridge_Bay',
-  'America/Campo_Grande',
-  'America/Cancun',
-  'America/Caracas',
-  'America/Cayenne',
-  'America/Cayman',
-  'America/Chicago',
-  'America/Chihuahua',
-  'America/Ciudad_Juarez',
-  'America/Costa_Rica',
-  'America/Creston',
-  'America/Cuiaba',
-  'America/Curacao',
-  'America/Danmarkshavn',
-  'America/Dawson',
-  'America/Dawson_Creek',
-  'America/Denver',
-  'America/Detroit',
-  'America/Dominica',
-  'America/Edmonton',
-  'America/Eirunepe',
-  'America/El_Salvador',
-  'America/Fortaleza',
-  'America/Glace_Bay',
-  'America/Goose_Bay',
-  'America/Grand_Turk',
-  'America/Grenada',
-  'America/Guadeloupe',
-  'America/Guatemala',
-  'America/Guayaquil',
-  'America/Guyana',
-  'America/Halifax',
-  'America/Havana',
-  'America/Hermosillo',
-  'America/Indiana/Indianapolis',
-  'America/Indiana/Knox',
-  'America/Indiana/Marengo',
-  'America/Indiana/Petersburg',
-  'America/Indiana/Tell_City',
-  'America/Indiana/Vevay',
-  'America/Indiana/Vincennes',
-  'America/Indiana/Winamac',
-  'America/Inuvik',
-  'America/Iqaluit',
-  'America/Jamaica',
-  'America/Juneau',
-  'America/Kentucky/Louisville',
-  'America/Kentucky/Monticello',
-  'America/Kralendijk',
-  'America/La_Paz',
-  'America/Lima',
-  'America/Los_Angeles',
-  'America/Lower_Princes',
-  'America/Maceio',
-  'America/Managua',
-  'America/Manaus',
-  'America/Marigot',
-  'America/Martinique',
-  'America/Matamoros',
-  'America/Mazatlan',
-  'America/Menominee',
-  'America/Merida',
-  'America/Metlakatla',
-  'America/Mexico_City',
-  'America/Miquelon',
-  'America/Moncton',
-  'America/Monterrey',
-  'America/Montevideo',
-  'America/Montserrat',
-  'America/Nassau',
-  'America/New_York',
-  'America/Nome',
-  'America/Noronha',
-  'America/North_Dakota/Beulah',
-  'America/North_Dakota/Center',
-  'America/North_Dakota/New_Salem',
-  'America/Nuuk',
-  'America/Ojinaga',
-  'America/Panama',
-  'America/Paramaribo',
-  'America/Phoenix',
-  'America/Port-au-Prince',
-  'America/Port_of_Spain',
-  'America/Porto_Velho',
-  'America/Puerto_Rico',
-  'America/Punta_Arenas',
-  'America/Rankin_Inlet',
-  'America/Recife',
-  'America/Regina',
-  'America/Resolute',
-  'America/Rio_Branco',
-  'America/Santarem',
-  'America/Santiago',
-  'America/Santo_Domingo',
-  'America/Sao_Paulo',
-  'America/Scoresbysund',
-  'America/Sitka',
-  'America/St_Barthelemy',
-  'America/St_Johns',
-  'America/St_Kitts',
-  'America/St_Lucia',
-  'America/St_Thomas',
-  'America/St_Vincent',
-  'America/Swift_Current',
-  'America/Tegucigalpa',
-  'America/Thule',
-  'America/Tijuana',
-  'America/Toronto',
-  'America/Tortola',
-  'America/Vancouver',
-  'America/Whitehorse',
-  'America/Winnipeg',
-  'America/Yakutat',
-  'Antarctica/Casey',
-  'Antarctica/Davis',
-  'Antarctica/DumontDUrville',
-  'Antarctica/Macquarie',
-  'Antarctica/Mawson',
-  'Antarctica/McMurdo',
-  'Antarctica/Palmer',
-  'Antarctica/Rothera',
-  'Antarctica/Syowa',
-  'Antarctica/Troll',
-  'Antarctica/Vostok',
-  'Arctic/Longyearbyen',
-  'Asia/Aden',
-  'Asia/Almaty',
-  'Asia/Amman',
-  'Asia/Anadyr',
-  'Asia/Aqtau',
-  'Asia/Aqtobe',
-  'Asia/Ashgabat',
-  'Asia/Atyrau',
-  'Asia/Baghdad',
-  'Asia/Bahrain',
-  'Asia/Baku',
-  'Asia/Bangkok',
-  'Asia/Barnaul',
-  'Asia/Beirut',
-  'Asia/Bishkek',
-  'Asia/Brunei',
-  'Asia/Chita',
-  'Asia/Colombo',
-  'Asia/Damascus',
-  'Asia/Dhaka',
-  'Asia/Dili',
-  'Asia/Dubai',
-  'Asia/Dushanbe',
-  'Asia/Famagusta',
-  'Asia/Gaza',
-  'Asia/Hebron',
-  'Asia/Ho_Chi_Minh',
-  'Asia/Hong_Kong',
-  'Asia/Hovd',
-  'Asia/Irkutsk',
-  'Asia/Jakarta',
-  'Asia/Jayapura',
-  'Asia/Jerusalem',
-  'Asia/Kabul',
-  'Asia/Kamchatka',
-  'Asia/Karachi',
-  'Asia/Kathmandu',
-  'Asia/Khandyga',
-  'Asia/Kolkata',
-  'Asia/Krasnoyarsk',
-  'Asia/Kuala_Lumpur',
-  'Asia/Kuching',
-  'Asia/Kuwait',
-  'Asia/Macau',
-  'Asia/Magadan',
-  'Asia/Makassar',
-  'Asia/Manila',
-  'Asia/Muscat',
-  'Asia/Nicosia',
-  'Asia/Novokuznetsk',
-  'Asia/Novosibirsk',
-  'Asia/Omsk',
-  'Asia/Oral',
-  'Asia/Phnom_Penh',
-  'Asia/Pontianak',
-  'Asia/Pyongyang',
-  'Asia/Qatar',
-  'Asia/Qostanay',
-  'Asia/Qyzylorda',
-  'Asia/Riyadh',
-  'Asia/Sakhalin',
-  'Asia/Samarkand',
-  'Asia/Seoul',
-  'Asia/Shanghai',
-  'Asia/Singapore',
-  'Asia/Srednekolymsk',
-  'Asia/Taipei',
-  'Asia/Tashkent',
-  'Asia/Tbilisi',
-  'Asia/Tehran',
-  'Asia/Thimphu',
-  'Asia/Tokyo',
-  'Asia/Tomsk',
-  'Asia/Ulaanbaatar',
-  'Asia/Urumqi',
-  'Asia/Ust-Nera',
-  'Asia/Vientiane',
-  'Asia/Vladivostok',
-  'Asia/Yakutsk',
-  'Asia/Yangon',
-  'Asia/Yekaterinburg',
-  'Asia/Yerevan',
-  'Atlantic/Azores',
-  'Atlantic/Bermuda',
-  'Atlantic/Canary',
-  'Atlantic/Cape_Verde',
-  'Atlantic/Faroe',
-  'Atlantic/Madeira',
-  'Atlantic/Reykjavik',
-  'Atlantic/South_Georgia',
-  'Atlantic/St_Helena',
-  'Atlantic/Stanley',
-  'Australia/Adelaide',
-  'Australia/Brisbane',
-  'Australia/Broken_Hill',
-  'Australia/Darwin',
-  'Australia/Eucla',
-  'Australia/Hobart',
-  'Australia/Lindeman',
-  'Australia/Lord_Howe',
-  'Australia/Melbourne',
-  'Australia/Perth',
-  'Australia/Sydney',
-  'Europe/Amsterdam',
-  'Europe/Andorra',
-  'Europe/Astrakhan',
-  'Europe/Athens',
-  'Europe/Belgrade',
-  'Europe/Berlin',
-  'Europe/Bratislava',
-  'Europe/Brussels',
-  'Europe/Bucharest',
-  'Europe/Budapest',
-  'Europe/Busingen',
-  'Europe/Chisinau',
-  'Europe/Copenhagen',
-  'Europe/Dublin',
-  'Europe/Gibraltar',
-  'Europe/Guernsey',
-  'Europe/Helsinki',
-  'Europe/Isle_of_Man',
-  'Europe/Istanbul',
-  'Europe/Jersey',
-  'Europe/Kaliningrad',
-  'Europe/Kirov',
-  'Europe/Kyiv',
-  'Europe/Lisbon',
-  'Europe/Ljubljana',
-  'Europe/London',
-  'Europe/Luxembourg',
-  'Europe/Madrid',
-  'Europe/Malta',
-  'Europe/Mariehamn',
-  'Europe/Minsk',
-  'Europe/Monaco',
-  'Europe/Moscow',
-  'Europe/Nicosia',
-  'Europe/Oslo',
-  'Europe/Paris',
-  'Europe/Podgorica',
-  'Europe/Prague',
-  'Europe/Riga',
-  'Europe/Rome',
-  'Europe/Samara',
-  'Europe/San_Marino',
-  'Europe/Sarajevo',
-  'Europe/Saratov',
-  'Europe/Simferopol',
-  'Europe/Skopje',
-  'Europe/Sofia',
-  'Europe/Stockholm',
-  'Europe/Tallinn',
-  'Europe/Tirane',
-  'Europe/Ulyanovsk',
-  'Europe/Vaduz',
-  'Europe/Vatican',
-  'Europe/Vienna',
-  'Europe/Vilnius',
-  'Europe/Volgograd',
-  'Europe/Warsaw',
-  'Europe/Zagreb',
-  'Europe/Zurich',
-  'Indian/Antananarivo',
-  'Indian/Chagos',
-  'Indian/Christmas',
-  'Indian/Cocos',
-  'Indian/Comoro',
-  'Indian/Kerguelen',
-  'Indian/Mahe',
-  'Indian/Maldives',
-  'Indian/Mauritius',
-  'Indian/Mayotte',
-  'Indian/Reunion',
-  'Pacific/Apia',
-  'Pacific/Auckland',
-  'Pacific/Bougainville',
-  'Pacific/Chatham',
-  'Pacific/Chuuk',
-  'Pacific/Easter',
-  'Pacific/Efate',
-  'Pacific/Fakaofo',
-  'Pacific/Fiji',
-  'Pacific/Funafuti',
-  'Pacific/Galapagos',
-  'Pacific/Gambier',
-  'Pacific/Guadalcanal',
-  'Pacific/Guam',
-  'Pacific/Honolulu',
-  'Pacific/Kanton',
-  'Pacific/Kiritimati',
-  'Pacific/Kosrae',
-  'Pacific/Kwajalein',
-  'Pacific/Majuro',
-  'Pacific/Marquesas',
-  'Pacific/Midway',
-  'Pacific/Nauru',
-  'Pacific/Niue',
-  'Pacific/Norfolk',
-  'Pacific/Noumea',
-  'Pacific/Pago_Pago',
-  'Pacific/Palau',
-  'Pacific/Pitcairn',
-  'Pacific/Pohnpei',
-  'Pacific/Port_Moresby',
-  'Pacific/Rarotonga',
-  'Pacific/Saipan',
-  'Pacific/Tahiti',
-  'Pacific/Tarawa',
-  'Pacific/Tongatapu',
-  'Pacific/Wake',
-  'Pacific/Wallis',
-  'UTC',
-];
-
-function parseOffsetMins(gmt: string): number {
-  const m = gmt.replace('GMT', '').match(/^([+-]?)(\d+):?(\d*)$/);
-  if (!m) return 0;
-  const sign = m[1] === '-' ? -1 : 1;
-  return sign * (parseInt(m[2] || '0', 10) * 60 + parseInt(m[3] || '0', 10));
-}
-
-function buildTimezoneList(): Array<{ id: string; label: string }> {
-  let ids: string[];
-  try {
-    ids = (
-      Intl as unknown as { supportedValuesOf(k: string): string[] }
-    ).supportedValuesOf('timeZone');
-  } catch {
-    ids = TIMEZONE_IDS_FALLBACK as string[];
-  }
-
-  const now = new Date();
-  type Entry = { id: string; label: string; offsetMins: number };
-  const list: Entry[] = [];
-
-  for (const id of ids) {
-    try {
-      const parts = new Intl.DateTimeFormat('en', {
-        timeZone: id,
-        timeZoneName: 'shortOffset',
-      }).formatToParts(now);
-      const gmt = parts.find((p) => p.type === 'timeZoneName')?.value ?? 'GMT';
-      list.push({ id, label: id, offsetMins: parseOffsetMins(gmt) });
-    } catch {
-      // skip IDs that fail formatting
-    }
-  }
-
-  list.sort((a, b) => a.offsetMins - b.offsetMins || a.id.localeCompare(b.id));
-  return list.map(({ id, label }) => ({ id, label }));
-}
-
-const TIMEZONES = buildTimezoneList();
-
 // Derived from PHONE_COUNTRIES after its definition — placeholder used by LocationStep
 let COUNTRIES: Array<{ code: string; label: string; flag: string }> = [];
-
-type AddressConfig = {
-  cityLabel: string;
-  cityPlaceholder: string;
-  regionLabel: string;
-  regionPlaceholder: string;
-  postalLabel: string;
-  postalPlaceholder: string;
-};
-
-const ADDRESS_CONFIG: Record<string, AddressConfig> = {
-  US: {
-    cityLabel: 'City',
-    cityPlaceholder: 'e.g. New York',
-    regionLabel: 'State',
-    regionPlaceholder: 'e.g. New York',
-    postalLabel: 'ZIP Code',
-    postalPlaceholder: 'e.g. 10001',
-  },
-  CA: {
-    cityLabel: 'City',
-    cityPlaceholder: 'e.g. Toronto',
-    regionLabel: 'Province',
-    regionPlaceholder: 'e.g. Ontario',
-    postalLabel: 'Postal Code',
-    postalPlaceholder: 'e.g. M5H 2N2',
-  },
-  GB: {
-    cityLabel: 'City or Town',
-    cityPlaceholder: 'e.g. London',
-    regionLabel: 'County or Region',
-    regionPlaceholder: 'e.g. Greater London',
-    postalLabel: 'Postcode',
-    postalPlaceholder: 'e.g. SW1A 1AA',
-  },
-  AU: {
-    cityLabel: 'City or Suburb',
-    cityPlaceholder: 'e.g. Sydney',
-    regionLabel: 'State or Territory',
-    regionPlaceholder: 'e.g. New South Wales',
-    postalLabel: 'Postcode',
-    postalPlaceholder: 'e.g. 2000',
-  },
-  NZ: {
-    cityLabel: 'City or Town',
-    cityPlaceholder: 'e.g. Auckland',
-    regionLabel: 'Region',
-    regionPlaceholder: 'e.g. Auckland Region',
-    postalLabel: 'Postcode',
-    postalPlaceholder: 'e.g. 1010',
-  },
-  IN: {
-    cityLabel: 'City',
-    cityPlaceholder: 'e.g. Mumbai',
-    regionLabel: 'State',
-    regionPlaceholder: 'e.g. Maharashtra',
-    postalLabel: 'PIN Code',
-    postalPlaceholder: 'e.g. 400001',
-  },
-  LK: {
-    cityLabel: 'City',
-    cityPlaceholder: 'e.g. Colombo',
-    regionLabel: 'Province',
-    regionPlaceholder: 'e.g. Western Province',
-    postalLabel: 'Postal Code',
-    postalPlaceholder: 'e.g. 00100',
-  },
-  SG: {
-    cityLabel: 'District',
-    cityPlaceholder: 'e.g. Orchard',
-    regionLabel: 'Region',
-    regionPlaceholder: 'e.g. Central Region',
-    postalLabel: 'Postal Code',
-    postalPlaceholder: 'e.g. 238823',
-  },
-  AE: {
-    cityLabel: 'City',
-    cityPlaceholder: 'e.g. Dubai',
-    regionLabel: 'Emirate',
-    regionPlaceholder: 'e.g. Dubai',
-    postalLabel: 'Postal Code',
-    postalPlaceholder: '',
-  },
-  DE: {
-    cityLabel: 'City',
-    cityPlaceholder: 'e.g. Berlin',
-    regionLabel: 'State (Bundesland)',
-    regionPlaceholder: 'e.g. Berlin',
-    postalLabel: 'Postleitzahl',
-    postalPlaceholder: 'e.g. 10115',
-  },
-  FR: {
-    cityLabel: 'City',
-    cityPlaceholder: 'e.g. Paris',
-    regionLabel: 'Region',
-    regionPlaceholder: 'e.g. Île-de-France',
-    postalLabel: 'Code Postal',
-    postalPlaceholder: 'e.g. 75001',
-  },
-};
-
-const DEFAULT_ADDRESS_CONFIG: AddressConfig = {
-  cityLabel: 'City',
-  cityPlaceholder: 'e.g. City name',
-  regionLabel: 'State / Region / Province',
-  regionPlaceholder: 'e.g. Region name',
-  postalLabel: 'Postal Code',
-  postalPlaceholder: 'e.g. Postal code',
-};
 
 type NominatimResult = {
   place_id: number;
@@ -647,8 +85,6 @@ type NominatimResult = {
     country_code?: string;
   };
 };
-
-type GradeOption = { value: GradeLevel; label: string };
 
 const EDUCATOR_SUBJECTS = [
   'Mathematics',
@@ -679,8 +115,6 @@ const DAYS_OF_WEEK = [
   { id: 'sunday', short: 'Sun' },
 ];
 
-const CURRENT_YEAR = new Date().getFullYear();
-const BIRTH_YEARS = Array.from({ length: 30 }, (_, i) => CURRENT_YEAR - 4 - i);
 const DEFAULT_GRADE_OPTIONS = optionsForCountry(normalizeCountryCode());
 
 // ─── Step types ────────────────────────────────────────────────────────────────
@@ -1072,18 +506,22 @@ function NameStep({
   setFirstName,
   lastName,
   setLastName,
-  isGuardian,
+  displayName,
+  setDisplayName,
   s,
 }: {
   firstName: string;
   setFirstName: (v: string) => void;
   lastName: string;
   setLastName: (v: string) => void;
-  isGuardian: boolean;
+  displayName: string;
+  setDisplayName: (v: string) => void;
   s: S;
   colors: AppColors;
 }) {
-  const [focusedField, setFocusedField] = useState<'first' | 'last' | null>(null);
+  const [focusedField, setFocusedField] = useState<'first' | 'last' | 'display' | null>(
+    null,
+  );
 
   return (
     <>
@@ -1119,6 +557,21 @@ function NameStep({
           autoCapitalize="words"
           returnKeyType="done"
           onFocus={() => setFocusedField('last')}
+          onBlur={() => setFocusedField(null)}
+        />
+      </View>
+      <Text style={[s.label, { marginTop: 12 }]}>Display Name</Text>
+      <View style={[s.inputWrap, focusedField === 'display' && s.inputWrapFocused]}>
+        <TextInput
+          style={s.input}
+          value={displayName}
+          onChangeText={setDisplayName}
+          accessibilityLabel="Display name"
+          placeholder="Display name"
+          placeholderTextColor={s.placeholderColor}
+          autoCapitalize="words"
+          returnKeyType="done"
+          onFocus={() => setFocusedField('display')}
           onBlur={() => setFocusedField(null)}
         />
       </View>
@@ -1330,48 +783,9 @@ const PHONE_COUNTRIES: PhoneCountry[] = [
 // Reuse PHONE_COUNTRIES as the country list for LocationStep (strip dialCode)
 COUNTRIES = PHONE_COUNTRIES.map(({ code, label, flag }) => ({ code, label, flag }));
 
-function guessCountryCode(): string {
-  try {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    if (tz === 'Asia/Colombo') return 'LK';
-    if (tz.startsWith('Asia/Kolkata') || tz === 'Asia/Calcutta') return 'IN';
-    if (tz.startsWith('Australia/')) return 'AU';
-    if (tz === 'Europe/London') return 'GB';
-    if (tz.startsWith('Pacific/Auckland') || tz === 'Pacific/Chatham') return 'NZ';
-    if (tz === 'Asia/Singapore') return 'SG';
-    if (tz === 'Asia/Dubai') return 'AE';
-    if (tz === 'Asia/Riyadh') return 'SA';
-    if (tz === 'Asia/Karachi') return 'PK';
-    if (tz === 'Asia/Dhaka') return 'BD';
-    if (tz === 'Asia/Kuala_Lumpur' || tz === 'Asia/Kuching') return 'MY';
-    if (tz === 'Africa/Nairobi') return 'KE';
-    if (tz === 'Africa/Lagos') return 'NG';
-    if (tz === 'Africa/Johannesburg') return 'ZA';
-    if (tz === 'Europe/Berlin') return 'DE';
-    if (tz === 'Europe/Istanbul') return 'TR';
-    if (tz === 'America/Sao_Paulo') return 'BR';
-    if (tz === 'Asia/Tokyo') return 'JP';
-    if (tz.startsWith('Asia/Shanghai')) return 'CN';
-    if (tz === 'Asia/Manila') return 'PH';
-    if (tz === 'Asia/Muscat') return 'OM';
-    if (tz === 'Asia/Qatar') return 'QA';
-    if (
-      tz === 'America/Toronto' ||
-      tz === 'America/Vancouver' ||
-      tz === 'America/Winnipeg' ||
-      tz === 'America/Halifax'
-    )
-      return 'CA';
-    if (tz.startsWith('America/')) return 'US';
-  } catch {
-    // ignore
-  }
-  return 'US';
-}
-
 function initPhoneState(phone: string): { code: string; national: string } {
   if (!phone?.startsWith('+')) {
-    return { code: guessCountryCode(), national: phone?.replace(/\D/g, '') ?? '' };
+    return { code: 'US', national: phone?.replace(/\D/g, '') ?? '' };
   }
   const digits = phone.slice(1).replace(/\D/g, '');
   const sorted = [...PHONE_COUNTRIES].sort(
@@ -1382,7 +796,7 @@ function initPhoneState(phone: string): { code: string; national: string } {
       return { code: c.code, national: digits.slice(c.dialCode.length) };
     }
   }
-  return { code: guessCountryCode(), national: digits };
+  return { code: 'US', national: digits };
 }
 
 function PhoneStep({
@@ -1402,12 +816,12 @@ function PhoneStep({
   colors: AppColors;
   isChild: boolean;
 }) {
+  const insets = useSafeAreaInsets();
   const [selectedCode, setSelectedCode] = useState(externalCode);
   const [nationalNumber, setNationalNumber] = useState(
     () => initPhoneState(phone).national,
   );
   const [showPicker, setShowPicker] = useState(false);
-  const [search, setSearch] = useState('');
   const [focused, setFocused] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
@@ -1423,14 +837,6 @@ function PhoneStep({
       return false;
     }
   }, [nationalNumber, selectedCode]);
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return PHONE_COUNTRIES;
-    const q = search.toLowerCase();
-    return PHONE_COUNTRIES.filter(
-      (c) => c.label.toLowerCase().includes(q) || c.dialCode.includes(q),
-    );
-  }, [search]);
 
   const syncPhone = useCallback(
     (dialCode: string, national: string, code: string) => {
@@ -1467,60 +873,43 @@ function PhoneStep({
       setSelectedCode(country.code);
       onCountryCodeChange(country.code);
       setShowPicker(false);
-      setSearch('');
       syncPhone(country.dialCode, nationalNumber, country.code);
     },
     [nationalNumber, onCountryCodeChange, syncPhone],
   );
 
-  if (showPicker) {
-    return (
-      <>
-        <TouchableOpacity
-          style={[s.listItem, { marginBottom: 12 }]}
-          onPress={() => {
-            setShowPicker(false);
-            setSearch('');
-          }}
-        >
-          <Text style={s.listCheck}>‹</Text>
-          <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back</Text>
-        </TouchableOpacity>
-        <View style={s.searchBox}>
-          <Text>🔍</Text>
-          <TextInput
-            style={s.searchInput}
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search countries…"
-            placeholderTextColor={s.placeholderColor}
-            autoFocus
-            autoCapitalize="none"
-          />
-        </View>
-        {filtered.map((c) => {
-          const sel = c.code === selectedCode;
-          return (
-            <TouchableOpacity
-              key={c.code}
-              style={[s.listItem, sel && s.listItemSelected]}
-              onPress={() => handleCountrySelect(c)}
-            >
-              <Text style={s.listFlag}>{c.flag}</Text>
-              <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{c.label}</Text>
-              <Text style={{ fontSize: 14, color: sel ? colors.teal : colors.textFaint }}>
-                +{c.dialCode}
-              </Text>
-              {sel && <Text style={[s.listCheck, { marginLeft: 6 }]}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })}
-      </>
-    );
-  }
-
   return (
     <>
+      {showPicker && (
+        <CountryPickerSheet
+          visible={showPicker}
+          bottomInset={insets.bottom}
+          countries={PHONE_COUNTRIES}
+          selectedCode={selectedCode}
+          colors={colors}
+          onClose={() => setShowPicker(false)}
+          onSelect={(country) => {
+            const match = PHONE_COUNTRIES.find((item) => item.code === country.code);
+            if (match) handleCountrySelect(match);
+          }}
+        />
+      )}
+      <Text style={s.label}>Country</Text>
+      <TouchableOpacity
+        style={[s.inputWrap, { paddingHorizontal: 14, minHeight: 52 }]}
+        accessibilityRole="button"
+        accessibilityLabel={`Country: ${selectedCountry.label}, +${selectedCountry.dialCode}. Change country`}
+        accessibilityState={{ expanded: showPicker }}
+        onPress={() => {
+          Keyboard.dismiss();
+          setShowPicker(true);
+        }}
+      >
+        <Text style={[s.input, { paddingHorizontal: 0 }]}>
+          {selectedCountry.label} (+{selectedCountry.dialCode})
+        </Text>
+        <ChevronDown size={20} color={colors.textMuted} accessibilityElementsHidden />
+      </TouchableOpacity>
       <Text style={s.label}>
         Phone Number{isChild ? <Text style={s.labelOptional}> (optional)</Text> : null}
       </Text>
@@ -1532,27 +921,12 @@ function PhoneStep({
           { paddingHorizontal: 0 },
         ]}
       >
-        <TouchableOpacity
-          style={{
-            flexDirection: 'row' as const,
-            alignItems: 'center' as const,
-            paddingHorizontal: 14,
-            gap: 6,
-          }}
-          onPress={() => setShowPicker(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={{ fontSize: 22 }}>{selectedCountry.flag}</Text>
-          <Text style={{ fontSize: 15, color: colors.text, fontWeight: '500' as const }}>
-            +{selectedCountry.dialCode}
-          </Text>
-          <Text style={{ fontSize: 11, color: colors.textFaint }}>▾</Text>
-        </TouchableOpacity>
-        <View style={{ width: 1, backgroundColor: colors.border, marginVertical: 12 }} />
         <TextInput
           style={[s.input, { paddingHorizontal: 14 }]}
           value={nationalNumber}
           onChangeText={handleNumberChange}
+          accessibilityLabel="Phone number"
+          textContentType="telephoneNumber"
           placeholder="Phone number"
           placeholderTextColor={s.placeholderColor}
           keyboardType="phone-pad"
@@ -1568,12 +942,14 @@ function PhoneStep({
       </View>
       {isDirty && isValid === false ? (
         <Text
-          style={{ fontSize: 13, color: '#ef4444', marginTop: -10, marginBottom: 12 }}
+          style={{ fontSize: 13, color: colors.red, marginTop: -10, marginBottom: 12 }}
         >
           Enter a valid {selectedCountry.label} number
         </Text>
       ) : (
-        <Text style={s.inputHint}>Tap the flag to change your country</Text>
+        <Text style={s.inputHint}>
+          Choose the country your phone number is registered in.
+        </Text>
       )}
     </>
   );
@@ -1645,248 +1021,6 @@ function NotificationsStep({
   );
 }
 
-type DetectedLocation = {
-  city: string;
-  region: string;
-  postalCode: string;
-  countryCode: string;
-};
-
-function TimezoneStep({
-  timezone,
-  setTimezone,
-  onLocationDetected,
-  s,
-  colors,
-}: {
-  timezone: string;
-  setTimezone: (v: string) => void;
-  onLocationDetected?: (loc: DetectedLocation) => void;
-  s: S;
-  colors: AppColors;
-}) {
-  const [detecting, setDetecting] = useState(false);
-  const [detectError, setDetectError] = useState<string | null>(null);
-  // Initialize label only when timezone was explicitly prefilled from DB
-  // (i.e. it differs from the device's current Intl timezone, meaning it was stored before)
-  const [detectedLabel, setDetectedLabel] = useState<string | null>(() => {
-    try {
-      const deviceTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (timezone && timezone !== 'UTC' && timezone !== deviceTz) {
-        return TIMEZONES.find((t) => t.id === timezone)?.label ?? timezone;
-      }
-    } catch {
-      /* ignore */
-    }
-    return null;
-  });
-  const [showManual, setShowManual] = useState(false);
-  const [search, setSearch] = useState('');
-
-  const allTimezones = useMemo(() => {
-    // TIMEZONES is built from Intl.supportedValuesOf so the device tz is already included.
-    // Only prepend as a fallback if it's somehow absent (unusual/private tz identifiers).
-    try {
-      const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      if (detected && !TIMEZONES.some((t) => t.id === detected)) {
-        return [{ id: detected, label: detected }, ...TIMEZONES];
-      }
-    } catch {
-      /* ignore */
-    }
-    return TIMEZONES;
-  }, []);
-
-  const filtered = useMemo(() => {
-    if (!search.trim()) return allTimezones;
-    const q = search.toLowerCase();
-    return allTimezones.filter(
-      (t) => t.id.toLowerCase().includes(q) || t.label.toLowerCase().includes(q),
-    );
-  }, [search, allTimezones]);
-
-  const runDetect = useCallback(async () => {
-    setDetecting(true);
-    setDetectError(null);
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setDetectError(
-          'Location permission denied. Please select your time zone manually.',
-        );
-        setShowManual(true);
-        return;
-      }
-      const pos = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Lowest,
-      });
-      const [geo] = await Location.reverseGeocodeAsync({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-      });
-      const tz =
-        geo?.timezone ??
-        (() => {
-          try {
-            return Intl.DateTimeFormat().resolvedOptions().timeZone;
-          } catch {
-            return null;
-          }
-        })();
-      if (tz) {
-        setTimezone(tz);
-        const match = TIMEZONES.find((t) => t.id === tz);
-        setDetectedLabel(match?.label ?? tz);
-        onLocationDetected?.({
-          city: geo.city ?? '',
-          region: geo.region ?? '',
-          postalCode: geo.postalCode ?? '',
-          countryCode: geo.isoCountryCode ?? '',
-        });
-      } else {
-        setDetectError('Could not determine your time zone. Please select it manually.');
-        setShowManual(true);
-      }
-    } catch {
-      setDetectError('Location unavailable. Please select your time zone manually.');
-      setShowManual(true);
-    } finally {
-      setDetecting(false);
-    }
-  }, [setTimezone, onLocationDetected]);
-
-  // Auto-detect on mount if permission already granted — skip the button tap
-  useEffect(() => {
-    if (detectedLabel) return;
-    void (async () => {
-      try {
-        const { status } = await Location.getForegroundPermissionsAsync();
-        if (status === 'granted') {
-          void runDetect();
-        }
-      } catch {
-        /* ignore — fall through to manual button */
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally run once on mount
-
-  // Confirmed state — show after GPS detection, manual selection, or DB prefill
-  if (!showManual && !!detectedLabel) {
-    const label = detectedLabel;
-
-    return (
-      <TouchableOpacity
-        style={[
-          s.listItem,
-          s.listItemSelected,
-          { flexDirection: 'row', alignItems: 'center' },
-        ]}
-        onPress={() => {
-          setShowManual(true);
-          setDetectedLabel(null);
-        }}
-        activeOpacity={0.7}
-      >
-        <View style={{ flex: 1, gap: 4 }}>
-          <Text style={[s.listItemSelectedTxt, { fontSize: 16, fontWeight: '600' }]}>
-            ✓ {label}
-          </Text>
-        </View>
-        <Text style={{ fontSize: 13, color: colors.teal, fontWeight: '500' }}>Edit</Text>
-      </TouchableOpacity>
-    );
-  }
-
-  // Initial state — not yet detected, not manual
-  if (!showManual && !detectedLabel) {
-    return (
-      <>
-        <TouchableOpacity
-          style={[
-            s.listItem,
-            {
-              backgroundColor: colors.tealBg,
-              borderColor: colors.teal,
-              justifyContent: 'center',
-              minHeight: 56,
-            },
-          ]}
-          onPress={runDetect}
-          disabled={detecting}
-          activeOpacity={0.8}
-        >
-          {detecting ? (
-            <ActivityIndicator color={colors.teal} size="small" />
-          ) : (
-            <Text style={[s.listItemSelectedTxt, { textAlign: 'center', fontSize: 16 }]}>
-              📍 Use my current location
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        {detectError ? (
-          <Text style={[s.inputHint, { marginTop: 8 }]}>{detectError}</Text>
-        ) : null}
-      </>
-    );
-  }
-
-  // Manual selection
-  return (
-    <>
-      {!detectError && (
-        <TouchableOpacity
-          style={[s.listItem, { marginBottom: 12 }]}
-          onPress={() => {
-            setShowManual(false);
-            setSearch('');
-          }}
-        >
-          <Text style={s.listCheck}>‹</Text>
-          <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back</Text>
-        </TouchableOpacity>
-      )}
-      {detectError ? (
-        <Text style={[s.inputHint, { marginBottom: 12 }]}>{detectError}</Text>
-      ) : null}
-      <View style={s.searchBox}>
-        <Text>🔍</Text>
-        <TextInput
-          style={s.searchInput}
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Search time zones…"
-          placeholderTextColor={s.placeholderColor}
-          autoCapitalize="none"
-          autoFocus
-        />
-      </View>
-      {filtered.map((item) => {
-        const sel = timezone === item.id;
-        return (
-          <TouchableOpacity
-            key={item.id}
-            style={[s.listItem, sel && s.listItemSelected]}
-            onPress={() => {
-              setTimezone(item.id);
-              const match = TIMEZONES.find((t) => t.id === item.id);
-              setDetectedLabel(match?.label ?? item.id);
-              setShowManual(false);
-              setSearch('');
-            }}
-          >
-            <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>
-              {item.label}
-            </Text>
-            {sel && <Text style={s.listCheck}>✓</Text>}
-          </TouchableOpacity>
-        );
-      })}
-    </>
-  );
-}
-
 function LocationStep({
   city,
   setCity,
@@ -1912,23 +1046,9 @@ function LocationStep({
   colors: AppColors;
   enableAddressSearch: boolean;
 }) {
-  const [showPicker, setShowPicker] = useState(false);
-  const [countrySearch, setCountrySearch] = useState('');
-  const [focusedField, setFocusedField] = useState<'city' | 'region' | 'postal' | null>(
-    null,
-  );
   const [addressQuery, setAddressQuery] = useState('');
   const [suggestions, setSuggestions] = useState<NominatimResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-
-  const addrConfig = ADDRESS_CONFIG[countryCode] ?? DEFAULT_ADDRESS_CONFIG;
-  const selectedCountry = COUNTRIES.find((c) => c.code === countryCode);
-
-  const filteredCountries = useMemo(() => {
-    if (!countrySearch.trim()) return COUNTRIES;
-    const q = countrySearch.toLowerCase();
-    return COUNTRIES.filter((c) => c.label.toLowerCase().includes(q));
-  }, [countrySearch]);
 
   useEffect(() => {
     if (!enableAddressSearch) {
@@ -1983,74 +1103,14 @@ function LocationStep({
     [setCity, setCountryCode, setPostalCode, setRegion],
   );
 
-  if (showPicker) {
-    return (
-      <>
-        <TouchableOpacity
-          style={[s.listItem, { marginBottom: 12 }]}
-          onPress={() => {
-            setShowPicker(false);
-            setCountrySearch('');
-          }}
-        >
-          <Text style={s.listCheck}>‹</Text>
-          <Text style={[s.listItemTxt, { marginLeft: 8 }]}>Back to location</Text>
-        </TouchableOpacity>
-        <View style={s.searchBox}>
-          <Text>🔍</Text>
-          <TextInput
-            style={s.searchInput}
-            value={countrySearch}
-            onChangeText={setCountrySearch}
-            placeholder="Search countries…"
-            placeholderTextColor={s.placeholderColor}
-            autoFocus
-            autoCapitalize="none"
-          />
-        </View>
-        {filteredCountries.map((c) => {
-          const sel = countryCode === c.code;
-          return (
-            <TouchableOpacity
-              key={c.code}
-              style={[s.listItem, sel && s.listItemSelected]}
-              onPress={() => {
-                setCountryCode(c.code);
-                setShowPicker(false);
-                setCountrySearch('');
-              }}
-            >
-              <Text style={s.listFlag}>{c.flag}</Text>
-              <Text style={[s.listItemTxt, sel && s.listItemSelectedTxt]}>{c.label}</Text>
-              {sel && <Text style={s.listCheck}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })}
-      </>
-    );
-  }
-
   return (
     <>
-      <Text style={s.label}>Country</Text>
-      <TouchableOpacity
-        style={[s.inputWrap, { marginBottom: 16 }]}
-        onPress={() => setShowPicker(true)}
-      >
-        {selectedCountry && <Text style={s.listFlag}>{selectedCountry.flag}</Text>}
-        <Text
-          style={[
-            s.input,
-            {
-              paddingVertical: 0,
-              color: selectedCountry ? undefined : s.placeholderColor,
-            },
-          ]}
-        >
-          {selectedCountry?.label ?? 'Select country…'}
-        </Text>
-        <Text style={s.listChevron}>›</Text>
-      </TouchableOpacity>
+      <LocationCountryField
+        countries={COUNTRIES}
+        countryCode={countryCode}
+        onChange={setCountryCode}
+        colors={colors}
+      />
 
       {enableAddressSearch && (
         <>
@@ -2127,110 +1187,23 @@ function LocationStep({
         </View>
       )}
 
-      <Text style={s.label}>{addrConfig.cityLabel}</Text>
-      <View style={[s.inputWrap, focusedField === 'city' && s.inputWrapFocused]}>
-        <TextInput
-          style={s.input}
-          value={city}
-          onChangeText={setCity}
-          placeholder={addrConfig.cityPlaceholder}
-          placeholderTextColor={s.placeholderColor}
-          autoCapitalize="words"
-          returnKeyType="next"
-          onFocus={() => setFocusedField('city')}
-          onBlur={() => setFocusedField(null)}
-        />
-      </View>
-
-      <Text style={s.label}>{addrConfig.regionLabel}</Text>
-      <View style={[s.inputWrap, focusedField === 'region' && s.inputWrapFocused]}>
-        <TextInput
-          style={s.input}
-          value={region}
-          onChangeText={setRegion}
-          placeholder={addrConfig.regionPlaceholder}
-          placeholderTextColor={s.placeholderColor}
-          autoCapitalize="words"
-          returnKeyType="next"
-          onFocus={() => setFocusedField('region')}
-          onBlur={() => setFocusedField(null)}
-        />
-      </View>
-
-      <Text style={s.label}>
-        {addrConfig.postalLabel}
-        {'  '}
-        <Text style={s.labelOptional}>(optional)</Text>
-      </Text>
-      <View style={[s.inputWrap, focusedField === 'postal' && s.inputWrapFocused]}>
-        <TextInput
-          style={s.input}
-          value={postalCode}
-          onChangeText={setPostalCode}
-          placeholder={addrConfig.postalPlaceholder}
-          placeholderTextColor={s.placeholderColor}
-          returnKeyType="done"
-          onFocus={() => setFocusedField('postal')}
-          onBlur={() => setFocusedField(null)}
-        />
-      </View>
-    </>
-  );
-}
-
-function GradeLevelSelect({
-  value,
-  onChange,
-  options,
-  s,
-}: {
-  value: string | null;
-  onChange: (value: string) => void;
-  options: GradeOption[];
-  s: S;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const selected = options.find((option) => option.value === value);
-
-  return (
-    <>
-      <TouchableOpacity
-        style={[s.inputWrap, isOpen && { marginBottom: 6 }]}
-        onPress={() => setIsOpen((open) => !open)}
-        activeOpacity={0.85}
+      <LocationAddressFields
+        countryCode={countryCode}
+        city={city}
+        region={region}
+        postalCode={postalCode}
+        setCity={setCity}
+        setRegion={setRegion}
+        setPostalCode={setPostalCode}
+        s={s}
+      />
+      <Text
+        style={s.inputHint}
+        accessibilityRole="link"
+        onPress={() => void Linking.openURL('https://www.openstreetmap.org/copyright')}
       >
-        <Text
-          style={[
-            s.input,
-            {
-              paddingVertical: 0,
-              color: selected ? undefined : s.placeholderColor,
-            },
-          ]}
-        >
-          {selected?.label ?? 'Select grade'}
-        </Text>
-        <Text style={s.listChevron}>{isOpen ? '⌃' : '⌄'}</Text>
-      </TouchableOpacity>
-      {isOpen &&
-        options.map((item) => {
-          const isSelected = value === item.value;
-          return (
-            <TouchableOpacity
-              key={item.value}
-              style={[s.listItem, isSelected && s.listItemSelected]}
-              onPress={() => {
-                onChange(item.value);
-                setIsOpen(false);
-              }}
-            >
-              <Text style={[s.listItemTxt, isSelected && s.listItemSelectedTxt]}>
-                {item.label}
-              </Text>
-              {isSelected && <Text style={s.listCheck}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })}
+        Location suggestions © OpenStreetMap contributors
+      </Text>
     </>
   );
 }
@@ -2251,26 +1224,13 @@ function StudentProfileStep({
   s: S;
   colors: AppColors;
 }) {
-  const [focused, setFocused] = useState(false);
   return (
     <>
       <Text style={s.label}>Year of Birth</Text>
-      <View style={[s.inputWrap, focused && s.inputWrapFocused]}>
-        <TextInput
-          style={s.input}
-          value={birthYear}
-          onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
-          placeholder={`e.g. ${BIRTH_YEARS[8]}`}
-          placeholderTextColor={s.placeholderColor}
-          keyboardType="number-pad"
-          maxLength={4}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-        />
-      </View>
+      <BirthYearSelect value={birthYear} onChange={setBirthYear} />
 
       <Text style={s.label}>Grade Level</Text>
-      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} s={s} />
+      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} />
     </>
   );
 }
@@ -2533,9 +1493,7 @@ function FirstChildStep({
   gradeOptions: GradeOption[];
   s: S;
 }) {
-  const [focusedField, setFocusedField] = useState<
-    'firstName' | 'lastName' | 'birthYear' | null
-  >(null);
+  const [focusedField, setFocusedField] = useState<'firstName' | 'lastName' | null>(null);
 
   return (
     <>
@@ -2570,22 +1528,10 @@ function FirstChildStep({
       </View>
 
       <Text style={s.label}>Year of Birth</Text>
-      <View style={[s.inputWrap, focusedField === 'birthYear' && s.inputWrapFocused]}>
-        <TextInput
-          style={s.input}
-          value={birthYear}
-          onChangeText={(v) => setBirthYear(v.replace(/\D/g, '').slice(0, 4))}
-          placeholder={`e.g. ${BIRTH_YEARS[8]}`}
-          placeholderTextColor={s.placeholderColor}
-          keyboardType="number-pad"
-          maxLength={4}
-          onFocus={() => setFocusedField('birthYear')}
-          onBlur={() => setFocusedField(null)}
-        />
-      </View>
+      <BirthYearSelect value={birthYear} onChange={setBirthYear} />
 
       <Text style={s.label}>Grade Level</Text>
-      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} s={s} />
+      <GradeLevelSelect value={grade} onChange={setGrade} options={gradeOptions} />
     </>
   );
 }
@@ -2618,10 +1564,10 @@ export default function ProfileSetupScreen() {
   }, [session, router]);
 
   // Form state — universal
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const { firstName, setFirstName, lastName, setLastName, displayName, setDisplayName } =
+    useSignupName();
   const [phone, setPhone] = useState('');
-  const [phoneCountryCode, setPhoneCountryCode] = useState(() => guessCountryCode());
+  const [phoneCountryCode, setPhoneCountryCode] = useState('US');
   const [timezone, setTimezone] = useState(() => {
     try {
       return Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
@@ -2629,10 +1575,18 @@ export default function ProfileSetupScreen() {
       return 'UTC';
     }
   });
-  const [city, setCity] = useState('');
-  const [region, setRegion] = useState('');
-  const [postalCode, setPostalCode] = useState('');
-  const [countryCode, setCountryCode] = useState('US');
+  const {
+    city,
+    setCity,
+    region,
+    setRegion,
+    postalCode,
+    setPostalCode,
+    countryCode,
+    setCountryCode,
+    prefillLocation,
+    restoreLocation,
+  } = useOnboardingLocation();
   const countryGradeOptions = useMemo(
     () => optionsForCountry(normalizeCountryCode(countryCode)),
     [countryCode],
@@ -2758,7 +1712,41 @@ export default function ProfileSetupScreen() {
       ),
     [onboarding?.profileKind, onboarding?.primaryRole, consentShown],
   );
+  const locationLookupGeneration = useRef(0);
+  const handleDeviceLocation = useCallback(
+    (location: {
+      city: string;
+      region: string;
+      postalCode: string;
+      countryCode: string;
+    }) => {
+      locationLookupGeneration.current += 1;
+      prefillLocation(location);
+    },
+    [prefillLocation],
+  );
+  const handleTimezoneLocation = useCallback(
+    (value: string) => {
+      const generation = ++locationLookupGeneration.current;
+      const hint = getTimezoneLocationHint(value);
+      if (hint) prefillLocation(hint);
+      void fetchTimezoneLocationHint(value)
+        .then((location) => {
+          if (location && generation === locationLookupGeneration.current)
+            prefillLocation(location);
+        })
+        .catch(() => {
+          /* Keep the offline hint; the address remains editable. */
+        });
+    },
+    [prefillLocation],
+  );
   const currentStep = steps[stepIdx] as WizardStepId | undefined;
+  useEffect(() => {
+    if (currentStep !== 'location' || city.trim()) return;
+    handleTimezoneLocation(timezone);
+  }, [currentStep, timezone, city, handleTimezoneLocation]);
+
   const isLastStep = stepIdx === steps.length - 1;
 
   useEffect(() => {
@@ -2788,14 +1776,17 @@ export default function ProfileSetupScreen() {
     initializedRef.current = true;
 
     const p = onboarding.prefill;
+    if (p.displayName && onboarding.flags.hasName) setDisplayName(p.displayName);
     if (p.firstName) setFirstName(p.firstName);
     if (p.lastName) setLastName(p.lastName);
     if (p.phone) setPhone(p.phone);
     if (p.timezone && p.timezone !== 'UTC') setTimezone(p.timezone);
-    if (p.city) setCity(p.city);
-    if (p.region) setRegion(p.region);
-    if (p.postalCode) setPostalCode(p.postalCode);
-    if (p.countryCode) setCountryCode(p.countryCode);
+    restoreLocation({
+      city: p.city,
+      region: p.region,
+      postalCode: p.postalCode,
+      countryCode: p.countryCode,
+    });
 
     // Jump directly to the first incomplete step
     const f = onboarding.flags;
@@ -2824,7 +1815,18 @@ export default function ProfileSetupScreen() {
     }
 
     if (targetIdx > 0) setStepIdx(targetIdx);
-  }, [onboarding, steps]);
+  }, [
+    onboarding,
+    steps,
+    setDisplayName,
+    setFirstName,
+    setLastName,
+    setCity,
+    setCountryCode,
+    setPostalCode,
+    setRegion,
+    restoreLocation,
+  ]);
 
   const { mutate: advance, isPending: saving } = useMutation({
     mutationFn: async ({ isSkip, isLast }: { isSkip: boolean; isLast: boolean }) => {
@@ -2833,7 +1835,7 @@ export default function ProfileSetupScreen() {
       }
       if (!isSkip) {
         if (currentStep === 'name') {
-          await saveNameStep(onboarding.profileId, firstName, lastName);
+          await saveNameStep(onboarding.profileId, firstName, lastName, displayName);
         } else if (currentStep === 'phone') {
           const rawPhone = phone.replace(/[\s()-]/g, '');
           if (rawPhone.trim()) await savePhoneStep(onboarding.accountId, rawPhone);
@@ -2954,13 +1956,20 @@ export default function ProfileSetupScreen() {
     if (saving) return false;
     switch (currentStep) {
       case 'name':
-        return !!firstName.trim() && !!lastName.trim();
+        return !!firstName.trim() && !!lastName.trim() && !!displayName.trim();
       case 'phone':
         return kind === 'child' || !!phone.trim();
       case 'timezone':
         return !!timezone;
-      case 'location':
-        return !!city.trim() && !!region.trim() && !!countryCode;
+      case 'location': {
+        const fields = getCountryAddressFields(countryCode);
+        return (
+          !!fields &&
+          (!fields.city.required || !!city.trim()) &&
+          (!fields.region.required || !!region.trim()) &&
+          (!fields.postal.required || !!postalCode.trim())
+        );
+      }
       case 'student-profile':
         return !!grade;
       case 'educator-profile':
@@ -2984,10 +1993,12 @@ export default function ProfileSetupScreen() {
     currentStep,
     firstName,
     lastName,
+    displayName,
     phone,
     timezone,
     city,
     region,
+    postalCode,
     countryCode,
     grade,
     subjects,
@@ -3013,6 +2024,10 @@ export default function ProfileSetupScreen() {
           setError('Please enter your last name.');
           return;
         }
+        if (!displayName.trim()) {
+          setError('Please enter your display name.');
+          return;
+        }
         break;
       case 'phone':
         if (kind !== 'child' && !phone.trim()) {
@@ -3026,20 +2041,24 @@ export default function ProfileSetupScreen() {
           return;
         }
         break;
-      case 'location':
-        if (!countryCode) {
+      case 'location': {
+        const fields = getCountryAddressFields(countryCode);
+        if (!fields) {
           setError('Please select your country.');
           return;
         }
-        if (!city.trim()) {
-          setError('Please enter your city.');
-          return;
-        }
-        if (!region.trim()) {
-          setError('Please enter your state or region.');
-          return;
+        for (const [value, field] of [
+          [city, fields.city],
+          [region, fields.region],
+          [postalCode, fields.postal],
+        ] as const) {
+          if (field.visible && field.required && !value.trim()) {
+            setError(`Please enter your ${field.label.toLowerCase()}.`);
+            return;
+          }
         }
         break;
+      }
       case 'student-profile':
         if (!grade) {
           setError('Please select your grade level to continue.');
@@ -3092,10 +2111,12 @@ export default function ProfileSetupScreen() {
     currentStep,
     firstName,
     lastName,
+    displayName,
     phone,
     timezone,
     city,
     region,
+    postalCode,
     countryCode,
     grade,
     subjects,
@@ -3244,7 +2265,8 @@ export default function ProfileSetupScreen() {
                 setFirstName={setFirstName}
                 lastName={lastName}
                 setLastName={setLastName}
-                isGuardian={kind === 'guardian'}
+                displayName={displayName}
+                setDisplayName={setDisplayName}
                 s={s}
                 colors={colors}
               />
@@ -3264,13 +2286,8 @@ export default function ProfileSetupScreen() {
               <TimezoneStep
                 timezone={timezone}
                 setTimezone={setTimezone}
-                onLocationDetected={(loc) => {
-                  if (loc.city) setCity(loc.city);
-                  if (loc.region) setRegion(loc.region);
-                  if (loc.postalCode) setPostalCode(loc.postalCode);
-                  if (loc.countryCode) setCountryCode(loc.countryCode);
-                }}
-                s={s}
+                onLocationDetected={handleDeviceLocation}
+                onTimezoneSelected={handleTimezoneLocation}
                 colors={colors}
               />
             )}

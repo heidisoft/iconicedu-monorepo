@@ -48,6 +48,7 @@ export {
   DEFAULT_TIMEZONE,
   getTimezoneDisplayLabel,
   getTimezoneOptions,
+  getTimezoneLocationHint,
   getBrowserTimezone,
   normalizeTimezone,
   countryCodeToEmoji,
