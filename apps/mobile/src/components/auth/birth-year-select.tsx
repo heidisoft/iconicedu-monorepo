@@ -30,6 +30,7 @@ export function BirthYearSelect({ value, onChange }: Props) {
   return (
     <>
       <Pressable
+        testID="onboarding-birth-year"
         accessibilityRole="button"
         accessibilityLabel="Year of birth"
         accessibilityValue={{ text: value || 'Select birth year' }}

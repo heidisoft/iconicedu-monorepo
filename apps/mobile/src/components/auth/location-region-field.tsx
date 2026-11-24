@@ -30,6 +30,7 @@ export function LocationRegionField({ countryCode, value, label, onChange }: Pro
   return (
     <>
       <Pressable
+        testID="onboarding-region"
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityValue={{ text: selected?.label ?? `Choose ${label.toLowerCase()}` }}

@@ -9,6 +9,8 @@ Check off each item as it is verified. Mark with **FAIL** and a note if somethin
 
 ## 1. Authentication
 
+Automated local iOS coverage: `pnpm --filter mobile test:e2e:auth`. Prerequisites and safety boundaries are documented in [Testing](../codebase/TESTING.md#mobile-auth-e2e-real-local-services). This uses real local Supabase OTP emails, API requests, persisted sessions, and database assertions; the manual checks below still cover OAuth and platform permission variations.
+
 ### 1.1 OTP Login
 
 - [ ] Email input accepts a valid email address

@@ -175,6 +175,7 @@ export function TimezoneStep({
       )}
       <Text style={[styles.label, { color: colors.textMuted }]}>Time zone</Text>
       <Pressable
+        testID="onboarding-timezone-select"
         accessibilityRole="button"
         accessibilityLabel={`Time zone: ${timezone ? timezoneCity(timezone) : 'Choose city'}. Change time zone`}
         accessibilityState={{ expanded: showPicker }}

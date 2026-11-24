@@ -100,6 +100,7 @@ export function LocationAddressFields({
           <View style={[s.inputWrap, focusedField === 'city' && s.inputWrapFocused]}>
             <TextInput
               style={s.input}
+              testID="onboarding-city"
               value={city}
               onChangeText={setCity}
               accessibilityLabel={addressFields.city.label}
@@ -157,6 +158,7 @@ export function LocationAddressFields({
           <View style={[s.inputWrap, focusedField === 'postal' && s.inputWrapFocused]}>
             <TextInput
               style={s.input}
+              testID="onboarding-postal"
               value={postalCode}
               onChangeText={setPostalCode}
               accessibilityLabel={addressFields.postal.label}

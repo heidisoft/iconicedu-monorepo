@@ -535,6 +535,7 @@ function NameStep({
       >
         <TextInput
           style={s.input}
+          testID="onboarding-first-name"
           value={firstName}
           onChangeText={setFirstName}
           placeholder="First name"
@@ -550,6 +551,7 @@ function NameStep({
       <View style={[s.inputWrap, focusedField === 'last' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
+          testID="onboarding-last-name"
           value={lastName}
           onChangeText={setLastName}
           placeholder="Last name"
@@ -564,6 +566,7 @@ function NameStep({
       <View style={[s.inputWrap, focusedField === 'display' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
+          testID="onboarding-display-name"
           value={displayName}
           onChangeText={setDisplayName}
           accessibilityLabel="Display name"
@@ -923,6 +926,7 @@ function PhoneStep({
       >
         <TextInput
           style={[s.input, { paddingHorizontal: 14 }]}
+          testID="onboarding-phone"
           value={nationalNumber}
           onChangeText={handleNumberChange}
           accessibilityLabel="Phone number"
@@ -1501,6 +1505,7 @@ function FirstChildStep({
       <View style={[s.inputWrap, focusedField === 'firstName' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
+          testID="onboarding-child-first-name"
           value={firstName}
           onChangeText={setFirstName}
           placeholder="First name"
@@ -1516,6 +1521,7 @@ function FirstChildStep({
       <View style={[s.inputWrap, focusedField === 'lastName' && s.inputWrapFocused]}>
         <TextInput
           style={s.input}
+          testID="onboarding-child-last-name"
           value={lastName}
           onChangeText={setLastName}
           placeholder="Last name"
@@ -2363,6 +2369,7 @@ export default function ProfileSetupScreen() {
 
         <View style={s.footer}>
           <TouchableOpacity
+            testID="onboarding-next"
             style={[s.btn, !canNext && s.btnDim]}
             onPress={handleNext}
             disabled={!canNext || saving}

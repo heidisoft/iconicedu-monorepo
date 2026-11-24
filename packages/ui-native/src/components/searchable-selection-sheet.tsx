@@ -144,6 +144,7 @@ export function SearchableSelectionSheet({
               const selected = item.id === selectedId;
               return (
                 <Pressable
+                  testID={`selection-option-${item.id}`}
                   accessibilityRole="button"
                   accessibilityLabel={[item.label, item.subtitle, item.detail]
                     .filter(Boolean)

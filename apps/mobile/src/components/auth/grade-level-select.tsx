@@ -25,6 +25,7 @@ export function GradeLevelSelect({ value, onChange, options }: Props) {
   return (
     <>
       <Pressable
+        testID="onboarding-grade"
         accessibilityRole="button"
         accessibilityLabel="Grade level"
         accessibilityValue={{ text: selected?.label ?? 'Select grade' }}
