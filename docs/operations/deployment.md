@@ -337,10 +337,17 @@ contains historical migrations whose timestamp sorts before migrations already r
 hosted environments. Review the pending migration list in the command output before
 confirming a manual production push.
 
-For newly created preview branches, hosted migration history can briefly lag behind the
-branch status. CI retries only the resulting duplicate `schema_migrations_pkey` error; all
-SQL errors and unrelated push failures remain fatal. Never delete or repair migration-history
-rows to work around this provisioning race.
+New disposable preview branches are rebuilt with `supabase db reset --linked --yes`
+so their schema, migration history, and seed data come from the same repository revision.
+CI refuses this reset unless the preview project ref is present and differs from the
+parent project. Existing previews receive pending migrations with `db push`; only duplicate
+`schema_migrations_pkey` provisioning races are retried. SQL errors remain fatal. Never
+repair migration-history rows merely because an object already exists.
+
+Railway automation requires `RAILWAY_API_TOKEN` to be an active account or workspace
+API token authorized for `RAILWAY_PROJECT_ID`. An environment-scoped project token cannot
+manage PR environments. If Railway returns `Not Authorized`, replace the GitHub Actions
+secret with a valid account/workspace token and confirm its project access before rerunning.
 
 Always test migrations locally first:
 

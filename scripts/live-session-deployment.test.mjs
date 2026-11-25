@@ -96,3 +96,52 @@ test('production applies schema before API deployment and preview configures its
       preview.run.indexOf('mutation environmentTriggersDeploy'),
   );
 });
+
+test('only newly created preview databases may be reset, with parent protection', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { tmpdir } = await import('node:os');
+  const dir = fs.mkdtempSync(path.join(tmpdir(), 'preview-migrations-'));
+  try {
+    fs.writeFileSync(
+      path.join(dir, 'supabase'),
+      '#!/bin/bash\necho "$*" >> "$CALLS"\nexit "${MOCK_EXIT:-0}"\n',
+      { mode: 0o700 },
+    );
+    const step = steps.find((s) => s.name === 'Apply preview branch migrations');
+    const run = (isNew, preview, parent, exitCode = '0') => {
+      const calls = path.join(dir, 'calls');
+      fs.writeFileSync(calls, '');
+      const script = step.run
+        .replaceAll('${{ steps.supabase-branch.outputs.branch_new }}', isNew)
+        .replaceAll('${{ steps.supabase-branch.outputs.branch_ref }}', preview)
+        .replaceAll('${{ vars.SUPABASE_PROJECT_ID }}', parent);
+      const result = spawnSync('bash', ['-c', script], {
+        env: {
+          ...process.env,
+          PATH: `${dir}:${process.env.PATH}`,
+          CALLS: calls,
+          MOCK_EXIT: exitCode,
+        },
+        encoding: 'utf8',
+      });
+      return { status: result.status, calls: fs.readFileSync(calls, 'utf8') };
+    };
+    assert.deepEqual(run('true', 'preview', 'parent'), {
+      status: 0,
+      calls: 'db reset --linked --yes\n',
+    });
+    for (const [preview, parent] of [
+      ['parent', 'parent'],
+      ['', 'parent'],
+      ['null', 'parent'],
+      ['preview', ''],
+    ]) {
+      assert.deepEqual(run('true', preview, parent), { status: 1, calls: '' });
+    }
+    assert.match(run('false', 'preview', 'parent').calls, /^db push /);
+    assert.equal(run('true', 'preview', 'parent', '1').status, 1);
+    assert.equal(run('false', 'preview', 'parent', '1').status, 1);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
