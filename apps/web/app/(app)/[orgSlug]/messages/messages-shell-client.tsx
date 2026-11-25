@@ -464,11 +464,16 @@ export function MessagesShellClient({
     setChannelState(channel);
   }, [channel]);
 
+  // Presence updates replace participant objects; only membership changes should
+  // restart the subscription, otherwise join/leave events create a feedback loop.
+  const presenceParticipantIdsKey = channelState.collections.participants
+    .map((participant) => participant.ids.id)
+    .sort()
+    .join(',');
+
   useEffect(() => {
     const orgId = channelState.ids.orgId;
-    const participantIds = new Set(
-      channelState.collections.participants.map((participant) => participant.ids.id),
-    );
+    const participantIds = new Set(presenceParticipantIdsKey.split(',').filter(Boolean));
     if (!participantIds.size) {
       return;
     }
@@ -535,7 +540,7 @@ export function MessagesShellClient({
     currentUserId,
     channelState.ids.orgId,
     channelState.ids.id,
-    channelState.collections.participants,
+    presenceParticipantIdsKey,
   ]);
 
   return (

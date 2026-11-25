@@ -4,7 +4,7 @@ This guide verifies staff identity labels and restricted audiences in ordinary c
 
 ## What the suite proves
 
-The test matrix covers:
+The coverage and manual parity matrix below covers:
 
 - a public staff welcome visible to every channel member;
 - parent-only, tutor-only, and named-recipient messages;
@@ -41,7 +41,24 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-## Automated web suite
+## Self-contained local role matrix
+
+```bash
+supabase start
+pnpm build:packages
+pnpm --filter web exec playwright install chromium
+pnpm --filter web test:e2e:audiences
+```
+
+This command starts owned API/web processes on loopback ports 3101/3100. It refuses occupied ports or hosted Supabase URLs. It does not reset an existing database: apply the branch migrations first. Each scenario creates a fresh synthetic organization and nine disposable password-authenticated users, with separate child fixtures for family setup, then removes its own fixtures afterward. The runner stops only its own servers. No storage-state files or existing accounts are required. Do not run another Next.js development server in this workspace while the suite uses its build directory.
+
+`message-audience-roles.local.spec.ts` runs six sender roles: owner, admin, staff, parent (`guardian`), student (`child`), and tutor (`educator`). For each sender it sends to everyone and individually to every other member, including a second parent. It verifies authenticated history for every member, a same-organization nonmember, and a different-organization account; restricted sends must increment only the selected recipient's unread count. Six browser workflows select a named person, verify the recipient/excluded account after reload, check the picker resets, then send to everyone. The regression workflow covers inherited private thread and quoted replies, edit privacy, retry deduplication, deletion, forged sender identities, invalid/nonmember/cross-organization recipients, and attempted reply audience expansion.
+
+Runtime unit tests also verify that presence updates and participant reordering do not repeatedly unsubscribe/rejoin live channels; membership, identity, and channel changes still clean up and reconnect.
+
+The GitHub **Message Audience E2E** workflow runs these cases against disposable local Supabase on pull requests and manual dispatch. It also runs API, mobile, and shared web audience unit tests. Local artifacts are private temporary files; do not commit or publish raw logs, traces, or sessions. Live push/email-provider delivery and native multi-device UI remain outside this browser/API suite.
+
+## Existing externally configured web smoke suite
 
 Create Playwright storage states for the synthetic staff, parent, and tutor. Storage-state files contain reusable sessions and must remain outside the repository.
 
@@ -101,7 +118,7 @@ For each restricted message, verify the excluded account cannot retrieve the mes
 6. inbox/activity feed, push, email, and unread counters;
 7. a forged API request containing a cross-organization or non-member profile ID.
 
-The API accepts audience requests from any channel member who can post. It must reject requests for DMs/group DMs, empty effective audiences, disabled-flag callers, and recipients without active channel membership. A thread reply with an audience payload must be rejected; the server and database copy the parent audience.
+The API accepts audience requests from any channel member who can post. It must reject requests for DMs/group DMs, empty effective audiences, disabled-flag callers, and recipients without active channel membership. A thread reply with explicit recipients must be rejected; the server and database copy the parent audience.
 
 ## Focused verification
 

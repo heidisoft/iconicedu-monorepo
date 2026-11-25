@@ -4,6 +4,73 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react-nativ
 import { MessageInput } from '@/components/messages/message-input';
 
 describe('MessageInput', () => {
+  it.each(['owner', 'admin', 'staff', 'guardian', 'child', 'educator'])(
+    '%s targets one parent rather than all parents, then resets to everyone',
+    async (role) => {
+      const onSend = jest.fn().mockResolvedValue(undefined);
+      render(
+        <MessageInput
+          onSend={onSend}
+          profileId={role}
+          audienceParticipants={[
+            { id: role, name: 'Sender', role: 'staff' },
+            { id: 'parent-A', name: 'Parent Alpha', role: 'guardian' },
+            { id: 'parent-B', name: 'Parent Beta', role: 'guardian' },
+          ]}
+        />,
+      );
+      expect(screen.queryByLabelText('Message audience Sender')).toBeNull();
+      fireEvent.press(screen.getByLabelText('Message audience Parent Alpha'));
+      fireEvent.changeText(screen.getByLabelText('Message input'), 'Private');
+      fireEvent.press(screen.getByLabelText('Send message'));
+      await waitFor(() =>
+        expect(onSend).toHaveBeenCalledWith('Private', {
+          audienceProfileIds: ['parent-A'],
+        }),
+      );
+      await waitFor(() =>
+        expect(
+          screen.getByLabelText('Message audience Everyone').props.accessibilityState
+            .selected,
+        ).toBe(true),
+      );
+      fireEvent.changeText(screen.getByLabelText('Message input'), 'Public');
+      fireEvent.press(screen.getByLabelText('Send message'));
+      await waitFor(() => expect(onSend).toHaveBeenLastCalledWith('Public'));
+    },
+  );
+  it('retains the private audience after a failed send instead of widening the next send', async () => {
+    const onSend = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Offline'))
+      .mockResolvedValue(undefined);
+    render(
+      <MessageInput
+        onSend={onSend}
+        profileId="sender"
+        audienceParticipants={[
+          { id: 'parent-A', name: 'Parent Alpha', role: 'guardian' },
+        ]}
+      />,
+    );
+    fireEvent.press(screen.getByLabelText('Message audience Parent Alpha'));
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Private failed');
+    fireEvent.press(screen.getByLabelText('Send message'));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText('Message audience Parent Alpha').props.accessibilityState
+          .selected,
+      ).toBe(true),
+    );
+    fireEvent.changeText(screen.getByLabelText('Message input'), 'Private retry');
+    fireEvent.press(screen.getByLabelText('Send message'));
+    await waitFor(() =>
+      expect(onSend).toHaveBeenLastCalledWith('Private retry', {
+        audienceProfileIds: ['parent-A'],
+      }),
+    );
+  });
   it('includes a selected channel audience in send metadata', async () => {
     const onSend = jest.fn().mockResolvedValue(undefined);
     render(

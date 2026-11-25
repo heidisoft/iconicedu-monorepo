@@ -64,3 +64,27 @@ describe('filterVisibleMessageRows', () => {
     expect(filterVisibleMessageRows([targeted], 'profile-current')).toEqual([]);
   });
 });
+
+describe('profile privacy regardless of organizational role', () => {
+  it.each(['owner', 'admin', 'staff', 'guardian', 'child', 'educator'])(
+    'does not grant %s access unless its exact profile is selected',
+    (role) => {
+      const privateRow = makeRow({
+        visibility_type: 'specific-users',
+        visibility_user_ids: ['sender', 'parent-A'],
+      });
+      expect(filterVisibleMessageRows([privateRow], role)).toEqual([]);
+      expect(filterVisibleMessageRows([privateRow], 'parent-A')).toEqual([privateRow]);
+      expect(filterVisibleMessageRows([privateRow], 'sender')).toEqual([privateRow]);
+      expect(filterVisibleMessageRows([privateRow], 'parent-B')).toEqual([]);
+    },
+  );
+  it('never treats an empty restricted audience as public', () => {
+    expect(
+      filterVisibleMessageRows(
+        [makeRow({ visibility_type: 'specific-users', visibility_user_ids: [] })],
+        'sender',
+      ),
+    ).toEqual([]);
+  });
+});

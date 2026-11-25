@@ -360,6 +360,75 @@ describe('message-input mention helpers', () => {
 });
 
 describe('MessageInput audience selection', () => {
+  it.each(['staff', 'guardian', 'child', 'educator'] as const)(
+    '%s can select one exact parent, then send to everyone after reset',
+    async (kind) => {
+      const user = userEvent.setup();
+      const onSend = vi.fn().mockResolvedValue(undefined);
+      const self = createParticipant({ kind, ids: { id: 'sender' } });
+      const first = createParticipant({
+        ids: { id: 'parent-A' },
+        profile: { ...createParticipant().profile, displayName: 'Parent Alpha' },
+      });
+      const second = createParticipant({
+        ids: { id: 'parent-B' },
+        profile: { ...createParticipant().profile, displayName: 'Parent Beta' },
+      });
+      render(
+        <MessageInput
+          onSend={onSend}
+          participants={[self, first, second]}
+          audienceParticipants={[self, first, second]}
+          currentUserId="sender"
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+      expect(screen.queryByRole('menuitemcheckbox', { name: /Alex Johnson/ })).toBeNull();
+      await user.click(screen.getByRole('menuitemcheckbox', { name: /Parent Alpha/ }));
+      await user.keyboard('{Escape}');
+      await user.type(screen.getByPlaceholderText('Write a message...'), 'Private');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+      await waitFor(() =>
+        expect(onSend).toHaveBeenLastCalledWith('Private', [], null, undefined, [
+          'parent-A',
+        ]),
+      );
+      await user.type(screen.getByPlaceholderText('Write a message...'), 'Public');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+      await waitFor(() =>
+        expect(onSend).toHaveBeenLastCalledWith('Public', [], null, undefined),
+      );
+    },
+  );
+  it('preserves the selected recipients on failure and retry', async () => {
+    const user = userEvent.setup();
+    const onSend = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Offline'))
+      .mockResolvedValue(undefined);
+    const parent = createParticipant({ ids: { id: 'parent-1' } });
+    render(
+      <MessageInput
+        onSend={onSend}
+        participants={[parent]}
+        audienceParticipants={[parent]}
+        currentUserId="sender"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Parent' }));
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Private retry');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    expect(screen.getByPlaceholderText('Write a message...')).toHaveValue(
+      'Private retry',
+    );
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(2));
+    expect(onSend).toHaveBeenLastCalledWith('Private retry', [], null, undefined, [
+      'parent-1',
+    ]);
+  });
   it('sends the resolved parent audience and resets to everyone', async () => {
     const user = userEvent.setup();
     const onSend = vi.fn().mockResolvedValue(undefined);
