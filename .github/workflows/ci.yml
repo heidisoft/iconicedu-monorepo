@@ -800,8 +800,8 @@ jobs:
         run: |
           set -euo pipefail
           # Hosted provisioning can copy schema without matching migration history.
-          # Rebuild only a newly created disposable preview, never the parent project.
-          if [[ "${{ steps.supabase-branch.outputs.branch_new }}" == "true" ]]; then
+          # Rebuild disposable previews for schema-changing PRs as well, never the parent project.
+          if [[ "${{ steps.supabase-branch.outputs.branch_new }}" == "true" || "${{ needs.changes.outputs.supabase }}" == "true" ]]; then
             PREVIEW_REF="${{ steps.supabase-branch.outputs.branch_ref }}"
             PARENT_REF="${{ vars.SUPABASE_PROJECT_ID }}"
             if [[ -z "$PREVIEW_REF" || "$PREVIEW_REF" == "null" || -z "$PARENT_REF" || "$PREVIEW_REF" == "$PARENT_REF" ]]; then

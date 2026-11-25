@@ -337,10 +337,11 @@ contains historical migrations whose timestamp sorts before migrations already r
 hosted environments. Review the pending migration list in the command output before
 confirming a manual production push.
 
-New disposable preview branches are rebuilt with `supabase db reset --linked --yes`
+New disposable preview branches and previews for PRs changing `supabase/` are rebuilt with `supabase db reset --linked --yes`
 so their schema, migration history, and seed data come from the same repository revision.
 CI refuses this reset unless the preview project ref is present and differs from the
-parent project. Existing previews receive pending migrations with `db push`; only duplicate
+parent project. Rebuilding discards preview-only data; production is never reset. Other existing previews
+receive pending migrations with `db push`; only duplicate
 `schema_migrations_pkey` provisioning races are retried. SQL errors remain fatal. Never
 repair migration-history rows merely because an object already exists.
 

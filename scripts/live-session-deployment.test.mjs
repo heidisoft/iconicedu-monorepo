@@ -97,7 +97,7 @@ test('production applies schema before API deployment and preview configures its
   );
 });
 
-test('only newly created preview databases may be reset, with parent protection', async () => {
+test('preview rebuilds protect the parent and retain normal pushes without schema changes', async () => {
   const { spawnSync } = await import('node:child_process');
   const { tmpdir } = await import('node:os');
   const dir = fs.mkdtempSync(path.join(tmpdir(), 'preview-migrations-'));
@@ -108,11 +108,12 @@ test('only newly created preview databases may be reset, with parent protection'
       { mode: 0o700 },
     );
     const step = steps.find((s) => s.name === 'Apply preview branch migrations');
-    const run = (isNew, preview, parent, exitCode = '0') => {
+    const run = (isNew, preview, parent, exitCode = '0', schemaChanged = 'false') => {
       const calls = path.join(dir, 'calls');
       fs.writeFileSync(calls, '');
       const script = step.run
         .replaceAll('${{ steps.supabase-branch.outputs.branch_new }}', isNew)
+        .replaceAll('${{ needs.changes.outputs.supabase }}', schemaChanged)
         .replaceAll('${{ steps.supabase-branch.outputs.branch_ref }}', preview)
         .replaceAll('${{ vars.SUPABASE_PROJECT_ID }}', parent);
       const result = spawnSync('bash', ['-c', script], {
@@ -139,6 +140,11 @@ test('only newly created preview databases may be reset, with parent protection'
       assert.deepEqual(run('true', preview, parent), { status: 1, calls: '' });
     }
     assert.match(run('false', 'preview', 'parent').calls, /^db push /);
+    assert.equal(
+      run('false', 'preview', 'parent', '0', 'true').calls,
+      'db reset --linked --yes\n',
+    );
+    assert.equal(run('false', 'parent', 'parent', '0', 'true').status, 1);
     assert.equal(run('true', 'preview', 'parent', '1').status, 1);
     assert.equal(run('false', 'preview', 'parent', '1').status, 1);
   } finally {
