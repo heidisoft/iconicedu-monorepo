@@ -271,6 +271,8 @@ export default function LoginScreen() {
                 style={[s.inputRow, error || showEmailError ? s.inputErr : undefined]}
               >
                 <TextInput
+                  testID="auth-email-input"
+                  accessibilityLabel="Email"
                   style={s.input}
                   value={email}
                   onChangeText={(nextEmail) => {
@@ -316,6 +318,7 @@ export default function LoginScreen() {
             {turnstile.widget}
 
             <TouchableOpacity
+              testID="auth-submit"
               style={[s.cta, isDisabled ? s.ctaDim : undefined]}
               onPress={handleEmailContinue}
               disabled={isDisabled}

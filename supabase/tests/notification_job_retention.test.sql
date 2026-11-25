@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(21);
+select plan(24);
 -- Synthetic identities: never depend on seed accounts or production data.
 insert into public.orgs(id, name, slug) values ('a1000000-0000-4000-8000-000000000001', 'Retention test', 'retention-test-only');
 insert into auth.users(id) values ('a2000000-0000-4000-8000-000000000001');
@@ -23,11 +23,15 @@ insert into public.event_pipeline_jobs(id, org_id, outbox_id, job_kind, dedupe_k
  ('a7000000-0000-4000-8000-000000000004','a1000000-0000-4000-8000-000000000001',null,'activity.project','ret:job:old-failed','{}','failed',now()-interval '40 days',now()-interval '40 days'),
  ('a7000000-0000-4000-8000-000000000005','a1000000-0000-4000-8000-000000000001',null,'notification.deliver','ret:job:deliver-45d','{}','succeeded',now()-interval '45 days',now()-interval '45 days'),
  ('a7000000-0000-4000-8000-000000000006','a1000000-0000-4000-8000-000000000001',null,'notification.deliver','ret:job:deliver-100d','{}','succeeded',now()-interval '100 days',now()-interval '100 days'),
- ('a7000000-0000-4000-8000-000000000007','a1000000-0000-4000-8000-000000000001',null,'activity.project','ret:job:dead-45d','{}','dead_letter',now()-interval '45 days',now()-interval '45 days');
+ ('a7000000-0000-4000-8000-000000000007','a1000000-0000-4000-8000-000000000001',null,'activity.project','ret:job:dead-45d','{}','dead_letter',now()-interval '45 days',now()-interval '45 days'),
+ ('a7000000-0000-4000-8000-000000000008','a1000000-0000-4000-8000-000000000001',null,'reminder.reconcile','ret:job:reconcile-10d','{}','succeeded',now()-interval '10 days',now()-interval '10 days'),
+ ('a7000000-0000-4000-8000-000000000009','a1000000-0000-4000-8000-000000000001',null,'reminder.reconcile','ret:job:reconcile-3d','{}','succeeded',now()-interval '3 days',now()-interval '3 days'),
+ ('a7000000-0000-4000-8000-00000000000a','a1000000-0000-4000-8000-000000000001',null,'activity.project','ret:job:project-10d','{}','succeeded',now()-interval '10 days',now()-interval '10 days');
 
 insert into public.event_pipeline_logs(id, org_id, job_id, result, created_at) values
  ('a8000000-0000-4000-8000-000000000001','a1000000-0000-4000-8000-000000000001','a7000000-0000-4000-8000-000000000002','succeeded',now()-interval '40 days'),
- ('a8000000-0000-4000-8000-000000000002','a1000000-0000-4000-8000-000000000001','a7000000-0000-4000-8000-000000000002','succeeded',now()-interval '1 day');
+ ('a8000000-0000-4000-8000-000000000002','a1000000-0000-4000-8000-000000000001','a7000000-0000-4000-8000-000000000002','succeeded',now()-interval '1 day'),
+ ('a8000000-0000-4000-8000-000000000003','a1000000-0000-4000-8000-000000000001','a7000000-0000-4000-8000-000000000002','retryable_failure',now()-interval '10 days');
 
 insert into public.reminder_jobs(id, org_id, job_type, target_kind, target_id, occurrence_start_at, run_at, dedupe_key, status, created_at, updated_at) values
  ('a9000000-0000-4000-8000-000000000001','a1000000-0000-4000-8000-000000000001','session.reminder','channel','a5000000-0000-4000-8000-000000000001',now()-interval '100 days',now()-interval '100 days','ret:rem:old-succeeded','succeeded',now()-interval '100 days',now()-interval '100 days'),
@@ -62,8 +66,11 @@ select ok(exists(select 1 from public.event_pipeline_jobs where id='a7000000-000
 select ok(exists(select 1 from public.event_pipeline_jobs where id='a7000000-0000-4000-8000-000000000005'), 'push delivery dedupe ledger kept for 90 days');
 select ok(not exists(select 1 from public.event_pipeline_jobs where id='a7000000-0000-4000-8000-000000000006'), 'push delivery older than 90 days purged');
 select ok(exists(select 1 from public.event_pipeline_jobs where id='a7000000-0000-4000-8000-000000000007'), 'dead-letter jobs kept 90 days for diagnosis');
+select ok(not exists(select 1 from public.event_pipeline_jobs where id='a7000000-0000-4000-8000-000000000008'), 'succeeded reconcile job older than 7 days purged');
+select ok(exists(select 1 from public.event_pipeline_jobs where id='a7000000-0000-4000-8000-000000000009'), 'recent reconcile job kept for the repair cooldown');
+select ok(exists(select 1 from public.event_pipeline_jobs where id='a7000000-0000-4000-8000-00000000000a'), 'other succeeded jobs keep the 30-day window');
 
-select is((select array_agg(id::text) from public.event_pipeline_logs where org_id='a1000000-0000-4000-8000-000000000001'), array['a8000000-0000-4000-8000-000000000002'], 'only recent pipeline logs remain');
+select is((select array_agg(id::text) from public.event_pipeline_logs where org_id='a1000000-0000-4000-8000-000000000001'), array['a8000000-0000-4000-8000-000000000002'], 'pipeline logs older than 7 days purged');
 
 select ok(not exists(select 1 from public.reminder_jobs where id='a9000000-0000-4000-8000-000000000001'), 'old succeeded reminder purged');
 select is((select count(*) from public.reminder_jobs where id in ('a9000000-0000-4000-8000-000000000002','a9000000-0000-4000-8000-000000000003')), 2::bigint, 'pending and recent reminders kept');

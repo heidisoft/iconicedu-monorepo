@@ -81,3 +81,13 @@
 
 - Global `ValidationPipe` registered in `apps/api/src/main.ts` but zero `class-validator` decorator usage found in `apps/api/src` — the declared validation convention (decorator-based DTOs) does not match actual practice (hand-rolled per-field checks). See [CONCERNS.md](CONCERNS.md).
 - `apps/mobile/.env.example` comments say config is read via `Constants.expoConfig?.extra`, but `apps/mobile/src/lib/api/http-client.ts` and `apps/mobile/src/lib/supabase/client.ts` read `process.env.EXPO_PUBLIC_*` directly — both patterns coexist (`apps/mobile/src/providers/analytics-provider.tsx` uses `Constants.expoConfig?.extra` with a `process.env` fallback, which is the only file following the documented convention).
+
+### Country-specific profile locations
+
+Mobile onboarding uses `getCountryAddressFields` from `@iconicedu/shared-types` to display the supported city, region, and postal-code fields and their required status. The country-level metadata snapshot in `packages/shared-types/src/shared/country-address-metadata.ts` comes from [Google libaddressinput address metadata](https://chromium-i18n.appspot.com/ssl-address/data/US), with the upstream license alongside it. Refresh the snapshot when country formats change; preserve its attribution and validate the postal-code examples.
+
+`PUT /profiles/:id/location` validates the complete location against the selected country's requirements using the authenticated session and RLS. Postal codes stay strings, including leading zeroes; unsupported fields are stored as null. Onboarding completeness uses the same API validation rules. This is format validation, not address or postal-code existence verification.
+
+Administrative-area lists in `country-regions.ts` use the same upstream metadata and include aliases for provider abbreviations and local names. Where available, mobile displays a searchable state/province/emirate picker; the API normalizes recognized region values to the displayed label and rejects unknown selections.
+
+`GET /profiles/location-hint?timezone=...` is authenticated and enriches a known timezone city through Nominatim. Requests contain the representative city/country, never device coordinates. Lookups are deduplicated, throttled, bounded, and cached; ambiguity, provider errors, and unsupported timezone IDs keep the offline city/country hint. Only returned, format-valid postal codes are suggested. Users must review these editable hints because a timezone covers more than one actual address. Device location continues to prefill native reverse-geocoding results. Country changes reset the previous country's region; asynchronous timezone hints preserve user edits and cannot supersede a newer device-location request.

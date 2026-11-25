@@ -1,5 +1,6 @@
 import {
   getAllTimezones,
+  getTimezone,
   getCountryForTimezone,
   getTimezonesForCountry,
 } from 'countries-and-timezones';
@@ -99,4 +100,16 @@ export function getTimezoneDisplayLabel(timezone?: string | null) {
   }
 
   return `${normalized} time`;
+}
+
+/** Editable address hints for an explicitly chosen timezone city, not a precise address. */
+export function getTimezoneLocationHint(
+  id: string,
+): { city: string; countryCode: string } | null {
+  const timezone = getTimezone(id);
+  if (!timezone || !timezone.countries?.length || !id.includes('/')) return null;
+  return {
+    city: id.split('/').pop()!.replace(/_/g, ' '),
+    countryCode: getCountryForTimezone(id)?.id ?? '',
+  };
 }

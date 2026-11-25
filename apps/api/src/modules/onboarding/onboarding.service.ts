@@ -1,3 +1,4 @@
+import { profileLocationError } from '../profiles/profile-location';
 import { createHash, randomUUID } from 'crypto';
 import {
   BadRequestException,
@@ -339,6 +340,7 @@ export class OnboardingService {
 
     let profileId: string | null = null;
     let profileKind: string | null = null;
+    let displayName = '';
     let firstName = '';
     let lastName = '';
     let timezone = '';
@@ -350,7 +352,7 @@ export class OnboardingService {
     const { data: profile, error: profileError } = await serviceSupabase
       .from('profiles')
       .select(
-        'id, kind, first_name, last_name, timezone, city, region, postal_code, country_code',
+        'id, kind, display_name, first_name, last_name, timezone, city, region, postal_code, country_code',
       )
       .eq('account_id', account.id)
       .eq('org_id', account.org_id)
@@ -362,6 +364,7 @@ export class OnboardingService {
           ProfileRow,
           | 'id'
           | 'kind'
+          | 'display_name'
           | 'first_name'
           | 'last_name'
           | 'timezone'
@@ -377,6 +380,7 @@ export class OnboardingService {
     if (profile) {
       profileId = profile.id;
       profileKind = profile.kind ?? null;
+      displayName = profile.display_name ?? '';
       firstName = profile.first_name ?? '';
       lastName = profile.last_name ?? '';
       timezone = profile.timezone ?? '';
@@ -389,7 +393,8 @@ export class OnboardingService {
     const kind = profileKind ?? account.primary_role ?? null;
     const hasName = !!firstName.trim() && !!lastName.trim();
     const hasTimezone = !!timezone.trim() && timezone.trim() !== 'UTC';
-    const hasLocation = !!city.trim() && !!region.trim();
+    const hasLocation =
+      profileLocationError({ city, region, postalCode, countryCode }) === null;
     const requiresPhone = kind !== 'child';
     const hasPhone = !!account.phone_e164?.trim();
 
@@ -474,6 +479,7 @@ export class OnboardingService {
         hasAvailability,
       },
       prefill: {
+        displayName,
         firstName,
         lastName,
         phone: account.phone_e164 ?? '',

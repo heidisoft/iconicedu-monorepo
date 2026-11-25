@@ -1487,20 +1487,34 @@ jobs:
 
           GQL="https://backboard.railway.app/graphql/v2"
 
+          # railway_api and supabase_api run inside $(...), so diagnostics must go
+          # to stderr; anything echoed to stdout is captured and never printed.
           railway_api() {
             local body="$1"
             local resp
-            resp=$(curl -sf \
+            resp=$(curl -sS --fail-with-body \
               -H "Authorization: Bearer $RAILWAY_TOKEN" \
               -H "Content-Type: application/json" \
               "$GQL" \
-              -d "$body") || { echo "::error::Railway API HTTP request failed"; exit 1; }
+              -d "$body") || { echo "::error::Railway API HTTP request failed: ${resp:0:300}" >&2; exit 1; }
             local errs
             errs=$(echo "$resp" | jq -r 'if .errors then .errors | map(.message) | join(", ") else empty end')
             if [[ -n "$errs" ]]; then
-              echo "::error::Railway GQL error: $errs"
+              echo "::error::Railway GQL error (check RAILWAY_API_TOKEN and RAILWAY_PROJECT_ID): $errs" >&2
               exit 1
             fi
+            echo "$resp"
+          }
+
+          supabase_api() {
+            local path="$1"
+            local resp
+            resp=$(curl -sS --fail-with-body \
+              -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+              "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}${path}") || {
+              echo "::error::Supabase Management API request failed for ${path} (check SUPABASE_ACCESS_TOKEN): ${resp:0:300}" >&2
+              exit 1
+            }
             echo "$resp"
           }
 
@@ -1548,9 +1562,7 @@ jobs:
           SUPABASE_URL="https://${SUPABASE_PROJECT_ID}.supabase.co"
           DB_PASS_ENCODED=$(jq -nr --arg v "$SUPABASE_DB_PASSWORD" '$v|@uri')
 
-          API_KEYS=$(curl -sf \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/api-keys")
+          API_KEYS=$(supabase_api /api-keys)
           SUPABASE_ANON_KEY=$(echo "$API_KEYS" | jq -r '.[] | select(.name=="anon") | .api_key')
           SUPABASE_SERVICE_ROLE_KEY=$(echo "$API_KEYS" | jq -r '.[] | select(.name=="service_role") | .api_key')
           if [[ -z "$SUPABASE_ANON_KEY" || "$SUPABASE_ANON_KEY" == "null" || -z "$SUPABASE_SERVICE_ROLE_KEY" || "$SUPABASE_SERVICE_ROLE_KEY" == "null" ]]; then
@@ -1564,9 +1576,7 @@ jobs:
             || echo '{}')
           JWT_SECRET=$(echo "$PROJECT_CONFIG" | jq -r '.jwt_secret // .jwtSecret // empty')
 
-          POOLER_CONFIG=$(curl -sf \
-            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
-            "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/config/database/pooler")
+          POOLER_CONFIG=$(supabase_api /config/database/pooler)
           PGBOUNCER_CONFIG=$(curl -sf \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_ID}/config/database/pgbouncer" \
