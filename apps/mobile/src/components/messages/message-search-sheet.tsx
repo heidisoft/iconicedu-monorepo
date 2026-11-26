@@ -1,3 +1,4 @@
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Modal,
@@ -70,9 +71,11 @@ function makeStyles(C: AppColors) {
     },
     input: { flex: 1, fontSize: 16, color: C.text },
     closeBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      minWidth: 44,
+      minHeight: 44,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: C.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
@@ -258,95 +261,97 @@ export function MessageSearchSheet({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <Pressable style={s.overlay} onPress={undefined}>
-        <View style={s.header}>
-          <View style={s.searchBox}>
-            <Search size={16} color={colors.textMuted} />
-            <TextInput
-              style={s.input}
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Search messages"
-              placeholderTextColor={colors.textFaint}
-              autoFocus
-              accessibilityLabel="Search messages input"
-            />
-            {query.length > 0 && (
+      <SafeAreaProvider>
+        <SafeAreaView style={s.overlay}>
+          <View style={s.header}>
+            <TouchableOpacity
+              style={s.closeBtn}
+              onPress={onClose}
+              accessibilityLabel="Close search"
+            >
+              <X size={18} color={colors.text} />
+            </TouchableOpacity>
+            <View style={s.searchBox}>
+              <Search size={16} color={colors.textMuted} />
+              <TextInput
+                style={s.input}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Search messages"
+                placeholderTextColor={colors.textFaint}
+                autoFocus
+                accessibilityLabel="Search messages input"
+              />
+              {query.length > 0 && (
+                <TouchableOpacity
+                  onPress={() => setQuery('')}
+                  accessibilityLabel="Clear search"
+                >
+                  <X size={16} color={colors.textMuted} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {senderOptions.length > 0 && (
               <TouchableOpacity
-                onPress={() => setQuery('')}
-                accessibilityLabel="Clear search"
+                style={[s.filterBtn, filtersOpen && s.filterBtnActive]}
+                onPress={() => setFiltersOpen((v) => !v)}
+                accessibilityLabel="Toggle search filters"
               >
-                <X size={16} color={colors.textMuted} />
+                <Filter size={16} color={filtersOpen ? colors.teal : colors.textMuted} />
               </TouchableOpacity>
             )}
           </View>
-          {senderOptions.length > 0 && (
-            <TouchableOpacity
-              style={[s.filterBtn, filtersOpen && s.filterBtnActive]}
-              onPress={() => setFiltersOpen((v) => !v)}
-              accessibilityLabel="Toggle search filters"
-            >
-              <Filter size={16} color={filtersOpen ? colors.teal : colors.textMuted} />
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={s.closeBtn}
-            onPress={onClose}
-            accessibilityLabel="Close search"
-          >
-            <X size={18} color={colors.text} />
-          </TouchableOpacity>
-        </View>
 
-        {filtersOpen && senderOptions.length > 0 && (
-          <View style={s.filterRow}>
-            <TouchableOpacity
-              style={[s.chip, senderFilter === null && s.chipActive]}
-              onPress={() => setSenderFilter(null)}
-            >
-              <Text style={[s.chipText, senderFilter === null && s.chipTextActive]}>
-                Anyone
-              </Text>
-            </TouchableOpacity>
-            {senderOptions.map((opt) => (
+          {filtersOpen && senderOptions.length > 0 && (
+            <View style={s.filterRow}>
               <TouchableOpacity
-                key={opt.id}
-                style={[s.chip, senderFilter === opt.id && s.chipActive]}
-                onPress={() => setSenderFilter(opt.id)}
+                style={[s.chip, senderFilter === null && s.chipActive]}
+                onPress={() => setSenderFilter(null)}
               >
-                <Text style={[s.chipText, senderFilter === opt.id && s.chipTextActive]}>
-                  {opt.name}
+                <Text style={[s.chipText, senderFilter === null && s.chipTextActive]}>
+                  Anyone
                 </Text>
               </TouchableOpacity>
-            ))}
-          </View>
-        )}
+              {senderOptions.map((opt) => (
+                <TouchableOpacity
+                  key={opt.id}
+                  style={[s.chip, senderFilter === opt.id && s.chipActive]}
+                  onPress={() => setSenderFilter(opt.id)}
+                >
+                  <Text style={[s.chipText, senderFilter === opt.id && s.chipTextActive]}>
+                    {opt.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
-        {loading ? (
-          <View style={s.emptyState}>
-            <ActivityIndicator size="large" color={colors.teal} />
-          </View>
-        ) : query.trim().length > 0 && query.trim().length < MIN_QUERY_LENGTH ? (
-          <View style={s.emptyState}>
-            <Text style={s.emptyDesc}>Keep typing to search…</Text>
-          </View>
-        ) : searched && results.length === 0 ? (
-          <View style={s.emptyState}>
-            <Search size={28} color={colors.textMuted} />
-            <Text style={s.emptyTitle}>No results</Text>
-            <Text style={s.emptyDesc}>
-              No messages match &quot;{query.trim()}&quot; in this channel.
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={results}
-            keyExtractor={(item) => item.message.ids.id}
-            renderItem={renderResult}
-            keyboardShouldPersistTaps="handled"
-          />
-        )}
-      </Pressable>
+          {loading ? (
+            <View style={s.emptyState}>
+              <ActivityIndicator size="large" color={colors.teal} />
+            </View>
+          ) : query.trim().length > 0 && query.trim().length < MIN_QUERY_LENGTH ? (
+            <View style={s.emptyState}>
+              <Text style={s.emptyDesc}>Keep typing to search…</Text>
+            </View>
+          ) : searched && results.length === 0 ? (
+            <View style={s.emptyState}>
+              <Search size={28} color={colors.textMuted} />
+              <Text style={s.emptyTitle}>No results</Text>
+              <Text style={s.emptyDesc}>
+                No messages match &quot;{query.trim()}&quot; in this channel.
+              </Text>
+            </View>
+          ) : (
+            <FlatList
+              data={results}
+              keyExtractor={(item) => item.message.ids.id}
+              renderItem={renderResult}
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 }

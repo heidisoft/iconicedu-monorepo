@@ -81,7 +81,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 420,
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: 24,
     padding: 24,
   },
   badge: {

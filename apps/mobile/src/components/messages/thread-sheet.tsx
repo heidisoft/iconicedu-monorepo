@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Modal,
@@ -41,8 +42,8 @@ function makeStyles(C: AppColors) {
     overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
     sheet: {
       backgroundColor: C.pageBg,
-      borderTopLeftRadius: 20,
-      borderTopRightRadius: 20,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       height: '88%',
       overflow: 'hidden',
     },
@@ -62,11 +63,19 @@ function makeStyles(C: AppColors) {
       borderBottomWidth: 1,
       borderBottomColor: C.border,
     },
-    headerTitle: { flex: 1, fontSize: 17, fontWeight: '700', color: C.text },
+    headerTitle: {
+      textAlign: 'center',
+      flex: 1,
+      fontSize: 17,
+      fontWeight: '700',
+      color: C.text,
+    },
     closeBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      minWidth: 44,
+      minHeight: 44,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: C.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
@@ -108,6 +117,7 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
   onReactionToggle,
 }) => {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [replies, setReplies] = useState<MessageVM[]>([]);
   const [loading, setLoading] = useState(false);
@@ -211,17 +221,28 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Pressable style={s.overlay} onPress={onClose}>
+      <Pressable
+        style={[s.overlay, { paddingTop: popupInsets.top + 16 }]}
+        onPress={onClose}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           style={s.flex}
         >
-          <Pressable style={s.sheet}>
+          <Pressable
+            style={[
+              s.sheet,
+              {
+                paddingBottom: 16 + popupInsets.bottom,
+                paddingLeft: popupInsets.left,
+                paddingRight: popupInsets.right,
+              },
+            ]}
+          >
             <View style={s.handle} />
 
             {/* Header */}
             <View style={s.header}>
-              <Text style={s.headerTitle}>Thread</Text>
               <TouchableOpacity
                 style={s.closeBtn}
                 onPress={onClose}
@@ -229,6 +250,12 @@ export const ThreadSheet: React.FC<ThreadSheetProps> = ({
               >
                 <Text style={s.closeTxt}>✕</Text>
               </TouchableOpacity>
+              <Text style={s.headerTitle}>Thread</Text>
+              <View
+                style={{ width: 44 }}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              />
             </View>
 
             {/* Parent message */}

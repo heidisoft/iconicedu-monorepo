@@ -29,7 +29,7 @@ function DialogOverlay({
     <FullWindowOverlay>
       <DialogPrimitive.Overlay
         className={cn(
-          'absolute bottom-0 left-0 right-0 top-0 flex items-center justify-center bg-black/50 p-2',
+          'absolute bottom-0 left-0 right-0 top-0 flex items-center justify-center bg-black/50 p-5',
           Platform.select({
             web: 'animate-in fade-in-0 fixed cursor-default [&>*]:cursor-auto',
           }),
@@ -66,7 +66,7 @@ function DialogContent({
       <DialogOverlay>
         <DialogPrimitive.Content
           className={cn(
-            'bg-background border-border z-50 mx-auto flex w-full max-w-[calc(100%-2rem)] flex-col gap-4 rounded-lg border p-6 shadow-lg shadow-black/5 sm:max-w-lg',
+            'bg-background border-border z-50 mx-auto flex w-full max-w-md flex-col gap-4 rounded-3xl border p-6 shadow-lg shadow-black/5 sm:max-w-lg',
             Platform.select({
               web: 'animate-in fade-in-0 zoom-in-95 duration-200',
             }),
@@ -77,7 +77,7 @@ function DialogContent({
           <>{children}</>
           <DialogPrimitive.Close
             className={cn(
-              'absolute right-4 top-4 rounded opacity-70 active:opacity-100',
+              'absolute left-3 top-3 min-h-11 min-w-11 items-center justify-center rounded-full opacity-70 active:opacity-100',
               Platform.select({
                 web: 'ring-offset-background focus:ring-ring data-[state=open]:bg-accent transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2',
               }),
@@ -101,7 +101,7 @@ function DialogContent({
 function DialogHeader({ className, ...props }: ViewProps) {
   return (
     <View
-      className={cn('flex flex-col gap-2 text-center sm:text-left', className)}
+      className={cn('flex flex-col gap-2 pl-12 text-center sm:text-left', className)}
       {...props}
     />
   );

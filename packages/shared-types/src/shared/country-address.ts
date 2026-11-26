@@ -78,3 +78,8 @@ export type LocationSuggestion = {
   postalCode: string;
   countryCode: string;
 };
+
+/** ISO country codes with address metadata; excludes the unknown-country fallback. */
+export const PROFILE_COUNTRY_CODES = Object.keys(COUNTRY_ADDRESS_METADATA).filter(
+  (code) => code !== 'ZZ',
+);

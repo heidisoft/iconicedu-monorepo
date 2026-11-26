@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
@@ -134,6 +135,7 @@ function ClassRequestSheet({
   s: ReturnType<typeof makeStyles>;
   onCreated: (channelId: string) => void;
 }) {
+  const requestInsets = useSafeAreaInsets();
   const [studentProfileIds, setStudentProfileIds] = useState<string[]>(defaultStudentIds);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [otherSubject, setOtherSubject] = useState('');
@@ -205,7 +207,10 @@ function ClassRequestSheet({
     >
       <ScrollView
         style={{ maxHeight: 584 }}
-        contentContainerStyle={s.requestSheet}
+        contentContainerStyle={[
+          s.requestSheet,
+          { paddingBottom: requestInsets.bottom + 24 },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -815,6 +820,7 @@ export default function HomeScreen() {
     staleTime: 5 * 60 * 1000,
   });
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const router = useRouter();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const supportPalette = React.useMemo(() => getSupportPalette(colors), [colors]);
@@ -971,7 +977,8 @@ export default function HomeScreen() {
       FAMILY_SWITCH_HEADER_HEIGHT +
       FAMILY_SWITCH_CARD_PADDING +
       familySwitchRowsHeight +
-      FAMILY_SWITCH_BOTTOM_PADDING,
+      FAMILY_SWITCH_BOTTOM_PADDING +
+      popupInsets.bottom,
     windowHeight * 0.78,
   );
   const refreshHomeData = useCallback(
@@ -1506,7 +1513,16 @@ export default function HomeScreen() {
         partialHeight={familySwitchSheetHeight}
         sheetStyle={{ backgroundColor: colors.pageBg }}
       >
-        <View style={s.familySwitchSheetContent}>
+        <View
+          style={[
+            s.familySwitchSheetContent,
+            {
+              paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING + popupInsets.bottom,
+              paddingLeft: popupInsets.left + 20,
+              paddingRight: popupInsets.right + 20,
+            },
+          ]}
+        >
           <Card style={s.familySwitchCard}>
             <View style={s.familySwitchHeader}>
               <Text style={s.familySwitchTitle}>View as</Text>

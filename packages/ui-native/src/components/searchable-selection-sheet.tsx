@@ -1,3 +1,4 @@
+import { SheetContent } from './sheet-content';
 import React, { useMemo, useState } from 'react';
 import {
   FlatList,
@@ -31,6 +32,7 @@ type Colors = {
 
 type Props = {
   visible: boolean;
+  /** @deprecated The sheet now measures its own safe area. */
   bottomInset?: number;
   options: readonly SelectionOption[];
   title: string;
@@ -46,7 +48,6 @@ type Props = {
 
 export function SearchableSelectionSheet({
   visible,
-  bottomInset = 0,
   options,
   selectedId,
   preserveOrder = false,
@@ -81,31 +82,31 @@ export function SearchableSelectionSheet({
       onRequestClose={onClose}
       onDismiss={() => setSearch('')}
     >
-      <View
-        style={[
-          styles.container,
-          { backgroundColor: colors.card, paddingBottom: bottomInset },
-        ]}
-      >
+      <SheetContent backgroundColor={colors.card}>
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.header}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={closeLabel}
+              onPress={onClose}
+              style={[styles.close, { backgroundColor: colors.inputBg }]}
+            >
+              <X size={22} color={colors.text} />
+            </Pressable>
             <Text
               accessibilityRole="header"
               style={[styles.title, { color: colors.text }]}
             >
               {title}
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={closeLabel}
-              onPress={onClose}
-              style={styles.close}
-            >
-              <X size={22} color={colors.text} />
-            </Pressable>
+            <View
+              style={{ width: 44 }}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            />
           </View>
           <View
             style={[
@@ -182,7 +183,7 @@ export function SearchableSelectionSheet({
             }}
           />
         </KeyboardAvoidingView>
-      </View>
+      </SheetContent>
     </Modal>
   );
 }
@@ -193,12 +194,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 28,
+    paddingTop: 0,
     paddingBottom: 12,
     gap: 12,
   },
-  title: { flex: 1, fontSize: 22, lineHeight: 28, fontWeight: '600' },
-  close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  title: {
+    textAlign: 'center',
+    flex: 1,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '600',
+  },
+  close: {
+    borderRadius: 22,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   search: {
     marginHorizontal: 20,
     marginBottom: 12,

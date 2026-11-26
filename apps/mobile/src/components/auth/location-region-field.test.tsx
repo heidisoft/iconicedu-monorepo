@@ -2,9 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { LocationRegionField } from './location-region-field';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 it('recognizes an abbreviated GPS region and offers a searchable state list', () => {
   const onChange = jest.fn();
   render(

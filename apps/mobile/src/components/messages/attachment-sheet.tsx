@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Modal,
@@ -165,8 +166,8 @@ function makeStyles(C: AppColors) {
     },
     sheet: {
       backgroundColor: C.pageBg,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       paddingBottom: 40,
     },
     handle: {
@@ -265,6 +266,7 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
   disabled = false,
 }) => {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
 
   const [mode, setMode] = useState<SheetMode>('menu');
@@ -447,9 +449,21 @@ export const AttachmentSheet: React.FC<AttachmentSheetProps> = ({
       onRequestClose={mode === 'recording' ? handleCancelRecording : onClose}
       statusBarTranslucent
     >
-      <Pressable style={s.overlay} onPress={mode === 'recording' ? undefined : onClose}>
+      <Pressable
+        style={[s.overlay, { paddingTop: popupInsets.top + 16 }]}
+        onPress={mode === 'recording' ? undefined : onClose}
+      >
         <Pressable>
-          <View style={s.sheet}>
+          <View
+            style={[
+              s.sheet,
+              {
+                paddingBottom: 16 + popupInsets.bottom,
+                paddingLeft: popupInsets.left,
+                paddingRight: popupInsets.right,
+              },
+            ]}
+          >
             <View style={s.handle} />
 
             {/* ── Menu ── */}

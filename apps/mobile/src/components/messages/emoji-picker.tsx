@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   Modal,
@@ -166,8 +167,8 @@ function makeStyles(C: AppColors) {
     overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
     sheet: {
       backgroundColor: C.pageBg,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       paddingTop: 8,
       maxHeight: '70%',
     },
@@ -257,6 +258,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
   onEmojiSelect,
 }) => {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [activeTab, setActiveTab] = useState<ActiveTab>(0);
   const [recentEmojis, setRecentEmojis] = useState<string[]>([]);
@@ -299,9 +301,18 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({
       statusBarTranslucent
     >
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={s.overlay}>
+        <View style={[s.overlay, { paddingTop: popupInsets.top + 16 }]}>
           <TouchableWithoutFeedback>
-            <View style={s.sheet}>
+            <View
+              style={[
+                s.sheet,
+                {
+                  paddingBottom: 16 + popupInsets.bottom,
+                  paddingLeft: popupInsets.left,
+                  paddingRight: popupInsets.right,
+                },
+              ]}
+            >
               <View style={s.handle} />
 
               {/* Category tab bar */}

@@ -2,9 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { BirthYearSelect } from './birth-year-select';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date('2026-06-01T12:00:00Z'));

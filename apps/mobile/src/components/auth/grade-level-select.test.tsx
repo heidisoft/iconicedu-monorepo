@@ -3,9 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { GradeLevel, optionsForCountry } from '@iconicedu/shared-types';
 import { GradeLevelSelect } from './grade-level-select';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 const options = [
   { value: GradeLevel.Kindergarten, label: 'Kindergarten' },
   { value: GradeLevel.Grade2, label: 'Grade 2' },

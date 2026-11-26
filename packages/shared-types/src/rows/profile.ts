@@ -33,6 +33,8 @@ export interface ProfileRow extends AuditRow {
   city?: string | null;
   postal_code?: string | null;
   ui_theme_key?: string | null;
+  hide_role?: boolean;
+  hide_status?: boolean;
 }
 
 export interface EducatorProfileRow extends Partial<AuditRow> {

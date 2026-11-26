@@ -38,7 +38,7 @@
       "staff_profile_specialties",
       "staff_profiles"
     ],
-    "apps/web/app/actions/family-invite.ts": ["accounts", "family_link_invites"],
+    "apps/web/app/actions/family-invite.ts": ["family_link_invites"],
     "apps/web/app/actions/messages.ts": [
       "<dynamic>",
       "activity_events",

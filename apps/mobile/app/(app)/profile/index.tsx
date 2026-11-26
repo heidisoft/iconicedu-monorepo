@@ -65,6 +65,10 @@ export default function ProfileScreen() {
           {settingsItems.map((item, i) => (
             <React.Fragment key={item.label}>
               <Pressable
+                onPress={() => {
+                  if (item.label === 'Edit Profile')
+                    router.push('/(app)/settings/profile');
+                }}
                 style={({ pressed }) => [
                   s.row,
                   pressed && { backgroundColor: colors.inputBg },

@@ -2,10 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { LocationAddressFields } from './location-address-fields';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
-
 const props = {
   city: '',
   region: '',

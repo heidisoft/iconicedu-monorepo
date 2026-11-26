@@ -337,6 +337,14 @@ export function ProfileSheet({
   const insets = useSafeAreaInsets();
   const profileId = user?.ids.id ?? '';
   const orgId = user?.ids.orgId ?? '';
+  const visibilityQuery = useQuery({
+    queryKey: ['profile-visibility', profileId],
+    queryFn: () =>
+      apiGet<{ hide_role?: boolean; hide_status?: boolean }>(`/profiles/${profileId}`),
+    enabled: visible && Boolean(profileId),
+  });
+  const hideRole = visibilityQuery.data?.hide_role !== false;
+  const hideStatus = visibilityQuery.data?.hide_status !== false;
   const presenceQuery = useQuery({
     queryKey: ['profile-preview-presence', orgId, profileId],
     queryFn: async () => {
@@ -361,7 +369,9 @@ export function ProfileSheet({
   const displayName = user.profile.displayName;
   const roleLabel = roleLabelFromKind(user.kind);
   const RoleIcon = roleIconFromKind(user.kind);
-  const aboutFields = buildAboutFields(user, presenceQuery.data);
+  const aboutFields = buildAboutFields(user, presenceQuery.data).filter(
+    (field) => !hideStatus || field.key !== 'lastSeen',
+  );
   const hasPresence = user.presence?.state?.emoji || user.presence?.state?.text;
 
   return (
@@ -369,15 +379,13 @@ export function ProfileSheet({
       visible={visible}
       onClose={onClose}
       allowExpand
+      topInset={insets.top}
       backdropColor={colors.modalOverlay}
       sheetStyle={{ backgroundColor: colors.bg }}
       dragHandleStyle={{ backgroundColor: colors.border }}
     >
       <ScrollView
-        contentContainerStyle={[
-          s.scrollContent,
-          { paddingBottom: Math.max(insets.bottom, 24) },
-        ]}
+        contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + 16 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
@@ -385,14 +393,14 @@ export function ProfileSheet({
           <LargeAvatar user={user} />
           <RoleNameIndicator
             name={displayName}
-            role={user.kind}
+            role={hideRole ? null : user.kind}
             iconSize={16}
             textStyle={[s.displayName, { color: colors.text }]}
             containerStyle={s.displayNameWrap}
             numberOfLines={2}
           />
 
-          {hasPresence && (
+          {!hideStatus && hasPresence && (
             <View style={[s.presenceBadge, { backgroundColor: colors.card }]}>
               {user.presence?.state?.emoji ? (
                 <Text style={s.presenceEmoji}>{user.presence.state.emoji}</Text>
@@ -408,10 +416,12 @@ export function ProfileSheet({
             </View>
           )}
 
-          <View style={[s.roleBadge, { backgroundColor: colors.card }]}>
-            <RoleIcon size={14} color={colors.textMuted} strokeWidth={2} />
-            <Text style={[s.roleText, { color: colors.textMuted }]}>{roleLabel}</Text>
-          </View>
+          {!hideRole && (
+            <View style={[s.roleBadge, { backgroundColor: colors.card }]}>
+              <RoleIcon size={14} color={colors.textMuted} strokeWidth={2} />
+              <Text style={[s.roleText, { color: colors.textMuted }]}>{roleLabel}</Text>
+            </View>
+          )}
 
           {onMessagePress ? (
             <TouchableOpacity

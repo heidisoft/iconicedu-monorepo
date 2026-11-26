@@ -7,6 +7,8 @@ generator client {
 }
 
 model Profile {
+  hideRole           Boolean                  @default(false) @map("hide_role")
+  hideStatus         Boolean                  @default(false) @map("hide_status")
   id                 String                   @id @db.Uuid
   fullName           String?                  @map("full_name")
   appRole            String                   @map("app_role")

@@ -33,6 +33,9 @@ export async function createChildProfile(input: {
   lastName: string;
   gradeLevel: string;
   birthYear: number;
+  email?: string;
+  themeKey?: string;
+  locale?: string;
   timezone?: string | null;
   city?: string | null;
   region?: string | null;

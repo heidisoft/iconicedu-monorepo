@@ -3,9 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { LocationCountryField } from './location-country-field';
 import { lightColors } from '@/lib/theme';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 const countries = [
   { code: 'US', label: 'United States' },
   { code: 'LK', label: 'Sri Lanka' },
@@ -23,6 +20,16 @@ it('opens a searchable country list, selects the country code, and closes', () =
   );
   fireEvent.press(screen.getByLabelText('Country: United States. Change country'));
   expect(screen.getByText('Choose country')).toBeTruthy();
+  // The native sheet's leading close action precedes its centered title.
+  const close = screen.getByLabelText('Close country picker');
+  const title = screen.getByText('Choose country');
+  let header = close.parent;
+  while (header && header.findAll((node) => node === title).length === 0) {
+    header = header.parent;
+  }
+  const actions = header?.findAll((node) => node === close || node === title);
+  expect(actions?.[0]).toBe(close);
+  expect(actions?.[1]).toBe(title);
   expect(screen.getByLabelText('United States').props.accessibilityState).toEqual({
     selected: true,
   });

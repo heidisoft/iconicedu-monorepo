@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Modal,
@@ -76,8 +77,8 @@ function makeStyles(C: AppColors) {
     overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: C.modalOverlay },
     sheet: {
       backgroundColor: C.pageBg,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       maxHeight: '80%',
       paddingBottom: 24,
     },
@@ -88,11 +89,19 @@ function makeStyles(C: AppColors) {
       paddingTop: 18,
       paddingBottom: 12,
     },
-    title: { flex: 1, fontSize: 18, fontWeight: '700', color: C.text },
+    title: {
+      textAlign: 'center',
+      flex: 1,
+      fontSize: 18,
+      fontWeight: '700',
+      color: C.text,
+    },
     closeBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      minWidth: 44,
+      minHeight: 44,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: C.inputBg,
       alignItems: 'center',
       justifyContent: 'center',
@@ -146,6 +155,7 @@ export function PinnedMessagesSheet({
   onJumpToMessage,
 }: PinnedMessagesSheetProps) {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [rows, setRows] = useState<PinnedRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -210,10 +220,22 @@ export function PinnedMessagesSheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <Pressable style={s.overlay} onPress={onClose}>
-        <Pressable style={s.sheet}>
+      <Pressable
+        style={[s.overlay, { paddingTop: popupInsets.top + 16 }]}
+        onPress={onClose}
+      >
+        <Pressable
+          testID="pinned-messages-sheet-content"
+          style={[
+            s.sheet,
+            {
+              paddingBottom: 16 + popupInsets.bottom,
+              paddingLeft: popupInsets.left,
+              paddingRight: popupInsets.right,
+            },
+          ]}
+        >
           <View style={s.header}>
-            <Text style={s.title}>Pinned messages</Text>
             <TouchableOpacity
               style={s.closeBtn}
               onPress={onClose}
@@ -221,6 +243,12 @@ export function PinnedMessagesSheet({
             >
               <X size={16} color={colors.text} />
             </TouchableOpacity>
+            <Text style={s.title}>Pinned messages</Text>
+            <View
+              style={{ width: 44 }}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            />
           </View>
 
           {loading ? (

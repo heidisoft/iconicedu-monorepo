@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
@@ -203,6 +204,7 @@ export default function AccountScreen() {
   const { user, signOut } = useAuth();
   const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const {
     data: account,
@@ -305,7 +307,8 @@ export default function AccountScreen() {
       FAMILY_SWITCH_HEADER_HEIGHT +
       FAMILY_SWITCH_CARD_PADDING +
       familySwitchRowsHeight +
-      FAMILY_SWITCH_BOTTOM_PADDING,
+      FAMILY_SWITCH_BOTTOM_PADDING +
+      popupInsets.bottom,
     windowHeight * 0.78,
   );
 
@@ -466,7 +469,16 @@ export default function AccountScreen() {
         partialHeight={familySwitchSheetHeight}
         sheetStyle={{ backgroundColor: colors.pageBg }}
       >
-        <View style={s.familySwitchSheetContent}>
+        <View
+          style={[
+            s.familySwitchSheetContent,
+            {
+              paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING + popupInsets.bottom,
+              paddingLeft: popupInsets.left + 20,
+              paddingRight: popupInsets.right + 20,
+            },
+          ]}
+        >
           <Card style={s.familySwitchCard}>
             <View style={s.familySwitchHeader}>
               <Text style={s.familySwitchTitle}>View as</Text>

@@ -69,7 +69,7 @@ function makeStyles(C: AppColors, bottomInset: number) {
   return StyleSheet.create({
     content: {
       paddingHorizontal: 20,
-      paddingBottom: Math.max(bottomInset, 20),
+      paddingBottom: bottomInset + 16,
     },
     header: {
       flexDirection: 'row',
@@ -366,6 +366,7 @@ export const AiRefineSheet: React.FC<AiRefineSheetProps> = ({
       visible={visible}
       onClose={onClose}
       allowExpand
+      topInset={insets.top}
       backdropColor={colors.modalOverlay}
       sheetStyle={{ backgroundColor: colors.pageBg }}
       dragHandleStyle={{ backgroundColor: colors.border }}

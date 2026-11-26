@@ -1,10 +1,11 @@
+import { ProfileSectionEditButton } from '@/components/profile/profile-editor';
 import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, MapPin } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
-import { useProfile } from '@/hooks/use-profile';
+import { useSettingsProfile } from '@/hooks/use-settings-profile';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
@@ -75,7 +76,7 @@ function Val({ value, s }: { value?: string | null; s: ReturnType<typeof makeSty
 export default function LocationScreen() {
   const router = useRouter();
   const { colors } = useTheme();
-  const { data: profile } = useProfile();
+  const { data: profile, isPending, isError, refetch } = useSettingsProfile();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const prof = profile as Record<string, unknown> | undefined;
@@ -96,57 +97,82 @@ export default function LocationScreen() {
       </View>
 
       <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={s.sectionLabel}>Address</Text>
-
-        {!hasAnyLocation ? (
-          <View style={[s.card, s.emptyCard]}>
-            <View style={s.emptyIconWrap}>
-              <MapPin size={28} color={colors.textMuted} />
-            </View>
-            <Text style={s.emptyTitle}>No location set</Text>
-            <Text style={s.emptyDesc}>
-              Location details appear here once your profile is updated.
-            </Text>
-          </View>
+        {isPending ? (
+          <Text style={s.emptyValue}>Loading…</Text>
+        ) : isError ? (
+          <TouchableOpacity accessibilityRole="button" onPress={() => void refetch()}>
+            <Text style={s.emptyValue}>Unable to load details. Tap to retry.</Text>
+          </TouchableOpacity>
         ) : (
-          <View style={s.card}>
-            <SettingsRow
-              icon={<MapPin size={20} color={colors.textMuted} />}
-              label="Country"
-              labelColor={colors.text}
-              hideChevron
-              trailing={
-                <Val
-                  value={(prof?.country_name as string) ?? (prof?.country_code as string)}
-                  s={s}
+          <>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <Text style={s.sectionLabel}>Address</Text>
+              <ProfileSectionEditButton
+                id={profile?.id}
+                section="location"
+                title="Address"
+              />
+            </View>
+
+            {!hasAnyLocation ? (
+              <View style={[s.card, s.emptyCard]}>
+                <View style={s.emptyIconWrap}>
+                  <MapPin size={28} color={colors.textMuted} />
+                </View>
+                <Text style={s.emptyTitle}>No location set</Text>
+                <Text style={s.emptyDesc}>
+                  Location details appear here once your profile is updated.
+                </Text>
+              </View>
+            ) : (
+              <View style={s.card}>
+                <SettingsRow
+                  icon={<MapPin size={20} color={colors.textMuted} />}
+                  label="Country"
+                  labelColor={colors.text}
+                  hideChevron
+                  trailing={
+                    <Val
+                      value={
+                        (prof?.country_name as string) ?? (prof?.country_code as string)
+                      }
+                      s={s}
+                    />
+                  }
                 />
-              }
-            />
-            <View style={s.divider} />
-            <SettingsRow
-              icon={<MapPin size={20} color={colors.textMuted} />}
-              label="Region / State"
-              labelColor={colors.text}
-              hideChevron
-              trailing={<Val value={prof?.region as string} s={s} />}
-            />
-            <View style={s.divider} />
-            <SettingsRow
-              icon={<MapPin size={20} color={colors.textMuted} />}
-              label="City"
-              labelColor={colors.text}
-              hideChevron
-              trailing={<Val value={prof?.city as string} s={s} />}
-            />
-            <View style={s.divider} />
-            <SettingsRow
-              icon={<MapPin size={20} color={colors.textMuted} />}
-              label="Postal Code"
-              labelColor={colors.text}
-              hideChevron
-              trailing={<Val value={prof?.postal_code as string} s={s} />}
-            />
-          </View>
+                <View style={s.divider} />
+                <SettingsRow
+                  icon={<MapPin size={20} color={colors.textMuted} />}
+                  label="Region / State"
+                  labelColor={colors.text}
+                  hideChevron
+                  trailing={<Val value={prof?.region as string} s={s} />}
+                />
+                <View style={s.divider} />
+                <SettingsRow
+                  icon={<MapPin size={20} color={colors.textMuted} />}
+                  label="City"
+                  labelColor={colors.text}
+                  hideChevron
+                  trailing={<Val value={prof?.city as string} s={s} />}
+                />
+                <View style={s.divider} />
+                <SettingsRow
+                  icon={<MapPin size={20} color={colors.textMuted} />}
+                  label="Postal Code"
+                  labelColor={colors.text}
+                  hideChevron
+                  trailing={<Val value={prof?.postal_code as string} s={s} />}
+                />
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
     </SafeAreaView>
