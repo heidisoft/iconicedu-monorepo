@@ -32,8 +32,8 @@
     "eas:submit:ios": "eas submit --platform ios",
     "eas:submit:android": "eas submit --platform android",
     "eas:update": "eas update",
-    "eas:update:production": "eas update --channel production",
-    "eas:update:preview": "eas update --channel preview",
+    "eas:update:production": "eas update --channel production --environment production",
+    "eas:update:preview": "eas update --channel preview --environment preview",
     "export:bundle": "EXPO_NO_TELEMETRY=1 npx expo export --platform android --output-dir .expo/dist",
     "test:e2e:message-audiences": "maestro test .maestro/message-audiences.yaml",
     "test:e2e:auth": "node scripts/auth-e2e.mjs"
