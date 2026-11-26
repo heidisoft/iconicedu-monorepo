@@ -1,5 +1,5 @@
 import { act, renderHook, waitFor } from '@testing-library/react-native';
-import type { ReleaseNotes } from '@/lib/release-notes';
+import { currentReleaseNotes, type ReleaseNotes } from '@/lib/release-notes';
 import {
   useWhatsNewReleaseNotes,
   WHATS_NEW_LAST_SEEN_KEY,
@@ -23,6 +23,31 @@ describe('useWhatsNewReleaseNotes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSetItemAsync.mockResolvedValue(undefined);
+  });
+
+  it('shows the current general release after the previous AI announcement was dismissed', async () => {
+    mockGetItemAsync.mockResolvedValue('2026-09-29-ai-messaging');
+
+    const { result } = renderHook(() => useWhatsNewReleaseNotes());
+
+    await waitFor(() => expect(result.current.shouldShow).toBe(true));
+    expect(result.current.releaseNotes).toBe(currentReleaseNotes);
+    expect(result.current.releaseNotes.requiresAiAssistEligibility).not.toBe(true);
+
+    act(() => result.current.dismiss());
+    expect(mockSetItemAsync).toHaveBeenCalledWith(
+      WHATS_NEW_LAST_SEEN_KEY,
+      currentReleaseNotes.id,
+    );
+  });
+
+  it('keeps the current release dismissed on the next launch', async () => {
+    mockGetItemAsync.mockResolvedValue(currentReleaseNotes.id);
+
+    const { result } = renderHook(() => useWhatsNewReleaseNotes());
+
+    await waitFor(() => expect(mockGetItemAsync).toHaveBeenCalled());
+    expect(result.current.shouldShow).toBe(false);
   });
 
   it('shows when no stored release id exists', async () => {

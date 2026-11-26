@@ -164,6 +164,12 @@ is shown once per session, including for downloads from Expo's launch check.
 Installed versions that still contain the previous update hook can restart
 silently while receiving the first update containing this notification.
 
+The **What's new** popup is separate from the restart notification. For each
+release announcement, update `apps/mobile/src/lib/release-notes.ts` with a new
+unique ID and user-facing highlights. Users see it after running that release
+until they dismiss it; dismissal is saved by release ID. General release notes
+must not set `requiresAiAssistEligibility`, which is only for AI-specific notices.
+
 Test updates on an installed release build before production rollout. OTA updates
 must match the installed native runtime; native dependency, SDK, plugin, or
 permission changes require a new store build and a distinct runtime version.
