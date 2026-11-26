@@ -156,6 +156,10 @@ For production, deploy the required API changes first, then manually run the
 **EAS Update** GitHub Actions workflow with branch **main** selected. The workflow
 rejects other branches, uses the EAS production environment, and publishes to the
 production channel. Merging to `main` alone does not publish an OTA update.
+The workflow uses the existing GitHub Actions `API_URL` and `WEB_URL` variables
+(or secrets) first. When either is absent, it discovers that origin from Railway
+or a ready Vercel production deployment on `main`. Discovery failures stop the
+publish and report provider/status information without printing response payloads.
 
 The app downloads available updates and shows an **Update ready** notification
 with **Later** and **Restart now** actions. Choosing Later preserves the current
