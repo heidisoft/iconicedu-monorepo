@@ -161,14 +161,15 @@ The workflow uses the existing GitHub Actions `API_URL` and `WEB_URL` variables
 or a ready Vercel production deployment on `main`. Discovery failures stop the
 publish and report provider/status information without printing response payloads.
 
-The app downloads available updates and shows an **Update ready** notification
-with **Later** and **Restart now** actions. Choosing Later preserves the current
-session; Expo can apply the downloaded update on the next cold launch. The prompt
-is shown once per session, including for downloads from Expo's launch check.
-Installed versions that still contain the previous update hook can restart
-silently while receiving the first update containing this notification.
+The app downloads available updates quietly without a restart prompt or automatic
+reload. Expo applies a downloaded update on the next cold launch, so an active
+class or unfinished form stays uninterrupted. This also applies to updates fetched
+by Expo's native launch check. Older installed JavaScript bundles retain their
+existing update behavior until this change has been downloaded and launched.
+The separate required app-store update notice remains available for unsupported
+native versions.
 
-The **What's new** popup is separate from the restart notification. For each
+The **What's new** popup remains a separate release announcement. For each
 release announcement, update `apps/mobile/src/lib/release-notes.ts` with a new
 unique ID and user-facing highlights. Users see it after running that release
 until they dismiss it; dismissal is saved by release ID. General release notes

@@ -41,50 +41,26 @@ describe('useAppUpdate', () => {
     setDev(true);
   });
 
-  it('downloads without restarting and prompts only when the download is pending', async () => {
+  it('downloads silently and never prompts or restarts when an update becomes pending', async () => {
     mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true });
     const { rerender } = renderHook(() => useAppUpdate());
     await waitFor(() => expect(mockFetchUpdateAsync).toHaveBeenCalledTimes(1));
-    expect(alert).not.toHaveBeenCalled();
-    expect(mockReloadAsync).not.toHaveBeenCalled();
-
     mockIsUpdatePending = true;
     rerender({});
-    expect(alert).toHaveBeenCalledWith('Update ready', expect.any(String), [
-      { text: 'Later', style: 'cancel' },
-      { text: 'Restart now', onPress: expect.any(Function) },
-    ]);
-    expect(mockReloadAsync).not.toHaveBeenCalled();
-    rerender({});
-    expect(alert).toHaveBeenCalledTimes(1);
-  });
-
-  it('prompts for a download from the native launch check and restarts on request', async () => {
-    mockIsUpdatePending = true;
-    renderHook(() => useAppUpdate());
-    const restart = alert.mock.calls[0][2][1].onPress;
-    await act(async () => restart());
-    expect(mockReloadAsync).toHaveBeenCalledTimes(1);
-  });
-
-  it('lets the user defer without reloading or prompting again', () => {
-    mockIsUpdatePending = true;
-    const { rerender } = renderHook(() => useAppUpdate());
-    expect(alert.mock.calls[0][2][0]).toEqual({ text: 'Later', style: 'cancel' });
     mockIsUpdatePending = false;
     rerender({});
     mockIsUpdatePending = true;
     rerender({});
-    expect(alert).toHaveBeenCalledTimes(1);
+    expect(alert).not.toHaveBeenCalled();
     expect(mockReloadAsync).not.toHaveBeenCalled();
   });
 
-  it('explains how to apply the update if restarting fails', async () => {
+  it('does not prompt or restart for an update downloaded by the native launch check', async () => {
     mockIsUpdatePending = true;
-    mockReloadAsync.mockRejectedValue(new Error('reload failed'));
     renderHook(() => useAppUpdate());
-    await act(async () => alert.mock.calls[0][2][1].onPress());
-    expect(alert).toHaveBeenLastCalledWith('Could not restart', expect.any(String));
+    await act(async () => {});
+    expect(alert).not.toHaveBeenCalled();
+    expect(mockReloadAsync).not.toHaveBeenCalled();
   });
 
   it('does not download or prompt when no update is available', async () => {
