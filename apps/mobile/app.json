@@ -35,7 +35,9 @@
       },
       "config": {
         "usesNonExemptEncryption": false
-      }
+      },
+      "associatedDomains": ["applinks:www.iconicedu.com", "applinks:iconicedu.com"],
+      "appleTeamId": "5NVN93C486"
     },
     "android": {
       "adaptiveIcon": {
@@ -48,6 +50,25 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.POST_NOTIFICATIONS"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": ["BROWSABLE", "DEFAULT"],
+          "data": [
+            {
+              "scheme": "https",
+              "host": "www.iconicedu.com",
+              "pathPrefix": "/r/"
+            },
+            {
+              "scheme": "https",
+              "host": "iconicedu.com",
+              "pathPrefix": "/r/"
+            }
+          ]
+        }
       ]
     },
     "plugins": [

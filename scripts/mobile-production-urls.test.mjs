@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import {
+  ICONIC_APPLE_TEAM_ID,
+  ICONIC_ANDROID_PACKAGE,
+} from '../packages/utils/src/mobile-app-links.ts';
 import { readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { test } from 'node:test';
@@ -167,4 +171,103 @@ test('OTA workflow passes existing production origins to the resolver', () => {
   assert.equal(step.run, 'node scripts/resolve-mobile-production-urls.mjs');
   assert.equal(step.env.API_URL, '${{ vars.API_URL || secrets.API_URL }}');
   assert.equal(step.env.WEB_URL, '${{ vars.WEB_URL || secrets.WEB_URL }}');
+});
+
+test('native referral HTTPS links claim only trusted referral paths and match checked-in projects', () => {
+  const mobile = JSON.parse(
+    readFileSync(new URL('../apps/mobile/app.json', import.meta.url), 'utf8'),
+  ).expo;
+  const hosts = ['www.iconicedu.com', 'iconicedu.com'];
+  assert.equal(mobile.ios.appleTeamId, ICONIC_APPLE_TEAM_ID);
+  assert.equal(mobile.ios.bundleIdentifier, ICONIC_ANDROID_PACKAGE);
+  assert.equal(mobile.android.package, ICONIC_ANDROID_PACKAGE);
+  assert.deepEqual(
+    mobile.ios.associatedDomains.filter((value) => value.startsWith('applinks:')).sort(),
+    hosts.map((host) => `applinks:${host}`).sort(),
+  );
+  const filters = mobile.android.intentFilters.filter((filter) => filter.autoVerify);
+  assert.ok(filters.length > 0);
+  for (const filter of filters) {
+    assert.equal(filter.action, 'VIEW');
+    assert.ok(filter.category.includes('BROWSABLE'));
+    assert.ok(filter.category.includes('DEFAULT'));
+  }
+  const matches = (value) => {
+    const url = new URL(value);
+    return filters.some((filter) =>
+      filter.data.some(
+        (data) =>
+          data.scheme === url.protocol.slice(0, -1) &&
+          data.host === url.hostname &&
+          url.pathname.startsWith(data.pathPrefix),
+      ),
+    );
+  };
+  for (const host of hosts) assert.ok(matches(`https://${host}/r/${'a'.repeat(48)}`));
+  for (const url of [
+    'http://www.iconicedu.com/r/code',
+    'https://attacker.example/r/code',
+    'https://www.iconicedu.com/login',
+    'https://iconicedu.com/auth/callback',
+    'https://www.iconicedu.com/ransom/',
+  ]) {
+    assert.equal(matches(url), false, `native app must not claim ${url}`);
+  }
+
+  const entitlements = readFileSync(
+    new URL(
+      '../apps/mobile/ios/ICONICAcademy/ICONICAcademy.entitlements',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const domainArray = entitlements.match(
+    /<key>com\.apple\.developer\.associated-domains<\/key>\s*<array>([\s\S]*?)<\/array>/,
+  )?.[1];
+  assert.ok(domainArray, 'checked-in iOS entitlements must include associated domains');
+  assert.deepEqual(
+    [...domainArray.matchAll(/<string>([^<]+)<\/string>/g)]
+      .map((match) => match[1])
+      .sort(),
+    [...mobile.ios.associatedDomains].sort(),
+  );
+
+  const project = readFileSync(
+    new URL(
+      '../apps/mobile/ios/ICONICAcademy.xcodeproj/project.pbxproj',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const teams = [...project.matchAll(/DEVELOPMENT_TEAM = ([A-Z0-9]+);/g)].map(
+    (match) => match[1],
+  );
+  assert.ok(
+    teams.length >= 2,
+    'debug and release Xcode configurations must select the signing team',
+  );
+  assert.ok(teams.every((team) => team === ICONIC_APPLE_TEAM_ID));
+
+  const manifest = readFileSync(
+    new URL('../apps/mobile/android/app/src/main/AndroidManifest.xml', import.meta.url),
+    'utf8',
+  );
+  const nativeFilters = [
+    ...manifest.matchAll(/<intent-filter([^>]*)>([\s\S]*?)<\/intent-filter>/g),
+  ].filter((match) => /android:autoVerify="true"/.test(match[1]));
+  assert.equal(nativeFilters.length, filters.length);
+  const nativeData = nativeFilters.flatMap((match) =>
+    [...match[2].matchAll(/<data\s+([^>]+)\/?>/g)].map((data) =>
+      Object.fromEntries(
+        [...data[1].matchAll(/android:(\w+)="([^"]*)"/g)].map((attr) => [
+          attr[1],
+          attr[2],
+        ]),
+      ),
+    ),
+  );
+  assert.deepEqual(
+    nativeData,
+    filters.flatMap((filter) => filter.data),
+  );
 });
