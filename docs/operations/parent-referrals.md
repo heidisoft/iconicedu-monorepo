@@ -134,11 +134,12 @@ action preserves the accepted invitation through authentication.
 
 ## Verified HTTPS app links
 
-This change prepares server verification for `/r/` links on `www.iconicedu.com`
-and `iconicedu.com`. Native associated domains and intent filters are deliberately
-reserved for a separate native-build PR. Until that app release is installed,
-parents can use **Open app and continue** with the existing `iconicedu://` scheme;
-referral signup and attribution do not require a new native build.
+Native configuration accepts only `/r/` links on `www.iconicedu.com` and
+`iconicedu.com`. The app config and checked-in iOS entitlements, Xcode signing team,
+and Android manifest are synchronized. These changes require rebuilt native apps;
+an OTA update cannot add associated domains or intent filters. Until the new app
+release is installed, parents can continue using **Open app and continue** with
+the existing `iconicedu://` scheme and the separately deployed referral signup flow.
 
 Web serves JSON at `/.well-known/apple-app-site-association` and
 `/.well-known/assetlinks.json` while referrals are enabled. The verified public
