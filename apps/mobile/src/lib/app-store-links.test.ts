@@ -24,10 +24,10 @@ describe('getAppStoreUrl', () => {
     );
   });
 
-  it('defaults to the App Store search page on iOS with no override', () => {
+  it('defaults to the country-neutral App Store listing on iOS with no override', () => {
     (Platform as unknown as { OS: string }).OS = 'ios';
     expect(getAppStoreUrl(null)).toBe(
-      'https://apps.apple.com/search?term=ICONIC%20Academy',
+      'https://apps.apple.com/app/iconic-academy/id6762158186',
     );
   });
 
@@ -41,7 +41,7 @@ describe('getAppStoreUrl', () => {
   it('ignores a blank override and falls back to the default', () => {
     (Platform as unknown as { OS: string }).OS = 'ios';
     expect(getAppStoreUrl({ iosUrl: '   ' })).toBe(
-      'https://apps.apple.com/search?term=ICONIC%20Academy',
+      'https://apps.apple.com/app/iconic-academy/id6762158186',
     );
   });
 });

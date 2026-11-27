@@ -12,6 +12,14 @@ export function useMobileFeatureFlag(key: MobileFeatureFlagKey): boolean {
 
   useEffect(() => {
     let cancelled = false;
+    let version = 0;
+    const unsubscribe = posthog?.onFeatureFlags?.((flags) => {
+      version += 1;
+      if (!cancelled)
+        setEnabled(
+          parseBooleanFeatureFlag(flags?.[key]) || getLocalMobileFeatureFlagFallback(key),
+        );
+    });
 
     async function evaluate() {
       const fallback = getLocalMobileFeatureFlagFallback(key);
@@ -20,13 +28,15 @@ export function useMobileFeatureFlag(key: MobileFeatureFlagKey): boolean {
         return;
       }
 
+      const evaluationVersion = version;
       try {
-        await posthog.reloadFeatureFlags?.();
+        if (posthog.reloadFeatureFlagsAsync) await posthog.reloadFeatureFlagsAsync();
+        else await posthog.reloadFeatureFlags?.();
         const value = posthog.isFeatureEnabled
           ? await posthog.isFeatureEnabled(key)
           : await posthog.getFeatureFlag?.(key);
 
-        if (!cancelled) {
+        if (!cancelled && evaluationVersion === version) {
           setEnabled(parseBooleanFeatureFlag(value) || fallback);
         }
       } catch {
@@ -40,6 +50,7 @@ export function useMobileFeatureFlag(key: MobileFeatureFlagKey): boolean {
 
     return () => {
       cancelled = true;
+      unsubscribe?.();
     };
   }, [key, posthog]);
 

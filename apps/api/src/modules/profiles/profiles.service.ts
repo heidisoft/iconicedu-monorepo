@@ -1,3 +1,4 @@
+import { normalizeProfileSettings } from './profile-settings';
 import { normalizeProfileLocation } from './profile-location';
 import type { ProfileLocationInput } from '@iconicedu/shared-types';
 import {
@@ -40,6 +41,7 @@ type CreateChildProfileInput = {
   countryName?: string | null;
   postalCode?: string | null;
   themeKey?: string | null;
+  locale?: string | null;
 };
 
 type CreationCleanupContext = {
@@ -152,7 +154,7 @@ export class ProfilesService {
     const { data, error } = await supabase
       .from('profiles')
       .select(
-        'id, org_id, account_id, kind, status, display_name, first_name, last_name, avatar_url, avatar_seed, ui_theme_key, deleted_at',
+        'id, org_id, account_id, kind, status, display_name, first_name, last_name, avatar_url, avatar_seed, ui_theme_key, hide_role, hide_status, timezone, locale, languages_spoken, country_code, country_name, city, region, postal_code, deleted_at',
       )
       .eq('account_id', accountId)
       .is('deleted_at', null)
@@ -276,7 +278,7 @@ export class ProfilesService {
     const { data, error } = await supabase
       .from('profiles')
       .select(
-        'id, org_id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, status, ui_theme_key',
+        'id, org_id, account_id, display_name, first_name, last_name, avatar_url, avatar_seed, kind, status, ui_theme_key, hide_role, hide_status, timezone, locale, languages_spoken, country_code, country_name, city, region, postal_code',
       )
       .eq('org_id', orgId)
       .in('account_id', accountIds)
@@ -289,12 +291,70 @@ export class ProfilesService {
     accessToken: string,
     input: CreateChildProfileInput,
   ): Promise<ChildProfileVM> {
+    if (
+      !input ||
+      typeof input !== 'object' ||
+      !Number.isInteger(input.birthYear) ||
+      typeof input.gradeLevel !== 'string' ||
+      !input.gradeLevel
+    )
+      throw new BadRequestException('Birth year and grade are required.');
+    if (
+      input.email != null &&
+      (typeof input.email !== 'string' ||
+        input.email.length > 254 ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email))
+    )
+      throw new BadRequestException('Invalid email address.');
+    const normalized = normalizeProfileSettings({
+      firstName: input.firstName,
+      lastName: input.lastName,
+      displayName: input.displayName,
+      timezone: input.timezone ?? 'UTC',
+      locale: input.locale ?? 'en-US',
+      themeKey: input.themeKey ?? 'green',
+      hideRole: false,
+      hideStatus: false,
+      birthYear: input.birthYear,
+      gradeLevel: input.gradeLevel,
+      ...(input.countryCode
+        ? {
+            location: {
+              countryCode: input.countryCode,
+              city: input.city,
+              region: input.region,
+              postalCode: input.postalCode,
+            },
+          }
+        : {}),
+    });
+    input = {
+      ...input,
+      firstName: normalized.first_name as string,
+      lastName: normalized.last_name as string,
+      displayName: normalized.display_name as string,
+      themeKey: normalized.ui_theme_key as string,
+      ...(input.countryCode
+        ? {
+            city: normalized.city as string | null,
+            region: normalized.region as string | null,
+            postalCode: normalized.postal_code as string | null,
+            countryCode: normalized.country_code as string,
+            countryName: normalized.country_name as string,
+          }
+        : {}),
+    };
     const { user, serviceClient } = await this.requireUser(accessToken);
     const guardianAccount = await this.requireGuardianAccount(
       serviceClient,
       user.id,
       input.orgId,
     );
+    if (
+      input.email &&
+      normalizeEmail(input.email) === normalizeEmail(guardianAccount.email)
+    )
+      throw new BadRequestException('Child email cannot match the parent email.');
     const cleanupContext: CreationCleanupContext = {
       serviceClient,
       orgId: guardianAccount.org_id,
@@ -452,7 +512,10 @@ export class ProfilesService {
         .limit(1)
         .maybeSingle<AccountRow>();
       if (error) throw new InternalServerErrorException(error.message);
-      if (existingAccount) return { account: existingAccount, created: false };
+      if (existingAccount)
+        throw new BadRequestException(
+          'This email already has an account. Use Invite child by email to link it after they sign in.',
+        );
     }
 
     const { data: childAccount, error: accountError } = await options.serviceClient
@@ -493,14 +556,14 @@ export class ProfilesService {
       org_id: input.guardianAccount.org_id,
       account_id: input.childAccount.id,
       kind: 'child',
-      display_name: displayNameValue,
+      display_name: input.input.displayName.trim() || displayNameValue,
       first_name: input.input.firstName.trim(),
       last_name: input.input.lastName.trim(),
       avatar_source: 'seed',
       avatar_url: null,
       avatar_seed: input.childAccount.id,
       timezone: input.input.timezone ?? 'UTC',
-      locale: 'en-US',
+      locale: input.input.locale ?? 'en-US',
       status: 'active',
       country_code: input.input.countryCode ?? null,
       country_name: input.input.countryName ?? null,

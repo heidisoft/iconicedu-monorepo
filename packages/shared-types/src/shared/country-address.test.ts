@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getCountryAddressFields } from './country-address';
+import { PROFILE_COUNTRIES } from './profile-countries';
+import { PROFILE_COUNTRY_CODES } from './country-address';
 import { COUNTRY_ADDRESS_METADATA } from './country-address-metadata';
 
 describe('country address presentation', () => {
@@ -44,4 +46,27 @@ it('provides region lists and matches local names and abbreviations', () => {
   expect(findCountryRegion('CA', 'Québec')?.label).toBe('Quebec');
   expect(findCountryRegion('AE', 'DU')?.label).toBe('Dubai');
   expect(getCountryRegions('LK')).toEqual([]);
+});
+
+describe('profile country labels', () => {
+  it('includes every supported address country once with a readable name', () => {
+    expect(PROFILE_COUNTRIES).toHaveLength(252);
+    expect(PROFILE_COUNTRIES.map((country) => country.code).sort()).toEqual(
+      [...PROFILE_COUNTRY_CODES].sort(),
+    );
+    expect(new Set(PROFILE_COUNTRIES.map((country) => country.code)).size).toBe(
+      PROFILE_COUNTRIES.length,
+    );
+    for (const country of PROFILE_COUNTRIES) {
+      expect(country.label.length).toBeGreaterThan(2);
+      expect(country.label).not.toBe(country.code);
+    }
+    expect(PROFILE_COUNTRIES).toEqual(
+      expect.arrayContaining([
+        { code: 'US', label: 'United States' },
+        { code: 'LK', label: 'Sri Lanka' },
+        { code: 'GB', label: 'United Kingdom' },
+      ]),
+    );
+  });
 });

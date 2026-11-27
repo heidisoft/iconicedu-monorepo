@@ -17,6 +17,7 @@
   "peerDependencies": {
     "react": "^19.1.0",
     "react-native": "*",
+    "react-native-safe-area-context": "~5.6.2",
     "react-native-svg": "*"
   },
   "devDependencies": {
@@ -26,6 +27,7 @@
     "jest-expo": "^55.0.0",
     "react": "19.2.4",
     "react-native": "0.83.2",
+    "react-native-safe-area-context": "~5.6.2",
     "react-native-svg": "~15.12.1",
     "react-test-renderer": "19.2.4",
     "tailwindcss": "^3.4.0",

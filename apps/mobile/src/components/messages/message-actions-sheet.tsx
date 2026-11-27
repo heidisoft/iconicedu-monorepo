@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   Modal,
@@ -150,8 +151,8 @@ function makeStyles(C: AppColors) {
     overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: C.modalOverlay },
     sheet: {
       backgroundColor: C.pageBg,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       paddingBottom: 40,
     },
     handle: {
@@ -228,6 +229,7 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
   onEdit,
 }) => {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const [emojiPickerVisible, setEmojiPickerVisible] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -362,9 +364,21 @@ export const MessageActionsSheet: React.FC<MessageActionsSheetProps> = ({
         onRequestClose={onClose}
         statusBarTranslucent
       >
-        <Pressable style={s.overlay} onPress={onClose}>
+        <Pressable
+          style={[s.overlay, { paddingTop: popupInsets.top + 16 }]}
+          onPress={onClose}
+        >
           <Pressable>
-            <View style={s.sheet}>
+            <View
+              style={[
+                s.sheet,
+                {
+                  paddingBottom: 16 + popupInsets.bottom,
+                  paddingLeft: popupInsets.left,
+                  paddingRight: popupInsets.right,
+                },
+              ]}
+            >
               <View style={s.handle} />
 
               {/* Facebook Messenger-style animated quick reactions — hidden in read-only mode */}

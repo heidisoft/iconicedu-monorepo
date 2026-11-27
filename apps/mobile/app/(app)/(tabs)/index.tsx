@@ -1,18 +1,26 @@
+import { FamilyActionsTile } from '@/components/home/family-actions-tile';
+import {
+  FamilyActionExplainer,
+  type FamilyAction,
+} from '@/components/home/family-action-explainer';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { ParentReferralExplainer } from '@/components/home/parent-referral-explainer';
+import { ParentHomeTiles } from '@/components/home/parent-home-tiles';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
   Image,
-  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -48,12 +56,11 @@ import {
   buildHomeUpcomingSessionsMetricDisplay,
   splitHomeSessionsByTimeline,
 } from '@/lib/home-metrics';
-import { fetchOrgSessions, queryKeys, submitClassRequest } from '@/lib/api/queries';
+import { fetchOrgSessions, queryKeys } from '@/lib/api/queries';
 import {
-  OTHER_SUBJECT_OPTION,
-  STANDARD_SUBJECT_OPTIONS,
-  type ClassRequestIntent,
-} from '@iconicedu/shared-types';
+  ClassRequestSheet,
+  type RequestableStudent,
+} from '@/components/home/class-request-sheet';
 import type { AppColors } from '@/lib/theme';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
@@ -103,234 +110,6 @@ const FAMILY_SWITCH_CARD_PADDING = 36;
 const FAMILY_SWITCH_ROW_HEIGHT = 62;
 const FAMILY_SWITCH_ROW_GAP = 12;
 const FAMILY_SWITCH_BOTTOM_PADDING = 18;
-const DEFAULT_SUBJECT_OPTIONS = [...STANDARD_SUBJECT_OPTIONS, OTHER_SUBJECT_OPTION];
-const DEFAULT_CLASS_REQUEST_INTENT: ClassRequestIntent = 'ongoing-tutoring';
-
-type RequestableStudent = {
-  profileId: string;
-  displayName: string;
-};
-
-function toggleSelectedValue(values: string[], value: string) {
-  return values.includes(value)
-    ? values.filter((item) => item !== value)
-    : [...values, value];
-}
-
-function ClassRequestSheet({
-  visible,
-  onClose,
-  students,
-  defaultStudentIds,
-  colors,
-  s,
-  onCreated,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  students: RequestableStudent[];
-  defaultStudentIds: string[];
-  colors: AppColors;
-  s: ReturnType<typeof makeStyles>;
-  onCreated: (channelId: string) => void;
-}) {
-  const [studentProfileIds, setStudentProfileIds] = useState<string[]>(defaultStudentIds);
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [otherSubject, setOtherSubject] = useState('');
-  const [learningGoals, setLearningGoals] = useState('');
-  const [specialRequirements, setSpecialRequirements] = useState('');
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  React.useEffect(() => {
-    if (!visible) return;
-    setStudentProfileIds(defaultStudentIds);
-    setSubjects([]);
-    setOtherSubject('');
-    setLearningGoals('');
-    setSpecialRequirements('');
-    setRequestError(null);
-  }, [defaultStudentIds, visible]);
-
-  const handleSubmit = useCallback(async () => {
-    if (!studentProfileIds.length) {
-      setRequestError('Select at least one student.');
-      return;
-    }
-    if (!subjects.length) {
-      setRequestError('Select at least one subject.');
-      return;
-    }
-    if (subjects.includes(OTHER_SUBJECT_OPTION) && !otherSubject.trim()) {
-      setRequestError('Enter the custom subject when "Other" is selected.');
-      return;
-    }
-
-    setSubmitting(true);
-    setRequestError(null);
-    try {
-      const response = await submitClassRequest({
-        requestIntent: DEFAULT_CLASS_REQUEST_INTENT,
-        studentProfileIds,
-        subjects,
-        otherSubject: otherSubject.trim() || null,
-        learningGoals: learningGoals.trim(),
-        specialRequirements: specialRequirements.trim() || null,
-      });
-      onClose();
-      onCreated(response.channelId);
-    } catch (error) {
-      setRequestError(
-        error instanceof Error ? error.message : 'Unable to create class request.',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }, [
-    learningGoals,
-    onClose,
-    onCreated,
-    otherSubject,
-    specialRequirements,
-    studentProfileIds,
-    subjects,
-  ]);
-
-  return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      partialHeight={640}
-      sheetStyle={{ backgroundColor: colors.pageBg }}
-    >
-      <ScrollView
-        style={{ maxHeight: 584 }}
-        contentContainerStyle={s.requestSheet}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={s.requestHeader}>
-          <Text style={s.requestTitle}>Explore Classes</Text>
-          <Text style={s.requestSubtitle}>
-            Tell us what you need, and we will match your family with the best tutors in
-            the world to help your kids learn, grow, and thrive.
-          </Text>
-        </View>
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Student name *</Text>
-          <View style={s.requestChipRow}>
-            {students.map((student) => {
-              const selected = studentProfileIds.includes(student.profileId);
-              return (
-                <TouchableOpacity
-                  key={student.profileId}
-                  style={[s.requestChip, selected && s.requestChipSelected]}
-                  onPress={() =>
-                    setStudentProfileIds((current) =>
-                      toggleSelectedValue(current, student.profileId),
-                    )
-                  }
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[s.requestChipText, selected && s.requestChipTextSelected]}
-                  >
-                    {student.displayName}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Subject *</Text>
-          <View style={s.requestChipRow}>
-            {DEFAULT_SUBJECT_OPTIONS.map((subject) => {
-              const selected = subjects.includes(subject);
-              return (
-                <TouchableOpacity
-                  key={subject}
-                  style={[s.requestChip, selected && s.requestChipSelected]}
-                  onPress={() =>
-                    setSubjects((current) => toggleSelectedValue(current, subject))
-                  }
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[s.requestChipText, selected && s.requestChipTextSelected]}
-                  >
-                    {subject}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {subjects.includes(OTHER_SUBJECT_OPTION) ? (
-          <View style={s.requestField}>
-            <Text style={s.requestLabel}>Other subject</Text>
-            <TextInput
-              style={s.requestInput}
-              value={otherSubject}
-              onChangeText={setOtherSubject}
-              placeholder="Enter custom subject"
-              placeholderTextColor={colors.textFaint}
-            />
-          </View>
-        ) : null}
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Learning goals</Text>
-          <Text style={s.requestHelper}>
-            What specific topics or skills should the tutor focus on?
-          </Text>
-          <TextInput
-            style={[s.requestInput, s.requestTextArea]}
-            value={learningGoals}
-            onChangeText={setLearningGoals}
-            placeholder="Describe the support you want"
-            placeholderTextColor={colors.textFaint}
-            multiline
-          />
-        </View>
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Special requirements</Text>
-          <Text style={s.requestHelper}>
-            Any accommodations, learning preferences, or other notes for the tutor.
-          </Text>
-          <TextInput
-            style={[s.requestInput, s.requestTextArea]}
-            value={specialRequirements}
-            onChangeText={setSpecialRequirements}
-            placeholder="Optional notes"
-            placeholderTextColor={colors.textFaint}
-            multiline
-          />
-        </View>
-
-        {requestError ? <Text style={s.requestError}>{requestError}</Text> : null}
-
-        <TouchableOpacity
-          style={[s.boostButton, submitting && { opacity: 0.6 }]}
-          onPress={handleSubmit}
-          disabled={submitting}
-          activeOpacity={0.85}
-        >
-          {submitting ? (
-            <ActivityIndicator color={colors.actionForeground} />
-          ) : (
-            <Text style={s.boostButtonText}>Submit request</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </BottomSheet>
-  );
-}
-
 function makeStyles(C: AppColors) {
   const supportPalette = getSupportPalette(C);
 
@@ -670,86 +449,6 @@ function makeStyles(C: AppColors) {
       fontSize: 15,
       fontWeight: '800',
     },
-    requestSheet: {
-      paddingHorizontal: 18,
-      paddingBottom: 24,
-      gap: 16,
-    },
-    requestHeader: {
-      gap: 6,
-      paddingBottom: 2,
-    },
-    requestTitle: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: C.text,
-      lineHeight: 25,
-    },
-    requestSubtitle: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: C.textMuted,
-    },
-    requestField: {
-      gap: 7,
-    },
-    requestLabel: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: C.text,
-    },
-    requestHelper: {
-      fontSize: 13,
-      color: C.textMuted,
-      lineHeight: 18,
-    },
-    requestChipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
-    requestChip: {
-      minHeight: 36,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: C.border,
-      backgroundColor: C.card,
-      paddingHorizontal: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    requestChipSelected: {
-      borderColor: C.teal,
-      backgroundColor: C.tealBg,
-    },
-    requestChipText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: C.textMuted,
-    },
-    requestChipTextSelected: {
-      color: C.teal,
-    },
-    requestInput: {
-      minHeight: 46,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: C.border,
-      backgroundColor: C.card,
-      color: C.text,
-      fontSize: 14,
-      paddingHorizontal: 13,
-      paddingVertical: 11,
-    },
-    requestTextArea: {
-      minHeight: 88,
-      textAlignVertical: 'top',
-    },
-    requestError: {
-      color: C.red,
-      fontSize: 13,
-      lineHeight: 18,
-    },
   });
 }
 
@@ -758,10 +457,33 @@ function makeStyles(C: AppColors) {
 // ---------------------------------------------------------------------------
 
 export default function HomeScreen() {
+  const isHomeFocused = useIsFocused();
+  const enableParentReferrals = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableParentReferrals,
+  );
   const { user } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
+  const focusedHome = useRef(isHomeFocused);
+  focusedHome.current = isHomeFocused;
+  const [familyActionsHighlight, setFamilyActionsHighlight] = useState(0);
+  const revealFamilyActions = useCallback(() => {
+    if (!focusedHome.current) return;
+    setFamilyActionsHighlight((value) => value + 1);
+  }, []);
+  React.useEffect(() => {
+    focusedHome.current = isHomeFocused;
+    return () => {
+      focusedHome.current = false;
+    };
+  }, [isHomeFocused]);
   const queryClient = useQueryClient();
-  const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
+  const {
+    familySwitchOptions,
+    switchFamilyView,
+    isViewingAsChild,
+    guardianAccountId,
+    guardianProfileId,
+  } = useFamilyView();
   const {
     data: profile,
     isPending: profileLoading,
@@ -815,6 +537,7 @@ export default function HomeScreen() {
     staleTime: 5 * 60 * 1000,
   });
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const router = useRouter();
   const s = React.useMemo(() => makeStyles(colors), [colors]);
   const supportPalette = React.useMemo(() => getSupportPalette(colors), [colors]);
@@ -892,6 +615,10 @@ export default function HomeScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
+  const [referralExplainerOpen, setReferralExplainerOpen] = useState(false);
+  React.useEffect(() => {
+    if (!enableParentReferrals) setReferralExplainerOpen(false);
+  }, [enableParentReferrals]);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
   const [todaySectionY, setTodaySectionY] = useState(0);
   const [thisWeekSectionY, setThisWeekSectionY] = useState(0);
@@ -906,6 +633,10 @@ export default function HomeScreen() {
   const todaySessions = sessionBuckets.today;
   const thisWeekSessions = sessionBuckets.thisWeek;
   const nextWeekSessions = sessionBuckets.nextWeek;
+  const [familyIntro, setFamilyIntro] = useState<FamilyAction | null>(null);
+  React.useEffect(() => {
+    setFamilyIntro(null);
+  }, [orgId, guardianAccountId, isViewingAsChild, profileData?.kind]);
   const [classRequestOpen, setClassRequestOpen] = useState(false);
   const requestableStudents = React.useMemo<RequestableStudent[]>(() => {
     const children = familySwitchOptions
@@ -971,7 +702,8 @@ export default function HomeScreen() {
       FAMILY_SWITCH_HEADER_HEIGHT +
       FAMILY_SWITCH_CARD_PADDING +
       familySwitchRowsHeight +
-      FAMILY_SWITCH_BOTTOM_PADDING,
+      FAMILY_SWITCH_BOTTOM_PADDING +
+      popupInsets.bottom,
     windowHeight * 0.78,
   );
   const refreshHomeData = useCallback(
@@ -1262,10 +994,33 @@ export default function HomeScreen() {
             </ScrollView>
           ) : (
             <ScrollView
+              testID="home-overview-row"
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.metricsRow}
             >
+              {!isViewingAsChild &&
+                profileData?.kind === 'guardian' &&
+                guardianProfileId &&
+                orgId && (
+                  <ParentHomeTiles
+                    width={metricCardWidth}
+                    autoAdvanceEnabled={isHomeFocused}
+                    onSuggestionDismissed={revealFamilyActions}
+                    referralsEnabled={enableParentReferrals}
+                    orgId={orgId}
+                    accountId={guardianAccountId}
+                    onAddChild={() => setFamilyIntro('child')}
+                    onRequestClass={
+                      canRequestClasses ? () => setFamilyIntro('class') : undefined
+                    }
+                    onRefer={
+                      enableParentReferrals
+                        ? () => setReferralExplainerOpen(true)
+                        : undefined
+                    }
+                  />
+                )}
               <TouchableOpacity
                 style={[
                   s.metricCard,
@@ -1334,6 +1089,25 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
+              {!isViewingAsChild &&
+                profileData?.kind === 'guardian' &&
+                guardianProfileId &&
+                orgId && (
+                  <FamilyActionsTile
+                    width={metricCardWidth}
+                    highlight={familyActionsHighlight}
+                    referralsEnabled={enableParentReferrals}
+                    onAddChild={() => setFamilyIntro('child')}
+                    onRequestClass={
+                      canRequestClasses ? () => setFamilyIntro('class') : undefined
+                    }
+                    onRefer={
+                      enableParentReferrals
+                        ? () => setReferralExplainerOpen(true)
+                        : undefined
+                    }
+                  />
+                )}
             </ScrollView>
           )}
         </View>
@@ -1500,13 +1274,31 @@ export default function HomeScreen() {
 
         <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
+      {enableParentReferrals &&
+        !isViewingAsChild &&
+        profileData?.kind === 'guardian' &&
+        referralExplainerOpen && (
+          <ParentReferralExplainer
+            orgId={orgId ?? ''}
+            onClose={() => setReferralExplainerOpen(false)}
+          />
+        )}
       <BottomSheet
         visible={familySwitchOpen}
         onClose={() => setFamilySwitchOpen(false)}
         partialHeight={familySwitchSheetHeight}
         sheetStyle={{ backgroundColor: colors.pageBg }}
       >
-        <View style={s.familySwitchSheetContent}>
+        <View
+          style={[
+            s.familySwitchSheetContent,
+            {
+              paddingBottom: FAMILY_SWITCH_BOTTOM_PADDING + popupInsets.bottom,
+              paddingLeft: popupInsets.left + 20,
+              paddingRight: popupInsets.right + 20,
+            },
+          ]}
+        >
           <Card style={s.familySwitchCard}>
             <View style={s.familySwitchHeader}>
               <Text style={s.familySwitchTitle}>View as</Text>
@@ -1579,13 +1371,26 @@ export default function HomeScreen() {
           </Card>
         </View>
       </BottomSheet>
+      {familyIntro && !isViewingAsChild && profileData?.kind === 'guardian' && (
+        <FamilyActionExplainer
+          kind={familyIntro}
+          onClose={() => setFamilyIntro(null)}
+          onContinue={() => {
+            setFamilyIntro(null);
+            if (familyIntro === 'child') router.push('/(app)/settings/child');
+            else if (canRequestClasses) setClassRequestOpen(true);
+          }}
+          onInvite={() => {
+            setFamilyIntro(null);
+            router.push('/(app)/settings/invite-child');
+          }}
+        />
+      )}
       <ClassRequestSheet
         visible={classRequestOpen}
         onClose={() => setClassRequestOpen(false)}
         students={requestableStudents}
         defaultStudentIds={defaultRequestStudentIds}
-        colors={colors}
-        s={s}
         onCreated={handleClassRequestCreated}
       />
     </SafeAreaView>

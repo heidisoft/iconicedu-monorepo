@@ -14,6 +14,12 @@ name: Local signup, login, invalid OTP, and persisted session
     commands:
       - tapOn: '^Open$'
 - extendedWaitUntil:
+    visible: .*Got it.*|Email
+    timeout: 90000
+- tapOn:
+    id: whats-new-dismiss
+    optional: true
+- extendedWaitUntil:
     visible:
       id: auth-email-input
     timeout: 90000

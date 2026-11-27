@@ -1,4 +1,11 @@
-import React, { useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  fetchFamilyChildInvites,
+  revokeFamilyChildInvite,
+} from '@/lib/api/family-invites';
+import { profileAvatarColors } from '@/lib/profile-avatar-colors';
+import { useFamilyView } from '@/providers/family-view-provider';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -8,9 +15,10 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Pressable,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronLeft, CirclePlus, Mail, Users } from 'lucide-react-native';
+import { ChevronLeft, CirclePlus, Users, Mail } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useFamilyLinks } from '@/hooks/use-family-links';
@@ -84,8 +92,46 @@ function makeStyles(C: AppColors) {
 
 export default function FamilyScreen() {
   const router = useRouter();
+  const { guardianProfileId, guardianAccountId } = useFamilyView();
   const { colors } = useTheme();
   const { links, childProfiles, isLoading } = useFamilyLinks();
+  const client = useQueryClient();
+  const invites = useQuery({
+    queryKey: ['family-child-invites', guardianAccountId],
+    queryFn: fetchFamilyChildInvites,
+    enabled: !!guardianProfileId,
+  });
+  const [revoking, setRevoking] = useState<string | null>(null);
+  function revoke(id: string) {
+    if (revoking) return;
+    Alert.alert(
+      'Cancel invitation?',
+      'The child will no longer be able to join through this invitation.',
+      [
+        { text: 'Keep invite', style: 'cancel' },
+        {
+          text: 'Cancel invitation',
+          style: 'destructive',
+          onPress: async () => {
+            setRevoking(id);
+            try {
+              await revokeFamilyChildInvite(id);
+              await client.invalidateQueries({
+                queryKey: ['family-child-invites', guardianAccountId],
+              });
+            } catch (error) {
+              Alert.alert(
+                'Unable to cancel invitation',
+                error instanceof Error ? error.message : 'Please try again.',
+              );
+            } finally {
+              setRevoking(null);
+            }
+          },
+        },
+      ],
+    );
+  }
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   if (isLoading) {
@@ -108,14 +154,6 @@ export default function FamilyScreen() {
     childProfiles.map((p) => [p.account_id as string, p]),
   );
 
-  function handleInvite() {
-    Alert.alert(
-      'Invite Child',
-      'Inviting a child by email or phone will be available soon.',
-      [{ text: 'OK' }],
-    );
-  }
-
   return (
     <SafeAreaView style={s.safe}>
       <View style={s.nav}>
@@ -136,8 +174,7 @@ export default function FamilyScreen() {
             </View>
             <Text style={s.emptyTitle}>No family links yet</Text>
             <Text style={s.emptyDesc}>
-              Invite a child using their email or phone number to link them to your
-              account.
+              Add a child to manage their profile and learning details.
             </Text>
           </View>
         ) : (
@@ -163,14 +200,42 @@ export default function FamilyScreen() {
                       childAvatarUrl ? (
                         <Image source={{ uri: childAvatarUrl }} style={s.childAvatar} />
                       ) : (
-                        <View style={s.childAvatar}>
-                          <Text style={s.childInitial}>{childInitial}</Text>
+                        <View
+                          style={[
+                            s.childAvatar,
+                            {
+                              backgroundColor: profileAvatarColors({
+                                seed: childAccountId,
+                                themeKey: childProf?.ui_theme_key as string,
+                              }).bg,
+                            },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              s.childInitial,
+                              {
+                                color: profileAvatarColors({
+                                  seed: childAccountId,
+                                  themeKey: childProf?.ui_theme_key as string,
+                                }).fg,
+                              },
+                            ]}
+                          >
+                            {childInitial}
+                          </Text>
                         </View>
                       )
                     }
                     label={childName}
                     labelColor={colors.text}
-                    hideChevron
+                    onPress={() =>
+                      childProf?.id &&
+                      router.push({
+                        pathname: '/(app)/settings/child',
+                        params: { id: String(childProf?.id ?? '') },
+                      })
+                    }
                     trailing={
                       <Text style={s.valueText} numberOfLines={1}>
                         {relation.charAt(0).toUpperCase() + relation.slice(1)}
@@ -183,26 +248,70 @@ export default function FamilyScreen() {
           </View>
         )}
 
+        {!!guardianProfileId && invites.isError && (
+          <Pressable onPress={() => void invites.refetch()}>
+            <Text style={s.hint}>Unable to load invitations. Tap to retry.</Text>
+          </Pressable>
+        )}
+        {!!guardianProfileId && !!invites.data?.length && (
+          <>
+            <Text style={s.sectionLabel}>Pending invitations</Text>
+            <View style={s.card}>
+              {invites.data.map((invite, index) => (
+                <React.Fragment key={invite.id}>
+                  {index > 0 && <View style={s.divider} />}
+                  <SettingsRow
+                    icon={<Mail size={20} color={colors.textMuted} />}
+                    label={invite.invitedEmail ?? 'Child invitation'}
+                    labelColor={colors.text}
+                    hideChevron
+                    trailing={
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Cancel child invitation"
+                        disabled={!!revoking}
+                        onPress={() => revoke(invite.id)}
+                        style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}
+                      >
+                        <Text style={{ color: colors.red }}>
+                          {revoking === invite.id ? 'Cancelling…' : 'Cancel'}
+                        </Text>
+                      </Pressable>
+                    }
+                  />
+                  <Text style={[s.hint, { paddingHorizontal: 16, paddingBottom: 12 }]}>
+                    {invite.expiresAt
+                      ? `${new Date(invite.expiresAt).getTime() < Date.now() ? 'Expired' : 'Expires'} ${new Date(invite.expiresAt).toLocaleDateString()}`
+                      : 'Pending'}
+                  </Text>
+                </React.Fragment>
+              ))}
+            </View>
+          </>
+        )}
         {/* Actions */}
-        <Text style={s.sectionLabel}>Actions</Text>
-        <View style={s.card}>
-          <SettingsRow
-            icon={<Mail size={20} color={colors.teal} />}
-            label="Invite child by email"
-            labelColor={colors.teal}
-            chevronColor={colors.textFaint}
-            onPress={handleInvite}
-          />
-          <View style={s.divider} />
-          <SettingsRow
-            icon={<CirclePlus size={20} color={colors.teal} />}
-            label="Invite child by phone"
-            labelColor={colors.teal}
-            chevronColor={colors.textFaint}
-            onPress={handleInvite}
-          />
-        </View>
-
+        {!!guardianProfileId && (
+          <>
+            <Text style={s.sectionLabel}>Actions</Text>
+            <View style={s.card}>
+              <SettingsRow
+                icon={<Mail size={20} color={colors.teal} />}
+                label="Invite child by email"
+                labelColor={colors.teal}
+                chevronColor={colors.textFaint}
+                onPress={() => router.push('/(app)/settings/invite-child')}
+              />
+              <View style={s.divider} />
+              <SettingsRow
+                icon={<CirclePlus size={20} color={colors.teal} />}
+                label="Add new child"
+                labelColor={colors.teal}
+                chevronColor={colors.textFaint}
+                onPress={() => router.push('/(app)/settings/child')}
+              />
+            </View>
+          </>
+        )}
         {links.length > 0 && (
           <Text style={s.hint}>
             {links.length} {links.length === 1 ? 'child' : 'children'} linked to your

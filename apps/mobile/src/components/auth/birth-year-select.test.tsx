@@ -2,9 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { BirthYearSelect } from './birth-year-select';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 beforeEach(() => {
   jest.useFakeTimers();
   jest.setSystemTime(new Date('2026-06-01T12:00:00Z'));
@@ -50,5 +47,15 @@ it('preserves the value on dismissal and adds the new year on reopening after Ne
   expect(screen.getByLabelText('1907')).toBeTruthy();
   expect(screen.getByLabelText('Year of birth').props.accessibilityValue.text).toBe(
     '2010',
+  );
+});
+it('does not open or change birth year while saving', () => {
+  const onChange = jest.fn();
+  render(<BirthYearSelect value="2015" onChange={onChange} disabled />);
+  fireEvent.press(screen.getByLabelText('Year of birth'));
+  expect(screen.queryByText('Choose birth year')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Year of birth').props.accessibilityState.disabled).toBe(
+    true,
   );
 });

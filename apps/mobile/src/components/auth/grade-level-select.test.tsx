@@ -3,9 +3,6 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { GradeLevel, optionsForCountry } from '@iconicedu/shared-types';
 import { GradeLevelSelect } from './grade-level-select';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 const options = [
   { value: GradeLevel.Kindergarten, label: 'Kindergarten' },
   { value: GradeLevel.Grade2, label: 'Grade 2' },
@@ -48,5 +45,22 @@ it('uses the supplied country-specific grade labels', () => {
   );
   expect(screen.getByLabelText('Grade level').props.accessibilityValue.text).toBe(
     local[0]!.label,
+  );
+});
+it('does not open or change grade while saving', () => {
+  const onChange = jest.fn();
+  render(
+    <GradeLevelSelect
+      value={GradeLevel.Grade2}
+      onChange={onChange}
+      options={options}
+      disabled
+    />,
+  );
+  fireEvent.press(screen.getByLabelText('Grade level'));
+  expect(screen.queryByText('Choose grade level')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Grade level').props.accessibilityState.disabled).toBe(
+    true,
   );
 });

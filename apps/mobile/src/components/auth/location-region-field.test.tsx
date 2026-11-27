@@ -2,9 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { LocationRegionField } from './location-region-field';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 it('recognizes an abbreviated GPS region and offers a searchable state list', () => {
   const onChange = jest.fn();
   render(
@@ -31,5 +28,20 @@ it('uses the country-specific province list and leaves the selection on dismissa
   expect(screen.getByLabelText('Ontario').props.accessibilityState.selected).toBe(true);
   expect(screen.queryByLabelText('California')).toBeNull();
   fireEvent.press(screen.getByLabelText('Close province picker'));
+  expect(onChange).not.toHaveBeenCalled();
+});
+it('does not open the region picker while saving', () => {
+  const onChange = jest.fn();
+  render(
+    <LocationRegionField
+      countryCode="US"
+      value="NY"
+      label="State"
+      onChange={onChange}
+      disabled
+    />,
+  );
+  fireEvent.press(screen.getByLabelText('State'));
+  expect(screen.queryByText('Choose state')).toBeNull();
   expect(onChange).not.toHaveBeenCalled();
 });

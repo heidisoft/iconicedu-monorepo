@@ -17,10 +17,14 @@ type RoleSelection = 'parent' | 'educator' | 'student';
 export interface RoleOnboardingSubmitInput {
   role: RoleSelection;
   inviteCode?: string;
+  referrerName?: string;
+  skipReferral?: boolean;
 }
 
 type RoleOnboardingModalProps = {
   open: boolean;
+  referralsEnabled?: boolean;
+  linkedReferrerName?: string;
   onSubmit: (
     input: RoleOnboardingSubmitInput,
   ) => Promise<{ success: boolean; message?: string }>;
@@ -48,9 +52,16 @@ const ROLE_OPTIONS: Array<{
   },
 ];
 
-export function RoleOnboardingModal({ open, onSubmit }: RoleOnboardingModalProps) {
+export function RoleOnboardingModal({
+  open,
+  onSubmit,
+  referralsEnabled = false,
+  linkedReferrerName = '',
+}: RoleOnboardingModalProps) {
   const [selectedRole, setSelectedRole] = React.useState<RoleSelection | null>(null);
   const [inviteCode, setInviteCode] = React.useState('');
+  const [referrerName, setReferrerName] = React.useState('');
+  const [skipReferral, setSkipReferral] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -71,6 +82,15 @@ export function RoleOnboardingModal({ open, onSubmit }: RoleOnboardingModalProps
       const result = await onSubmit({
         role: selectedRole,
         inviteCode: selectedRole === 'student' ? inviteCode : undefined,
+        ...(referralsEnabled && selectedRole === 'parent'
+          ? {
+              ...(skipReferral
+                ? { skipReferral: true }
+                : !linkedReferrerName
+                  ? { referrerName: referrerName.trim() }
+                  : {}),
+            }
+          : {}),
       });
       if (!result.success) {
         setErrorMessage(result.message ?? 'Unable to complete onboarding.');
@@ -125,6 +145,43 @@ export function RoleOnboardingModal({ open, onSubmit }: RoleOnboardingModalProps
             </p>
           </div>
         ) : null}
+
+        {selectedRole === 'parent' && referralsEnabled && (
+          <div className="grid gap-2">
+            <Label htmlFor="referrerName">Who referred you? (optional)</Label>
+            <Input
+              id="referrerName"
+              value={skipReferral ? '' : linkedReferrerName || referrerName}
+              readOnly={!!linkedReferrerName}
+              disabled={isSubmitting}
+              maxLength={100}
+              onChange={(event) => {
+                setReferrerName(event.target.value);
+              }}
+              placeholder={
+                skipReferral ? 'No referral attached' : 'Referring parent’s name'
+              }
+              autoComplete="off"
+            />
+            {linkedReferrerName && !skipReferral && (
+              <button
+                type="button"
+                className="w-fit text-sm underline"
+                disabled={isSubmitting}
+                onClick={() => setSkipReferral(true)}
+              >
+                Remove referral
+              </button>
+            )}
+            <p className="text-xs text-muted-foreground">
+              {linkedReferrerName && !skipReferral
+                ? 'Your invitation has attached this parent automatically.'
+                : skipReferral
+                  ? 'Referral removed. You can continue normally.'
+                  : 'If a parent recommended ICONIC Academy, enter their name so our team can confirm their $20 discount.'}
+            </p>
+          </div>
+        )}
 
         {selectedRole === 'educator' ? (
           <p className="rounded-2xl border border-amber-300/50 bg-amber-100/40 px-3 py-2 text-xs text-amber-900 dark:border-amber-600/40 dark:bg-amber-900/30 dark:text-amber-100">

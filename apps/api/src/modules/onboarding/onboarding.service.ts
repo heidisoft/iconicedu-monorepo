@@ -1,3 +1,7 @@
+import {
+  ReferralsService,
+  normalizeReferralInput,
+} from '@iconicedu/api/modules/referrals/referrals.service';
 import { profileLocationError } from '../profiles/profile-location';
 import { createHash, randomUUID } from 'crypto';
 import {
@@ -275,6 +279,7 @@ function hasExpectedSupportUiDefaults(uiDefaults: unknown): boolean {
 export class OnboardingService {
   constructor(
     private readonly notificationPreferencesService: NotificationPreferencesService,
+    private readonly referralsService: ReferralsService,
   ) {}
 
   async getStatus(accessToken: string) {
@@ -494,24 +499,73 @@ export class OnboardingService {
 
   async completeRole(
     accessToken: string,
-    body: { role?: unknown; staffAccessCode?: unknown },
+    body: {
+      role?: unknown;
+      staffAccessCode?: unknown;
+      referralCode?: string;
+      referrerName?: string;
+    },
     orgSlug?: string | null,
   ) {
+    const referral = normalizeReferralInput(body);
     const role = parseRole(body.role);
     if (!role) throw new BadRequestException('Valid role is required');
     if (role === 'student') {
       throw new BadRequestException('Use /api/onboarding/student for student onboarding');
     }
 
+    // Resolve the invitation server-side so native signup joins its organization.
+    const invitation = referral.code
+      ? await this.referralsService.resolve(referral.code)
+      : null;
+    if ((referral.code || referral.name) && role !== 'parent')
+      throw new BadRequestException(
+        'Parent invitations can only be used for parent signup.',
+      );
+    if (invitation && orgSlug && orgSlug !== invitation.orgSlug)
+      throw new BadRequestException('This invitation belongs to another organization.');
     const { user, serviceSupabase } = await this.requireUser(accessToken);
-    const orgId = await this.resolveOrgIdForUser(serviceSupabase, user.id, orgSlug);
+    const orgId = await this.resolveOrgIdForUser(
+      serviceSupabase,
+      user.id,
+      invitation?.orgSlug ?? orgSlug,
+    );
     if (!orgId) throw new BadRequestException('No organization found for onboarding');
 
-    const account = await this.getOrCreateAccount(serviceSupabase, {
-      orgId,
-      authUserId: user.id,
-      authEmail: user.email ?? null,
-    });
+    const hasReferral = Boolean(referral.code || referral.name);
+    const establishedAccount = hasReferral
+      ? await this.getAccountByAuthUserId(serviceSupabase, user.id, true)
+      : null;
+    const account =
+      establishedAccount ??
+      (await this.getOrCreateAccount(serviceSupabase, {
+        orgId,
+        authUserId: user.id,
+        authEmail: user.email ?? null,
+      }));
+
+    if (hasReferral && (account.onboarding_completed_at || account.primary_role)) {
+      const roles = await this.getUserRoles(serviceSupabase, account.id, account.org_id);
+      return {
+        success: true,
+        referralStatus:
+          account.org_id === orgId &&
+          (await this.referralsService.hasMatchingSignupReferral(
+            account.id,
+            account.org_id,
+            body,
+          ))
+            ? ('already_recorded' as const)
+            : ('not_eligible' as const),
+        onboarding: await this.resolveOnboardingDestinations(
+          serviceSupabase,
+          buildAuthOnboardingState(account, roles),
+          account.org_id,
+        ),
+      };
+    }
+    if (hasReferral && account.primary_role && account.primary_role !== 'guardian')
+      throw new BadRequestException('Invitations apply to new parent accounts only.');
 
     if (role === 'staff') {
       const staffAccessCode =
@@ -546,6 +600,10 @@ export class OnboardingService {
       });
     }
 
+    const referralStatus = hasReferral ? 'pending_review' : undefined;
+    if (role === 'parent' && !account.onboarding_completed_at) {
+      await this.referralsService.record(user.id, account.org_id, body);
+    }
     const updatedAccount = await this.updateAccountRoleState(serviceSupabase, {
       accountId: account.id,
       orgId: account.org_id,
@@ -558,6 +616,7 @@ export class OnboardingService {
     const roles = await this.getUserRoles(serviceSupabase, account.id, account.org_id);
     return {
       success: true,
+      ...(referralStatus ? { referralStatus } : {}),
       onboarding: await this.resolveOnboardingDestinations(
         serviceSupabase,
         buildAuthOnboardingState(updatedAccount, roles),
@@ -1411,12 +1470,19 @@ export class OnboardingService {
     if (error) throw new InternalServerErrorException(error.message);
   }
 
-  private async getAccountByAuthUserId(supabase: SupabaseClient, authUserId: string) {
-    const { data, error } = await supabase
+  private async getAccountByAuthUserId(
+    supabase: SupabaseClient,
+    authUserId: string,
+    establishedOnly = false,
+  ) {
+    let query = supabase
       .from('accounts')
       .select('*')
       .eq('auth_user_id', authUserId)
-      .is('deleted_at', null)
+      .is('deleted_at', null);
+    if (establishedOnly)
+      query = query.or('primary_role.not.is.null,onboarding_completed_at.not.is.null');
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle<AccountRow>();

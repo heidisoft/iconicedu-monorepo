@@ -4,13 +4,13 @@ import {
   fetchProfilesByAccountIds,
   queryKeys,
 } from '@/lib/api/queries';
-import { useAccount } from './use-account';
+import { useFamilyView } from '@/providers/family-view-provider';
 
 export function useFamilyLinks() {
-  const { data: account } = useAccount();
-  const acc = account as Record<string, unknown> | undefined;
+  const { account, guardianAccountId } = useFamilyView();
+  const acc = account;
   const orgId = acc?.org_id as string | undefined;
-  const accountId = acc?.id as string | undefined;
+  const accountId = guardianAccountId;
 
   const { data: links = [], isLoading: linksLoading } = useQuery({
     queryKey: queryKeys.familyLinks(orgId ?? '', accountId ?? ''),

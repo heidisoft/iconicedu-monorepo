@@ -1,4 +1,5 @@
 export const queryKeys = {
+  parentReferralOffer: () => ['parent-referral-offer'] as const,
   onboardingStatus: (userId: string) => ['onboarding-status', userId] as const,
   profile: (profileId: string) => ['profile', profileId] as const,
   channels: (orgId: string) => ['channels', orgId] as const,

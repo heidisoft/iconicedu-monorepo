@@ -1,5 +1,12 @@
-import React, { useState } from 'react';
-import { Text, TextInput, View, type TextStyle, type ViewStyle } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  Keyboard,
+  Text,
+  TextInput,
+  View,
+  type TextStyle,
+  type ViewStyle,
+} from 'react-native';
 import { LocationRegionField } from './location-region-field';
 import { getCountryAddressFields, getCountryRegions } from '@iconicedu/shared-types';
 
@@ -54,6 +61,7 @@ const ADDRESS_EXAMPLES: Record<
 };
 
 type Props = {
+  disabled?: boolean;
   countryCode: string;
   city: string;
   region: string;
@@ -72,6 +80,7 @@ type Props = {
 };
 
 export function LocationAddressFields({
+  disabled = false,
   countryCode,
   city,
   region,
@@ -87,6 +96,12 @@ export function LocationAddressFields({
   const addressFields =
     getCountryAddressFields(countryCode) ?? getCountryAddressFields('ZZ')!;
   const examples = ADDRESS_EXAMPLES[countryCode];
+  const regionInput = useRef<TextInput>(null);
+  const postalInput = useRef<TextInput>(null);
+  const freeTextRegion =
+    addressFields.region.visible && getCountryRegions(countryCode).length === 0;
+  const nextAfterCity =
+    freeTextRegion || (!addressFields.region.visible && addressFields.postal.visible);
   return (
     <>
       {addressFields.city.visible && (
@@ -99,6 +114,7 @@ export function LocationAddressFields({
           </Text>
           <View style={[s.inputWrap, focusedField === 'city' && s.inputWrapFocused]}>
             <TextInput
+              editable={!disabled}
               style={s.input}
               testID="onboarding-city"
               value={city}
@@ -107,7 +123,14 @@ export function LocationAddressFields({
               placeholder={examples?.cityPlaceholder ?? addressFields.city.label}
               placeholderTextColor={s.placeholderColor}
               autoCapitalize="words"
-              returnKeyType="next"
+              autoCorrect={false}
+              returnKeyType={nextAfterCity ? 'next' : 'done'}
+              blurOnSubmit={!nextAfterCity}
+              onSubmitEditing={() => {
+                if (freeTextRegion) regionInput.current?.focus();
+                else if (nextAfterCity) postalInput.current?.focus();
+                else Keyboard.dismiss();
+              }}
               onFocus={() => setFocusedField('city')}
               onBlur={() => setFocusedField(null)}
             />
@@ -124,6 +147,7 @@ export function LocationAddressFields({
           </Text>
           {getCountryRegions(countryCode).length > 0 ? (
             <LocationRegionField
+              disabled={disabled}
               countryCode={countryCode}
               value={region}
               label={addressFields.region.label}
@@ -132,14 +156,22 @@ export function LocationAddressFields({
           ) : (
             <View style={[s.inputWrap, focusedField === 'region' && s.inputWrapFocused]}>
               <TextInput
+                editable={!disabled}
                 style={s.input}
+                ref={regionInput}
                 value={region}
                 onChangeText={setRegion}
                 accessibilityLabel={addressFields.region.label}
                 placeholder={examples?.regionPlaceholder ?? addressFields.region.label}
                 placeholderTextColor={s.placeholderColor}
                 autoCapitalize="words"
-                returnKeyType="next"
+                autoCorrect={false}
+                returnKeyType={addressFields.postal.visible ? 'next' : 'done'}
+                blurOnSubmit={!addressFields.postal.visible}
+                onSubmitEditing={() => {
+                  if (addressFields.postal.visible) postalInput.current?.focus();
+                  else Keyboard.dismiss();
+                }}
                 onFocus={() => setFocusedField('region')}
                 onBlur={() => setFocusedField(null)}
               />
@@ -157,8 +189,10 @@ export function LocationAddressFields({
           </Text>
           <View style={[s.inputWrap, focusedField === 'postal' && s.inputWrapFocused]}>
             <TextInput
+              editable={!disabled}
               style={s.input}
               testID="onboarding-postal"
+              ref={postalInput}
               value={postalCode}
               onChangeText={setPostalCode}
               accessibilityLabel={addressFields.postal.label}

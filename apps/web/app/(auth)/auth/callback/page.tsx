@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { isParentReferralCode } from '@iconicedu/web/lib/referrals/referral-cookie';
+import { useReferralOnboarding } from '@iconicedu/web/lib/referrals/referral-onboarding-context';
 import { useRouter } from 'next/navigation';
 
 import { shouldSkipCallbackRun } from '@iconicedu/web/app/(auth)/auth/callback/callback-run-guard';
@@ -28,10 +30,12 @@ function resolveCallbackSource(value?: string | null): AuthCallbackSource {
 
 export default function CallbackPage() {
   const router = useRouter();
+  const referral = useReferralOnboarding();
   const supabase = React.useMemo(() => createSupabaseBrowserClient(), []);
   const [loadingMessage, setLoadingMessage] = React.useState('Logging you in…');
   const [pageError, setPageError] = React.useState<string | null>(null);
   const [roleOnboardingState, setRoleOnboardingState] = React.useState<{
+    referralCode?: string;
     orgSlug: string | null;
     fallbackDestination: string;
     intent: 'login' | 'get-started' | null;
@@ -123,6 +127,9 @@ export default function CallbackPage() {
         ) {
           setLoadingMessage('Complete setup to continue…');
           setRoleOnboardingState({
+            referralCode: isParentReferralCode(searchParams.get('referral'))
+              ? searchParams.get('referral')!
+              : undefined,
             orgSlug: requestedOrgSlug || null,
             fallbackDestination: onboarding.destination ?? fallbackAuthPath,
             intent: authIntent,
@@ -215,7 +222,14 @@ export default function CallbackPage() {
       {roleOnboardingState ? (
         <RoleOnboardingModal
           open
-          onSubmit={async ({ role, inviteCode }) => {
+          referralsEnabled={referral.enabled}
+          linkedReferrerName={
+            referral.referrerName ||
+            (isParentReferralCode(roleOnboardingState.referralCode)
+              ? 'Parent from your invitation'
+              : '')
+          }
+          onSubmit={async ({ role, inviteCode, referrerName, skipReferral }) => {
             try {
               const search = new URLSearchParams();
               if (roleOnboardingState.orgSlug) {
@@ -225,7 +239,18 @@ export default function CallbackPage() {
                 role === 'student'
                   ? `/api/onboarding/student${search.toString() ? `?${search.toString()}` : ''}`
                   : `/api/onboarding/role${search.toString() ? `?${search.toString()}` : ''}`;
-              const body = role === 'student' ? { inviteCode } : { role };
+              const body =
+                role === 'student'
+                  ? { inviteCode }
+                  : {
+                      role,
+                      ...(referrerName ? { referrerName } : {}),
+                      ...(skipReferral ? { skipReferral: true } : {}),
+                      ...(referral.enabled &&
+                      isParentReferralCode(roleOnboardingState.referralCode)
+                        ? { referralCode: roleOnboardingState.referralCode }
+                        : {}),
+                    };
 
               const response = await fetch(endpoint, {
                 method: 'POST',

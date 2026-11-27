@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useMeetingDialogLaunch } from '@/hooks/use-meeting-dialog-launch';
 import {
   openLiveSession,
@@ -179,6 +180,7 @@ export function SessionCard({
   } | null;
 }) {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const joinLiveSession = useJoinLiveSession();
   const router = useRouter();
@@ -608,7 +610,18 @@ export function SessionCard({
         onDismiss={meetingDialogLaunch.onDismiss}
         onRequestClose={() => setExternalJoinTarget(null)}
       >
-        <Pressable style={s.modalBackdrop} onPress={() => setExternalJoinTarget(null)}>
+        <Pressable
+          style={[
+            s.modalBackdrop,
+            {
+              paddingTop: popupInsets.top + 24,
+              paddingBottom: popupInsets.bottom + 24,
+              paddingLeft: popupInsets.left + 20,
+              paddingRight: popupInsets.right + 20,
+            },
+          ]}
+          onPress={() => setExternalJoinTarget(null)}
+        >
           <Pressable
             style={[
               s.modalCard,
@@ -616,14 +629,27 @@ export function SessionCard({
             ]}
             onPress={(event) => event.stopPropagation()}
           >
-            <View style={s.modalHeading}>
-              <Text style={[s.modalTitle, { color: colors.text }]}>
-                Session ready to join
-              </Text>
-              <Text style={[s.modalDescription, { color: colors.textMuted }]}>
-                This session opens in an external provider. Stay here until you are ready,
-                then use the link below to join.
-              </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+              <TouchableOpacity
+                style={[
+                  s.modalCloseIconButton,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                ]}
+                onPress={() => setExternalJoinTarget(null)}
+                activeOpacity={0.85}
+                accessibilityLabel="Close join dialog"
+              >
+                <X size={16} color={colors.text} />
+              </TouchableOpacity>
+              <View style={s.modalHeading}>
+                <Text style={[s.modalTitle, { color: colors.text }]}>
+                  Session ready to join
+                </Text>
+                <Text style={[s.modalDescription, { color: colors.textMuted }]}>
+                  This session opens in an external provider. Stay here until you are
+                  ready, then use the link below to join.
+                </Text>
+              </View>
             </View>
             <View
               style={[
@@ -682,17 +708,6 @@ export function SessionCard({
                     ? `Join ${externalJoinTarget.providerLabel}`
                     : 'Join session'}
                 </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  s.modalCloseIconButton,
-                  { backgroundColor: colors.inputBg, borderColor: colors.border },
-                ]}
-                onPress={() => setExternalJoinTarget(null)}
-                activeOpacity={0.85}
-                accessibilityLabel="Close join dialog"
-              >
-                <X size={16} color={colors.text} />
               </TouchableOpacity>
             </View>
           </Pressable>
@@ -889,7 +904,7 @@ function makeStyles(C: AppColors) {
       backgroundColor: C.card,
       padding: 20,
     },
-    modalHeading: { gap: 8 },
+    modalHeading: { flex: 1, gap: 8 },
     modalTitle: {
       fontSize: 20,
       fontWeight: '700',
@@ -951,8 +966,8 @@ function makeStyles(C: AppColors) {
       fontWeight: '700',
     },
     modalCloseIconButton: {
-      width: 42,
-      height: 42,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
       borderRadius: 21,

@@ -1,7 +1,16 @@
-import { saveNameStep, saveLocationStep, fetchTimezoneLocationHint } from './queries';
-import { apiPut, apiGet } from '@/lib/api/http-client';
+import {
+  saveNameStep,
+  saveLocationStep,
+  fetchTimezoneLocationHint,
+  completeParentRole,
+} from './queries';
+import { apiPut, apiGet, apiPost } from '@/lib/api/http-client';
 
-jest.mock('@/lib/api/http-client', () => ({ apiPut: jest.fn(), apiGet: jest.fn() }));
+jest.mock('@/lib/api/http-client', () => ({
+  apiPut: jest.fn(),
+  apiGet: jest.fn(),
+  apiPost: jest.fn(),
+}));
 jest.mock('@/lib/supabase/client', () => ({ supabase: {} }));
 
 it('saves the chosen display name separately from the full name through the API', async () => {
@@ -35,4 +44,13 @@ it('requests timezone location details through the authenticated API client', as
   expect(apiGet).toHaveBeenCalledWith(
     '/profiles/location-hint?timezone=America%2FNew_York',
   );
+});
+
+it('passes an accepted referral to the owning role onboarding API', async () => {
+  const referralCode = 'a'.repeat(48);
+  await completeParentRole({ referralCode });
+  expect(apiPost).toHaveBeenCalledWith('/onboarding/role', {
+    role: 'parent',
+    referralCode,
+  });
 });

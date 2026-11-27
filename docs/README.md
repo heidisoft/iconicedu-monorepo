@@ -47,6 +47,8 @@ Internal engineers, operators, and AI assistants.
 - [Deployment](operations/deployment.md)
 - [Reminders Runbook](operations/reminders.md)
 - [Class Archive Lifecycle](operations/class-archive-lifecycle.md)
+- [Mobile Profile and Family Management](operations/profile-family-management.md)
+- [Parent Referrals](operations/parent-referrals.md)
 - [Notification Job Retention](operations/notification-retention.md)
 - [Local Event Pipeline Testing](operations/local-event-pipeline-testing.md)
 
@@ -82,6 +84,7 @@ Internal engineers, operators, and AI assistants.
 - [Deployment](operations/deployment.md)
 - [Reminders Runbook](operations/reminders.md)
 - [Class Archive Lifecycle](operations/class-archive-lifecycle.md)
+- [Mobile Profile and Family Management](operations/profile-family-management.md)
 - [Local Event Pipeline Testing](operations/local-event-pipeline-testing.md)
 - [Push Notifications](operations/push-notifications.md)
 - [Push Notification Catalog](operations/push-notification-catalog.md)

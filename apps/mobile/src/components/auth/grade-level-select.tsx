@@ -8,12 +8,13 @@ import { useTheme } from '@/providers/theme-provider';
 
 export type GradeOption = { value: GradeLevel; label: string };
 type Props = {
+  disabled?: boolean;
   value: string | null;
   onChange: (value: string) => void;
   options: readonly GradeOption[];
 };
 
-export function GradeLevelSelect({ value, onChange, options }: Props) {
+export function GradeLevelSelect({ value, onChange, options, disabled = false }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
@@ -29,7 +30,8 @@ export function GradeLevelSelect({ value, onChange, options }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Grade level"
         accessibilityValue={{ text: selected?.label ?? 'Select grade' }}
-        accessibilityState={{ expanded: open }}
+        accessibilityState={{ expanded: open, disabled }}
+        disabled={disabled}
         onPress={() => {
           Keyboard.dismiss();
           setOpen(true);

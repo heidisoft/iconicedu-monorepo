@@ -1,3 +1,4 @@
+import { ReferralsModule } from '@iconicedu/api/modules/referrals/referrals.module';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
 import { NotificationPreferencesModule } from '@iconicedu/api/modules/notification-preferences/notification-preferences.module';
@@ -5,7 +6,7 @@ import { OnboardingController } from '@iconicedu/api/modules/onboarding/onboardi
 import { OnboardingService } from '@iconicedu/api/modules/onboarding/onboarding.service';
 
 @Module({
-  imports: [AuthModule, NotificationPreferencesModule],
+  imports: [AuthModule, NotificationPreferencesModule, ReferralsModule],
   controllers: [OnboardingController],
   providers: [OnboardingService],
 })

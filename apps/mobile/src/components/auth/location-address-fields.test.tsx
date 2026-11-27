@@ -2,10 +2,6 @@ import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { LocationAddressFields } from './location-address-fields';
 
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
-
 const props = {
   city: '',
   region: '',
@@ -28,6 +24,7 @@ it('shows US city, state and required ZIP and keeps it a string', () => {
   expect(screen.getByLabelText('State')).toBeTruthy();
   expect(screen.getByLabelText('ZIP code')).toBeTruthy();
   expect(screen.queryByText(/optional/)).toBeNull();
+  expect(screen.getByLabelText('City').props.returnKeyType).toBe('done');
   fireEvent.changeText(screen.getByLabelText('ZIP code'), '00501');
   expect(props.setPostalCode).toHaveBeenCalledWith('00501');
 });
@@ -48,4 +45,11 @@ it('updates visible fields and labels with country selection', () => {
 it('marks optional Sri Lankan postal code clearly', () => {
   render(<LocationAddressFields {...props} countryCode="LK" />);
   expect(screen.getByText(/optional/)).toBeTruthy();
+});
+it('disables address entry and the region picker while saving', () => {
+  render(<LocationAddressFields {...props} countryCode="US" disabled />);
+  expect(screen.getByLabelText('City').props.editable).toBe(false);
+  expect(screen.getByLabelText('ZIP code').props.editable).toBe(false);
+  fireEvent.press(screen.getByLabelText('State'));
+  expect(screen.queryByLabelText('Search state')).toBeNull();
 });

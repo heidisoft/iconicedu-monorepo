@@ -1,3 +1,6 @@
+import { FamilyChildInvitesController } from './family-child-invites.controller';
+import { FamilyChildInvitesService } from './family-child-invites.service';
+import { ProfileSettingsService } from './profile-settings.service';
 import { TimezoneLocationService } from './timezone-location.service';
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@iconicedu/api/modules/auth/auth.module';
@@ -7,7 +10,12 @@ import { ProfilesService } from '@iconicedu/api/modules/profiles/profiles.servic
 
 @Module({
   imports: [AuthModule, NotificationPreferencesModule],
-  controllers: [ProfilesController],
-  providers: [ProfilesService, TimezoneLocationService],
+  controllers: [ProfilesController, FamilyChildInvitesController],
+  providers: [
+    FamilyChildInvitesService,
+    ProfileSettingsService,
+    ProfilesService,
+    TimezoneLocationService,
+  ],
 })
 export class ProfilesModule {}

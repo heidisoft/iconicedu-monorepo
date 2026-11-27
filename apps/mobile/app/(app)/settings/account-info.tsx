@@ -1,29 +1,12 @@
 import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  ChevronLeft,
-  CheckCircle,
-  Mail,
-  Phone,
-  Shield,
-  CreditCard,
-} from 'lucide-react-native';
+import { ChevronLeft, CheckCircle, Mail, Phone } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { SettingsRow } from '@iconicedu/ui-native';
 import { useAccount } from '@/hooks/use-account';
-import { useProfile } from '@/hooks/use-profile';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
-
-const ROLE_LABELS: Record<string, string> = {
-  educator: 'Educator',
-  guardian: 'Parent / Guardian',
-  child: 'Student',
-  staff: 'Staff',
-  admin: 'Admin',
-  owner: 'Owner',
-};
 
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
@@ -94,12 +77,9 @@ export default function AccountInfoScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { data: account } = useAccount();
-  const { data: profile } = useProfile();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const acc = account as Record<string, unknown> | undefined;
-  const prof = profile as Record<string, unknown> | undefined;
-  const profileKind = (prof?.kind as string) ?? (acc?.primary_role as string);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -166,34 +146,6 @@ export default function AccountInfoScreen() {
               />
             </>
           )}
-        </View>
-
-        {/* Account */}
-        <Text style={s.sectionLabel}>Account</Text>
-        <View style={s.card}>
-          <SettingsRow
-            icon={<CreditCard size={20} color={colors.textMuted} />}
-            label="Role"
-            labelColor={colors.text}
-            hideChevron
-            trailing={
-              <Text style={s.valueText}>
-                {ROLE_LABELS[profileKind ?? ''] ?? profileKind ?? '—'}
-              </Text>
-            }
-          />
-          <View style={s.divider} />
-          <SettingsRow
-            icon={<Shield size={20} color={colors.textMuted} />}
-            label="Status"
-            labelColor={colors.text}
-            hideChevron
-            trailing={
-              <Text style={s.valueText}>
-                {((acc?.status as string) ?? '—').replace(/_/g, ' ')}
-              </Text>
-            }
-          />
         </View>
       </ScrollView>
     </SafeAreaView>

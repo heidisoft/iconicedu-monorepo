@@ -7,6 +7,8 @@ generator client {
 }
 
 model Profile {
+  hideRole           Boolean                  @default(false) @map("hide_role")
+  hideStatus         Boolean                  @default(false) @map("hide_status")
   id                 String                   @id @db.Uuid
   fullName           String?                  @map("full_name")
   appRole            String                   @map("app_role")
@@ -370,4 +372,43 @@ model LiveSessionAdmission {
 
   @@index([liveSessionId, status, expiresAt], map: "live_session_admissions_waiting_idx")
   @@map("live_session_admissions")
+}
+
+model ParentReferralLink {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId             String   @map("org_id") @db.Uuid
+  referrerAccountId String   @map("referrer_account_id") @db.Uuid
+  code              String   @unique
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([orgId, referrerAccountId])
+  @@map("parent_referral_links")
+}
+
+model ParentReferral {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orgId               String   @map("org_id") @db.Uuid
+  referredAccountId   String   @map("referred_account_id") @db.Uuid
+  referrerAccountId   String?  @map("referrer_account_id") @db.Uuid
+  claimedReferrerName String   @map("claimed_referrer_name")
+  attributionSource   String   @map("attribution_source")
+  status              String   @default("pending_review")
+  rewardLabel         String   @default("$20 off") @map("reward_label")
+  reviewNote          String?  @map("review_note")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@unique([orgId, referredAccountId])
+  @@map("parent_referrals")
+}
+
+model ParentReferralEvent {
+  id              BigInt   @id @default(autoincrement())
+  referralId      String   @map("referral_id") @db.Uuid
+  orgId           String   @map("org_id") @db.Uuid
+  actorAuthUserId String?  @map("actor_auth_user_id") @db.Uuid
+  beforeData      Json?    @map("before_data")
+  afterData       Json     @map("after_data")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("parent_referral_events")
 }

@@ -1,3 +1,5 @@
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -152,6 +154,9 @@ export default function LoginScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const analytics = useAnalytics();
+  const referralsEnabled = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableParentReferrals,
+  );
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const isTablet = Math.min(width, height) >= 768;
@@ -328,6 +333,17 @@ export default function LoginScreen() {
               <Text style={s.ctaTxt}>{loading ? 'Sending...' : 'Get Started'}</Text>
             </TouchableOpacity>
 
+            {referralsEnabled ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push('/r/manual')}
+                style={{ minHeight: 44, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text style={{ color: colors.teal, fontWeight: '600' }}>
+                  Have an invitation?
+                </Text>
+              </Pressable>
+            ) : null}
             <Text style={s.terms}>
               {'By continuing, you agree to our '}
               <Text style={s.termsLink}>Terms</Text>

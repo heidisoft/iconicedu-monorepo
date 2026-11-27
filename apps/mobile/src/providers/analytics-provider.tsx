@@ -1,7 +1,7 @@
 import React, { useContext, createContext, useEffect, useMemo } from 'react';
 import { NativeModules } from 'react-native';
 import Constants from 'expo-constants';
-import { PostHogProvider, usePostHog } from 'posthog-react-native';
+import { PostHog, PostHogProvider, usePostHog } from 'posthog-react-native';
 import type { AnalyticsClient } from '@iconicedu/utils';
 import { createNoopAnalytics, setGlobalErrorReporter } from '@iconicedu/utils';
 import {
@@ -44,15 +44,22 @@ const AnalyticsContext = createContext<AnalyticsClient>(createNoopAnalytics());
  * Bridges PostHog's hook into the vendor-agnostic AnalyticsClient context.
  * Must be mounted inside <PostHogProvider>.
  */
-function AnalyticsBridge({ children }: { children: React.ReactNode }) {
+function AnalyticsBridge({
+  children,
+  flagsClient,
+}: {
+  children: React.ReactNode;
+  flagsClient: PostHog | null;
+}) {
   const ph = usePostHog();
-  const featureFlagClient = ph as MobileFeatureFlagClient;
+  const featureFlagClient = (flagsClient ?? ph) as MobileFeatureFlagClient;
 
   const client = useMemo<AnalyticsClient>(
     () => ({
       identify(userId: string, traits?: Record<string, unknown>) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         ph.identify(userId, traits as any);
+        flagsClient?.identify(userId, traits as Parameters<PostHog['identify']>[1]);
       },
       capture(event: string, properties?: Record<string, unknown>) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,12 +71,13 @@ function AnalyticsBridge({ children }: { children: React.ReactNode }) {
       },
       reset() {
         ph.reset();
+        flagsClient?.reset();
       },
       flush() {
         ph.flush();
       },
     }),
-    [ph],
+    [ph, flagsClient],
   );
 
   useEffect(() => {
@@ -101,10 +109,31 @@ function AnalyticsBridge({ children }: { children: React.ReactNode }) {
  * in the PostHog Activity Feed immediately without waiting for the 30 s batch.
  */
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
+  const flagsClient = useMemo(() => {
+    // This optional project is for local flags only; release builds ignore it.
+    // eslint-disable-next-line no-undef
+    const key = __DEV__ ? process.env.EXPO_PUBLIC_POSTHOG_FLAGS_KEY?.trim() : undefined;
+    return key
+      ? new PostHog(key, {
+          host: process.env.EXPO_PUBLIC_POSTHOG_FLAGS_HOST?.trim() || POSTHOG_HOST,
+          persistence: 'memory',
+          captureAppLifecycleEvents: false,
+          enableSessionReplay: false,
+          errorTracking: { autocapture: false },
+          before_send: () => null,
+        })
+      : null;
+  }, []);
+  useEffect(
+    () => () => {
+      void flagsClient?.shutdown();
+    },
+    [flagsClient],
+  );
   if (!POSTHOG_KEY) {
     // No key configured — use noop in dev/CI to avoid crashing.
     return (
-      <MobileFeatureFlagsProvider client={null}>
+      <MobileFeatureFlagsProvider client={flagsClient}>
         <AnalyticsContext.Provider value={createNoopAnalytics()}>
           {children}
         </AnalyticsContext.Provider>
@@ -146,7 +175,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
         },
       }}
     >
-      <AnalyticsBridge>{children}</AnalyticsBridge>
+      <AnalyticsBridge flagsClient={flagsClient}>{children}</AnalyticsBridge>
     </PostHogProvider>
   );
 }
