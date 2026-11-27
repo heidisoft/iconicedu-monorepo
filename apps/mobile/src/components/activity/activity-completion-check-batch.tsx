@@ -47,6 +47,8 @@ export function ActivityCompletionCheckBatch({
   const sessions = useMemo(() => getSessions(activity), [activity]);
 
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  // Manual pressed state — NativeWind's interop drops Pressable function styles.
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(
     () =>
       new Set(
@@ -126,51 +128,59 @@ export function ActivityCompletionCheckBatch({
               accessibilityLabel={`${session.title} — ${isResolved ? 'resolved' : 'needs confirmation'}`}
               disabled={isCollapsedResolved}
               onPress={() => setExpandedIndex(isExpanded ? null : index)}
-              style={({ pressed }) => [
-                styles.sessionRow,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: pressed ? colors.inkSubtle : 'transparent',
-                },
-              ]}
+              onPressIn={() => setPressedKey(sessionResponseKey)}
+              onPressOut={() => setPressedKey(null)}
             >
-              <View style={styles.sessionRowLeft}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor: isConfirmed
-                        ? colors.action
-                        : isDisputed
-                          ? colors.warning
-                          : colors.border,
-                    },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.sessionTitle,
-                    { color: isResolved ? colors.textMuted : colors.text },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {session.title}
-                </Text>
+              <View
+                style={[
+                  styles.sessionRow,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor:
+                      pressedKey === sessionResponseKey
+                        ? colors.inkSubtle
+                        : 'transparent',
+                  },
+                ]}
+              >
+                <View style={styles.sessionRowLeft}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      {
+                        backgroundColor: isConfirmed
+                          ? colors.action
+                          : isDisputed
+                            ? colors.warning
+                            : colors.border,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.sessionTitle,
+                      { color: isResolved ? colors.textMuted : colors.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {session.title}
+                  </Text>
+                </View>
+                {isCollapsedResolved ? (
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: isDisputed ? colors.warning : colors.success },
+                    ]}
+                  >
+                    {isDisputed ? 'Reported' : 'Completed'}
+                  </Text>
+                ) : isExpanded ? (
+                  <ChevronUp size={14} color={colors.textMuted} />
+                ) : (
+                  <ChevronDown size={14} color={colors.textMuted} />
+                )}
               </View>
-              {isCollapsedResolved ? (
-                <Text
-                  style={[
-                    styles.statusText,
-                    { color: isDisputed ? colors.warning : colors.success },
-                  ]}
-                >
-                  {isDisputed ? 'Reported' : 'Completed'}
-                </Text>
-              ) : isExpanded ? (
-                <ChevronUp size={14} color={colors.textMuted} />
-              ) : (
-                <ChevronDown size={14} color={colors.textMuted} />
-              )}
             </Pressable>
 
             {isExpanded ? (

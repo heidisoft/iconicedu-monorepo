@@ -400,6 +400,11 @@ function getInitials(name: string): string {
 const LEADING_SIZE = 40;
 const SUB_LEADING_SIZE = 28;
 const CONTENT_GAP = 12;
+// Vertical rhythm inside a row: tight within the header block, one step
+// between the header and anything under it (preview, link, widget).
+const SPACE_TIGHT = 2;
+const SPACE_SM = 6;
+const SPACE_MD = 10;
 /** Left edge of the body (previews, actions, interactive widgets). */
 export const ACTIVITY_BODY_INDENT = LEADING_SIZE + CONTENT_GAP;
 const SUB_BODY_INDENT = SUB_LEADING_SIZE + 10;
@@ -459,7 +464,8 @@ export function makeActivityItemStyles(C: AppColors) {
       height: 20,
       borderRadius: 10,
       borderWidth: 2,
-      borderColor: C.card,
+      // Ring matches the row background (flat list on the page colour).
+      borderColor: C.bg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -472,7 +478,7 @@ export function makeActivityItemStyles(C: AppColors) {
     subHeadlineText: { flex: 1, fontSize: 14, lineHeight: 19 },
     // Title + detail (system rows)
     titleText: { flex: 1, fontSize: 15, lineHeight: 21 },
-    detailText: { fontSize: 14, lineHeight: 20, marginTop: 2 },
+    detailText: { fontSize: 14, lineHeight: 20, marginTop: SPACE_TIGHT },
     strong: { fontWeight: '700' },
     strongRead: { fontWeight: '600' },
 
@@ -490,7 +496,7 @@ export function makeActivityItemStyles(C: AppColors) {
       borderRadius: 6,
       paddingHorizontal: 7,
       paddingVertical: 3,
-      marginTop: 8,
+      marginTop: SPACE_SM,
     },
     tagText: {
       fontSize: 11,
@@ -512,11 +518,11 @@ export function makeActivityItemStyles(C: AppColors) {
     },
 
     // Body — previews and actions align with the headline text
-    body: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: 12, gap: 10 },
-    subBody: { marginLeft: SUB_BODY_INDENT, marginTop: 8, gap: 8 },
-    // Interactive widgets (completion check, rating) use the full row width so
-    // their side-by-side buttons have room on narrow phones.
-    widget: { marginTop: 14 },
+    body: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: SPACE_MD, gap: SPACE_SM },
+    subBody: { marginLeft: SUB_BODY_INDENT, marginTop: SPACE_SM, gap: SPACE_SM },
+    // Interactive widgets (completion check, rating) share the body's indent so
+    // every block under the headline starts on the same left edge.
+    widget: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: SPACE_MD },
     separator: {
       height: StyleSheet.hairlineWidth,
       backgroundColor: C.border,
@@ -940,6 +946,13 @@ export function ActivityItem({
   // widget after the user answers (so the "How was it?" rating step can follow),
   // while rows that load already answered collapse to their status tag.
   const [completionPendingOnMount] = useState(() => !isCompletionCheckResolved(item));
+  // Pressed state is tracked manually: NativeWind's babel interop drops
+  // Pressable's function-form `style`, which silently removed all row padding.
+  const [isPressed, setIsPressed] = useState(false);
+  const pressHandlers = {
+    onPressIn: () => setIsPressed(true),
+    onPressOut: () => setIsPressed(false),
+  };
 
   const tone =
     item.content.leading?.kind === 'icon' ? item.content.leading.tone : undefined;
@@ -1046,12 +1059,14 @@ export function ActivityItem({
     return (
       <Pressable
         onPress={handlePress}
+        {...pressHandlers}
         accessibilityRole="button"
         accessibilityHint={a11yHint}
-        style={({ pressed }) => [s.subItemInner, pressed && { opacity: 0.7 }]}
       >
-        {header}
-        {body}
+        <View style={[s.subItemInner, isPressed && { opacity: 0.7 }]}>
+          {header}
+          {body}
+        </View>
       </Pressable>
     );
   }
@@ -1082,13 +1097,15 @@ export function ActivityItem({
     <View style={s.itemOuter}>
       <Pressable
         onPress={handlePress}
+        {...pressHandlers}
         accessibilityRole="button"
         accessibilityHint={a11yHint}
-        style={({ pressed }) => [s.itemWrap, pressed && s.itemWrapPressed]}
       >
-        {header}
-        {body}
-        {interactiveWidget ? <View style={s.widget}>{interactiveWidget}</View> : null}
+        <View style={[s.itemWrap, isPressed && s.itemWrapPressed]} testID="activity-row">
+          {header}
+          {body}
+          {interactiveWidget ? <View style={s.widget}>{interactiveWidget}</View> : null}
+        </View>
       </Pressable>
     </View>
   );

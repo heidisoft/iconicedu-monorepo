@@ -10,6 +10,8 @@ import {
   Star,
 } from 'lucide-react-native';
 
+import { StyleSheet } from 'react-native';
+
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
 import {
@@ -414,6 +416,16 @@ describe('ActivityItem', () => {
     } as ActivityFeedItemVM;
 
     expect(getIconKey(item)).toBe(iconKey);
+  });
+
+  it('keeps row padding on a static style (NativeWind drops Pressable style functions)', () => {
+    renderActivity(makeBaseActivity());
+
+    const row = screen.getByTestId('activity-row');
+    const style = StyleSheet.flatten(row.props.style);
+    expect(style.paddingHorizontal).toBe(20);
+    expect(style.paddingVertical).toBe(16);
+    expect(typeof row.props.style).not.toBe('function');
   });
 
   it('marks unread activities read when the row is pressed', () => {
