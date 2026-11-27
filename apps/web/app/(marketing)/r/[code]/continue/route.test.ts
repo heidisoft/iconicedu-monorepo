@@ -1,6 +1,15 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { POST } from './route';
-const mocks = vi.hoisted(() => ({ flag: vi.fn(), get: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  flag: vi.fn(),
+  get: vi.fn(),
+  entry: vi.fn(),
+  cookie: vi.fn(),
+}));
+vi.mock('@iconicedu/web/lib/referrals/referral-entry-state', () => ({
+  getReferralEntryState: mocks.entry,
+}));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: mocks.cookie }) }));
 vi.mock('@iconicedu/web/flags', () => ({ enableParentReferrals: mocks.flag }));
 vi.mock('@iconicedu/web/lib/api/http-client', () => ({
   createPublicApiClient: () => ({ get: mocks.get }),
@@ -10,6 +19,7 @@ const url = `https://academy.example.invalid/r/${code}/continue`;
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.flag.mockResolvedValue(true);
+  mocks.entry.mockResolvedValue('guest');
   mocks.get.mockResolvedValue({ orgSlug: 'test-academy', referrerName: 'Test Parent' });
 });
 it('sets first-party HttpOnly attribution and sends the recipient to web signup', async () => {
@@ -59,3 +69,20 @@ it('does not redirect using an untrusted organization slug', async () => {
   );
   expect(response.status).toBe(404);
 });
+
+it.each(['signed_in', 'unavailable'])(
+  'does not set attribution or redirect when entry is %s',
+  async (state) => {
+    mocks.entry.mockResolvedValue(state);
+    const response = await POST(
+      new Request(url, {
+        method: 'POST',
+        headers: { origin: 'https://academy.example.invalid' },
+      }),
+      { params: Promise.resolve({ code }) },
+    );
+    expect(response.status).toBe(state === 'signed_in' ? 403 : 503);
+    expect(response.headers.get('set-cookie')).toBeNull();
+    expect(mocks.get).not.toHaveBeenCalled();
+  },
+);

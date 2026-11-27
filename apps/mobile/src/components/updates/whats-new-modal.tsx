@@ -23,12 +23,13 @@ export function WhatsNewModal({ visible, releaseNotes, onDismiss }: WhatsNewModa
     >
       <SafeAreaView style={[styles.overlay, { backgroundColor: colors.modalOverlay }]}>
         <Pressable
+          accessible={false}
           style={styles.backdrop}
           onPress={onDismiss}
           testID="whats-new-backdrop"
         >
           <Pressable
-            accessibilityRole="summary"
+            accessible={false}
             onPress={(event) => event.stopPropagation()}
             style={[
               styles.card,
@@ -53,6 +54,8 @@ export function WhatsNewModal({ visible, releaseNotes, onDismiss }: WhatsNewModa
             </View>
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Got it"
+              testID="whats-new-dismiss"
               onPress={onDismiss}
               style={[styles.button, { backgroundColor: colors.action }]}
             >

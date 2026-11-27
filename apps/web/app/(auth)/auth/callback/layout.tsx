@@ -6,6 +6,7 @@ import { ReferralOnboardingProvider } from '@iconicedu/web/lib/referrals/referra
 import {
   isParentReferralCode,
   PARENT_REFERRAL_COOKIE,
+  PARENT_REFERRAL_CANCELLED_COOKIE,
 } from '@iconicedu/web/lib/referrals/referral-cookie';
 export default async function CallbackLayout({
   children,
@@ -13,7 +14,12 @@ export default async function CallbackLayout({
   children: React.ReactNode;
 }) {
   const enabled = await enableParentReferrals();
-  const code = (await cookies()).get(PARENT_REFERRAL_COOKIE)?.value;
+  const cookieStore = await cookies();
+  const rawCode = cookieStore.get(PARENT_REFERRAL_COOKIE)?.value;
+  const code =
+    cookieStore.get(PARENT_REFERRAL_CANCELLED_COOKIE)?.value === rawCode
+      ? undefined
+      : rawCode;
   let referrerName = '';
   if (enabled && isParentReferralCode(code)) {
     try {

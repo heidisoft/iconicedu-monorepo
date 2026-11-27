@@ -42,7 +42,9 @@ beforeEach(() => {
     referrerName: 'Test Parent',
   });
   mocks.flag.mockResolvedValue(true);
-  mocks.getCookie.mockReturnValue({ value: code });
+  mocks.getCookie.mockImplementation((key: string) =>
+    key === 'iconic-parent-referral' ? { value: code } : undefined,
+  );
   mocks.proxy.mockImplementation(async () => NextResponse.json({ success: true }));
 });
 it('attaches the first-party referral code and clears it after successful onboarding', async () => {
@@ -97,4 +99,17 @@ it('preserves attribution for retry when the referral service is temporarily una
   expect(response.status).toBe(503);
   expect(response.headers.get('set-cookie')).toBeNull();
   expect(mocks.proxy).not.toHaveBeenCalled();
+});
+
+it('does not restore cancelled attribution from an older callback URL', async () => {
+  mocks.getCookie.mockImplementation((key: string) =>
+    key === 'iconic-parent-referral-cancelled' ? { value: code } : undefined,
+  );
+  await POST(
+    request({ role: 'parent', referralCode: code, referrerName: 'Test Parent' }),
+  );
+  const forwarded = await mocks.proxy.mock.calls[0]![0].json();
+  expect(forwarded).not.toHaveProperty('referralCode');
+  expect(forwarded).not.toHaveProperty('referrerName');
+  expect(mocks.resolve).not.toHaveBeenCalled();
 });

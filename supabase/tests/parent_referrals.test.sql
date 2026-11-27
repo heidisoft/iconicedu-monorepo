@@ -50,5 +50,17 @@ select lives_ok($$select public.review_parent_referral('f2000000-0000-4000-8000-
 select lives_ok($$select public.review_parent_referral('f2000000-0000-4000-8000-000000000006',(select id from claim),'fulfilled','Stripe discount recorded manually')$$,'staff can record manual Stripe fulfilment');
 select ok(exists(select 1 from public.parent_referral_events where referral_id=(select id from claim) and actor_auth_user_id='f2000000-0000-4000-8000-000000000006' and after_data->>'status'='fulfilled'),'fulfilment is audited to the reviewer');
 select is((select count(*) from public.parent_referral_events where referral_id=(select id from claim)),3::bigint,'creation, approval, and fulfilment each have one audit event');
+select throws_ok($$select public.record_parent_referral('f2000000-0000-4000-8000-000000000001','f1000000-0000-4000-8000-000000000001',(select code from invitation),null)$$,'42501',null,'parents cannot apply their own invitation');
+select is((select count(*) from public.parent_referrals where referred_account_id=referrer_account_id),0::bigint,'self referrals never create a reward');
+insert into auth.users(id,email,email_confirmed_at) values ('f2000000-0000-4000-8000-000000000007','existing-other-org@example.invalid',now());
+insert into public.accounts(id,org_id,auth_user_id,primary_role,status,onboarding_completed_at) values
+('f3000000-0000-4000-8000-000000000007','f1000000-0000-4000-8000-000000000002','f2000000-0000-4000-8000-000000000007','guardian','active',now()),
+('f3000000-0000-4000-8000-000000000008','f1000000-0000-4000-8000-000000000001','f2000000-0000-4000-8000-000000000007',null,'active',null);
+insert into public.profiles(org_id,account_id,kind,avatar_source) values ('f1000000-0000-4000-8000-000000000001','f3000000-0000-4000-8000-000000000008','guardian','seed');
+select throws_ok($$select public.record_parent_referral('f2000000-0000-4000-8000-000000000007','f1000000-0000-4000-8000-000000000001',(select code from invitation),null)$$,'42501',null,'existing accounts cannot get a new reward by changing organizations');
+select is((select count(*) from public.parent_referrals where referred_account_id='f3000000-0000-4000-8000-000000000008'),0::bigint,'ineligible signup creates no credit');
+insert into public.accounts(id,org_id,auth_user_id,primary_role,status) values ('f3000000-0000-4000-8000-000000000009','f1000000-0000-4000-8000-000000000002','f2000000-0000-4000-8000-000000000002',null,'active');
+insert into public.profiles(org_id,account_id,kind,avatar_source) values ('f1000000-0000-4000-8000-000000000002','f3000000-0000-4000-8000-000000000009','guardian','seed');
+select throws_ok($$select public.record_parent_referral('f2000000-0000-4000-8000-000000000002','f1000000-0000-4000-8000-000000000002',null,'Another Parent')$$,'42501',null,'a retry in another organization cannot create a second reward');
 select * from finish();
 rollback;

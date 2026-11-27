@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, openSync, closeSync } from 'node:fs';
+import {
+  mkdtempSync,
+  openSync,
+  closeSync,
+  writeFileSync,
+  readFileSync,
+  unlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -120,6 +128,14 @@ async function unused(url) {
 }
 
 async function run() {
+  const referralMode = process.env.MOBILE_REFERRAL_E2E ?? '';
+  if (referralMode && !['accept', 'cancel'].includes(referralMode))
+    throw new Error('Unknown local referral E2E mode.');
+  let flagsServer;
+  let referralFixture;
+  let testEnvContents;
+  const testEnvPath = resolve(root, 'apps/mobile/.env.development.local');
+
   execFileSync('maestro', ['--version'], { stdio: 'ignore' });
   const devices = JSON.parse(
     execFileSync('xcrun', ['simctl', 'list', 'devices', 'booted', '--json'], {
@@ -154,10 +170,14 @@ async function run() {
   requireTestEmail(email);
   const apiUrl = 'http://127.0.0.1:3101';
   const metroUrl = 'http://127.0.0.1:8082';
+  // Expo 55's virtual env module overlays .env files at runtime. Avoid changing
+  // another running Metro's configuration while this isolated test override exists.
+  await unused('http://127.0.0.1:8081');
   await unused(apiUrl);
   await unused(metroUrl);
   const artifacts = mkdtempSync(resolve(tmpdir(), 'iconicedu-auth-e2e-'));
   const children = [];
+  const cancelledEmail = `maestro-auth-cancel-${randomUUID().slice(0, 8)}@example.test`;
   const stop = () => {
     for (const child of children) {
       try {
@@ -190,13 +210,78 @@ async function run() {
     EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY: local.ANON_KEY,
     EXPO_PUBLIC_APP_ENV: 'development',
     EXPO_PUBLIC_TURNSTILE_SITE_KEY: '',
-    EXPO_PUBLIC_POSTHOG_KEY: '',
-    POSTHOG_KEY: '',
+    EXPO_PUBLIC_POSTHOG_KEY: 'phc_local_auth_e2e',
+    EXPO_PUBLIC_POSTHOG_HOST: 'http://127.0.0.1:3102',
+    POSTHOG_KEY: 'phc_local_auth_e2e',
+    POSTHOG_HOST: 'http://127.0.0.1:3102',
+    POSTHOG_FLAGS_KEY: referralMode ? 'phc_local_referral_e2e' : '',
+    POSTHOG_FLAGS_HOST: 'http://127.0.0.1:3102',
+    EXPO_PUBLIC_POSTHOG_FLAGS_KEY: referralMode ? 'phc_local_referral_e2e' : '',
+    EXPO_PUBLIC_POSTHOG_FLAGS_HOST: 'http://127.0.0.1:3102',
+    NODE_ENV: 'development',
     SENTRY_DSN: '',
     REACT_NATIVE_PACKAGER_HOSTNAME: '127.0.0.1',
   };
   console.log(`Auth E2E artifacts (local synthetic accounts only): ${artifacts}`);
   try {
+    if (referralMode) {
+      await unused('http://127.0.0.1:3102');
+      flagsServer = createServer((_request, response) => {
+        response.setHeader('Content-Type', 'application/json');
+        response.end(
+          JSON.stringify({
+            hasFeatureFlags: true,
+            featureFlags: { 'enable-parent-referrals': true },
+            featureFlagPayloads: {},
+            flags: { 'enable-parent-referrals': { enabled: true, value: true } },
+          }),
+        );
+      });
+      await new Promise((done) => flagsServer.listen(3102, '127.0.0.1', done));
+      const orgId = randomUUID(),
+        accountId = randomUUID();
+      const referrerEmail = `maestro-auth-referrer-${randomUUID()}@example.test`;
+      const { data: referrer, error } = await admin.auth.admin.createUser({
+        email: referrerEmail,
+        email_confirm: true,
+      });
+      assert.ifError(error);
+      referralFixture = { orgId, accountId, authId: referrer.user.id };
+      for (const [table, row] of [
+        ['orgs', { id: orgId, name: 'Referral E2E', slug: `referral-e2e-${orgId}` }],
+        [
+          'accounts',
+          {
+            id: accountId,
+            org_id: orgId,
+            auth_user_id: referrer.user.id,
+            email: referrerEmail,
+            primary_role: 'guardian',
+            status: 'active',
+            onboarding_completed_at: new Date().toISOString(),
+          },
+        ],
+        [
+          'profiles',
+          {
+            org_id: orgId,
+            account_id: accountId,
+            kind: 'guardian',
+            display_name: 'Referral E2E Parent',
+            avatar_source: 'seed',
+          },
+        ],
+      ]) {
+        const result = await admin.from(table).insert(row);
+        assert.ifError(result.error);
+      }
+      const result = await admin.rpc('get_parent_referral_link', {
+        actor_auth_id: referrer.user.id,
+        target_org_id: orgId,
+      });
+      assert.ifError(result.error);
+      referralFixture.code = result.data.code;
+    }
     const udid = execFileSync(
       'xcrun',
       [
@@ -233,6 +318,23 @@ async function run() {
       resolve(artifacts, 'api.log'),
       children,
     );
+    const publicKeys = [
+      'EXPO_PUBLIC_API_URL',
+      'EXPO_PUBLIC_SUPABASE_URL',
+      'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+      'EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
+      'EXPO_PUBLIC_APP_ENV',
+      'EXPO_PUBLIC_TURNSTILE_SITE_KEY',
+      'EXPO_PUBLIC_POSTHOG_KEY',
+      'EXPO_PUBLIC_POSTHOG_HOST',
+      'EXPO_PUBLIC_POSTHOG_FLAGS_KEY',
+      'EXPO_PUBLIC_POSTHOG_FLAGS_HOST',
+    ];
+    const contents =
+      publicKeys.map((key) => `${key}=${JSON.stringify(env[key])}`).join('\n') + '\n';
+    // Exclusive creation preserves any developer-owned override; only public client values.
+    writeFileSync(testEnvPath, contents, { flag: 'wx', mode: 0o600 });
+    testEnvContents = contents;
     const metroEnv = { ...env };
     for (const key of [
       'SUPABASE_SERVICE_ROLE_KEY',
@@ -249,6 +351,7 @@ async function run() {
         'expo',
         'start',
         '--dev-client',
+        '--clear',
         '--lan',
         '--port',
         '8082',
@@ -281,6 +384,12 @@ async function run() {
       '-e',
       `TEST_EMAIL=${email}`,
       '-e',
+      `TEST_CANCEL_EMAIL=${cancelledEmail}`,
+      '-e',
+      `REFERRAL_MODE=${referralMode}`,
+      '-e',
+      `REFERRAL_URL=${referralFixture ? `iconicedu://r/${referralFixture.code}` : ''}`,
+      '-e',
       `MAIL_URL=${local.INBUCKET_URL.replace(/\/$/, '')}`,
       '-e',
       `RUNTIME_URL=${metroUrl}`,
@@ -308,7 +417,7 @@ async function run() {
       throw new Error('Maestro auth flows failed. Inspect the private local artifacts.');
     const { data: account, error: accountError } = await admin
       .from('accounts')
-      .select('id,onboarding_completed_at')
+      .select('id,org_id,onboarding_completed_at')
       .eq('email', email)
       .single();
     assert.ifError(accountError);
@@ -350,10 +459,34 @@ async function run() {
       .single();
     assert.ifError(childError);
     assert.equal(child.birth_year, new Date().getFullYear() - 10);
+    const claim = await admin
+      .from('parent_referrals')
+      .select('id,referrer_account_id,status')
+      .eq('referred_account_id', account.id);
+    assert.ifError(claim.error);
+    assert.equal(
+      claim.data.length,
+      referralMode === 'accept' ? 1 : 0,
+      'Only an accepted, uncancelled invitation may create a reward',
+    );
+    if (referralMode === 'accept') {
+      assert.equal(claim.data[0].referrer_account_id, referralFixture.accountId);
+      assert.equal(claim.data[0].status, 'pending_review');
+    }
     console.log(
       'PASS: real OTP signup, full onboarding, invalid OTP, persisted session, existing-user login, logout, and persisted profile values.',
     );
   } finally {
+    if (testEnvContents) {
+      try {
+        if (readFileSync(testEnvPath, 'utf8') === testEnvContents)
+          unlinkSync(testEnvPath);
+      } catch (error) {
+        if (error.code !== 'ENOENT')
+          console.error('Unable to remove the local test override.');
+      }
+    }
+    if (flagsServer) await new Promise((done) => flagsServer.close(done));
     process.removeListener('SIGINT', stop);
     process.removeListener('SIGTERM', stop);
     for (const child of children) {
@@ -403,6 +536,30 @@ async function run() {
       const { error } = await admin.auth.admin.deleteUser(user.id);
       if (error) throw new Error('Unable to remove the disposable local auth user.');
     }
+    const cancelled = users.users.find((user) => user.email === cancelledEmail);
+    if (cancelled) await admin.auth.admin.deleteUser(cancelled.id);
+    if (referralFixture) {
+      execFileSync(
+        'docker',
+        [
+          'exec',
+          '-i',
+          'supabase_db_iconicedu-monorepo',
+          'psql',
+          '-U',
+          'postgres',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-At',
+        ],
+        {
+          input: `delete from public.profiles where org_id='${referralFixture.orgId}'; delete from public.parent_referral_events where org_id='${referralFixture.orgId}'; delete from public.parent_referrals where org_id='${referralFixture.orgId}'; delete from public.parent_referral_links where org_id='${referralFixture.orgId}'; delete from public.profile_change_events where org_id='${referralFixture.orgId}'; delete from public.orgs where id='${referralFixture.orgId}';`,
+          stdio: ['pipe', 'ignore', 'pipe'],
+        },
+      );
+      await admin.auth.admin.deleteUser(referralFixture.authId);
+    }
+    await cleanupTestMailbox(local.INBUCKET_URL, cancelledEmail);
     await cleanupTestMailbox(local.INBUCKET_URL, email);
   }
 }

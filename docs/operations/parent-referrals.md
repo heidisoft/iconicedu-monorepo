@@ -70,14 +70,16 @@ Authorized active staff/admin/owner accounts can:
 
 Review endpoints require a normal authenticated session. The API verifies the user
 rather than trusting client-supplied actor IDs or role claims. Referrals are unique
-per new parent within an organization. Self-referrals by account and cross-org
+per new authenticated parent across organizations. Self-referrals by account and cross-org
 attribution are rejected. Creation and every review change produce append-only
 `parent_referral_events` with actor identity and before/after snapshots. Referrals
 and audit records cannot be read or written directly by frontend clients.
 
 ## Rollout
 
-1. Apply `20261126220000_parent_referrals.sql` before deploying the API and web app.
+1. Apply `20261126220000_parent_referrals.sql`, then the forward guards
+   `20261127030000_referral_existing_account_guards.sql` and
+   `20261127031000_referral_serial_claim_guards.sql`, before deploying the API and web app.
 2. Keep the existing API `WEB_URL` set to the public HTTPS web origin. No new
    required environment variables are introduced.
 3. Enable the catalogued `enable-parent-referrals` flag globally so identified
@@ -122,10 +124,13 @@ flags client uses isolated memory storage and drops captured events; it does not
 record lifecycle events, errors, or session replay. Identity and flag properties
 are still sent for targeting. Web and API evaluate flags without capturing events.
 
-The referral landing page leads with the new family’s reasons to join: exploring
+The web landing page and native invitation screen lead with the new family’s reasons to join: exploring
 classes, managing child profiles and upcoming sessions, and receiving academy
 updates and messages. The referring parent’s discount appears as a secondary note;
-it does not promise a discount to the new parent or a parent chat feature.
+it does not promise a discount to the new parent or a parent chat feature. The native
+screen uses the same personal invitation heading, inviter line, neutral benefit
+card, and three checked benefits as the web page. Its **Create your parent account**
+action preserves the accepted invitation through authentication.
 
 ## Verified HTTPS app links
 
@@ -162,3 +167,39 @@ the web-to-scheme flow; it cannot prove production HTTPS domain verification.
 The production Android association trusts the release signing certificate. Use the
 existing `iconicedu://` scheme for local debug builds; do not add a debug signing
 certificate to the production domain’s trust statements.
+
+## Eligibility and leaving signup
+
+Invitation entry pages reject any signed-in session, including the referring parent's
+own account. Previously accepted invitations can continue through email verification
+and first-time parent onboarding. The API and database reject self-referrals, established
+accounts in any organization, and a second claim for the same authenticated identity.
+Concurrent claims are serialized per identity. Rewards remain pending staff review.
+Parents can also sign up normally without an invitation or referring parent's name.
+
+Closing a native invitation, leaving it without accepting, or backing out of verification
+clears pending attribution. Accepting explicitly preserves it through authentication.
+SecureStore writes and deletion are serialized, and late validation responses cannot
+restore an abandoned invitation. Web navigation away and verification-back navigation
+clear the attribution cookie; a cancellation marker prevents stale auth callbacks from
+restoring it. Cookie cleanup remains available when the rollout flag is off.
+
+Focused browser coverage against local Supabase and locally running web/API services:
+
+```bash
+PLAYWRIGHT_REFERRALS_LOCAL=1 PLAYWRIGHT_SKIP_WEBSERVER=1 pnpm --filter web test:e2e e2e/parent-referrals.spec.ts --workers=1
+```
+
+Native coverage uses a cloned iOS simulator and disposable local accounts. Stop
+other Metro servers first. The runner exclusively creates an ignored
+`apps/mobile/.env.development.local` override for Expo 55, then removes it during
+cleanup. It refuses to overwrite an existing developer override:
+
+```bash
+MOBILE_REFERRAL_E2E=cancel pnpm --filter mobile test:e2e:auth
+MOBILE_REFERRAL_E2E=accept pnpm --filter mobile test:e2e:auth
+```
+
+These tests cover accepted and abandoned invitations, signup with no reward after
+cancellation, signed-in rejection, and footer store destinations. They do not verify
+production domain association, physical-device store installation, or Stripe fulfilment.

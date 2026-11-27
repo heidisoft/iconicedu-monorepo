@@ -73,3 +73,12 @@ it('acknowledges a retried signup whose reward was already recorded', async () =
   expect(await completePendingReferralSignup('parent')).toBe('already_recorded');
   expect(clearPendingParentReferral).toHaveBeenCalledTimes(1);
 });
+
+it('does not start an attribution write if the invitation was cancelled during its lookup', async () => {
+  jest
+    .mocked(readPendingParentReferral)
+    .mockResolvedValueOnce({ code, ownerId: 'parent', savedAt: Date.now() })
+    .mockResolvedValueOnce(null);
+  expect(await completePendingReferralSignup('parent')).toBe('cancelled');
+  expect(completeParentRole).not.toHaveBeenCalled();
+});
