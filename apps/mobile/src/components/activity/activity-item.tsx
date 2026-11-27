@@ -523,9 +523,13 @@ export function makeActivityItemStyles(C: AppColors) {
     // Interactive widgets (completion check, rating) share the body's indent so
     // every block under the headline starts on the same left edge.
     widget: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: SPACE_MD },
+    // 1pt line in the muted text colour at low opacity — a step stronger than
+    // the `border` token, which nearly disappears on the warm page background,
+    // while staying quiet in both light and dark mode.
     separator: {
-      height: StyleSheet.hairlineWidth,
-      backgroundColor: C.border,
+      height: 1,
+      backgroundColor: C.textMuted,
+      opacity: 0.3,
       marginHorizontal: 20,
     },
 

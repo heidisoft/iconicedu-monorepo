@@ -49,7 +49,7 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
       {rows.map((row, index) => (
         <View key={index} testID="activity-skeleton-row">
           {index > 0 ? (
-            <View style={[s.separator, { backgroundColor: colors.border }]} />
+            <View style={[s.separator, { backgroundColor: colors.textMuted }]} />
           ) : null}
           <View style={s.row}>
             <View style={s.itemRow}>
@@ -109,7 +109,7 @@ const s = StyleSheet.create({
   wrap: { paddingTop: 0, paddingBottom: 24 },
   sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
   row: { paddingHorizontal: ROW_PADDING_X, paddingVertical: 16 },
-  separator: { height: StyleSheet.hairlineWidth, marginHorizontal: ROW_PADDING_X },
+  separator: { height: 1, opacity: 0.3, marginHorizontal: ROW_PADDING_X },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: CONTENT_GAP },
   leading: {
     width: LEADING_SIZE,
