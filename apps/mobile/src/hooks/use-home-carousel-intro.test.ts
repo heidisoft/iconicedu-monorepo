@@ -33,7 +33,7 @@ async function flush() {
     await Promise.resolve();
   });
 }
-it('advances exactly once and remembers this parent across remounts', async () => {
+it('starts the hint exactly once and remembers this parent across remounts', async () => {
   const next = jest.fn();
   const account = `first-${scope}`;
   const view = renderHook(() => useHomeCarouselIntro(account, true, next));
@@ -83,7 +83,7 @@ it('stops when the parent interacts before the delay', async () => {
   act(() => jest.advanceTimersByTime(5000));
   expect(next).not.toHaveBeenCalled();
 });
-it('does not advance a backgrounded or unmounted carousel', async () => {
+it('does not animate a backgrounded or unmounted carousel', async () => {
   const next = jest.fn();
   const view = renderHook(() => useHomeCarouselIntro(`background-${scope}`, true, next));
   await flush();
@@ -100,10 +100,36 @@ it('does not advance a backgrounded or unmounted carousel', async () => {
 });
 it('respects the stored seen state from a previous app session', async () => {
   const account = `stored-${scope}`;
-  mockStored.set(`home-carousel-intro-v1:${account}:family-promotions`, '1');
+  mockStored.set(`home-carousel-intro-v2:${account}:family-promotions`, '1');
   const next = jest.fn();
   renderHook(() => useHomeCarouselIntro(account, true, next));
   await flush();
   act(() => jest.advanceTimersByTime(5000));
   expect(next).not.toHaveBeenCalled();
+});
+
+it('cancels an active hint on interaction and cleans it up on unmount', async () => {
+  const cancel = jest.fn();
+  const animate = jest.fn(() => cancel);
+  const view = renderHook(() =>
+    useHomeCarouselIntro(`cancel-active-${scope}`, true, animate),
+  );
+  await flush();
+  act(() => jest.advanceTimersByTime(2200));
+  expect(animate).toHaveBeenCalledTimes(1);
+  act(() => view.result.current());
+  expect(cancel).toHaveBeenCalledTimes(1);
+  view.unmount();
+  expect(cancel).toHaveBeenCalledTimes(1);
+});
+it('cancels an active hint when the home screen loses focus', async () => {
+  const cancel = jest.fn();
+  const view = renderHook(
+    ({ enabled }) => useHomeCarouselIntro(`blur-${scope}`, enabled, () => cancel),
+    { initialProps: { enabled: true } },
+  );
+  await flush();
+  act(() => jest.advanceTimersByTime(2200));
+  view.rerender({ enabled: false });
+  expect(cancel).toHaveBeenCalledTimes(1);
 });

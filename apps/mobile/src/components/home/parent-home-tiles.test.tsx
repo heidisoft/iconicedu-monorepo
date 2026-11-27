@@ -251,7 +251,7 @@ it('uses a flat mint dark variant for the class request slide', async () => {
   );
 });
 
-it('advances one slide after the first visible layout and then stops', async () => {
+it('peeks once and returns without changing the current slide', async () => {
   const { AccessibilityInfo, AppState } = require('react-native');
   jest.useFakeTimers();
   const reduce = jest
@@ -288,11 +288,11 @@ it('advances one slide after the first visible layout and then stops', async () 
     );
     act(() => jest.advanceTimersByTime(2200));
     expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.now).toBe(
-      2,
+      1,
     );
     act(() => jest.advanceTimersByTime(10000));
     expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.now).toBe(
-      2,
+      1,
     );
   } finally {
     reduce.mockRestore();

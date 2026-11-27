@@ -160,9 +160,12 @@ the existing form; iOS waits for native dismissal before presenting another shee
 Child creation retains its final confirmation. Class requests retain the existing
 Explore Classes form and request-conversation behavior.
 
-The suggestion carousel advances once, after 2.2 seconds on its first visible,
+The suggestion carousel gives one gentle upward peek and a soft spring return,
+after 2.2 seconds on its first visible,
 laid-out homepage presentation with multiple slides. A parent/device-scoped local
-preference remembers the introduction. Manual interaction cancels it; it does not
+preference remembers the introduction (version 2 for the peek animation). The hint
+briefly reveals the next tile while keeping the current tile selected. Animation
+runs on the native driver and resets immediately on user interaction. Manual interaction cancels it; it does not
 repeat or run while the homepage is unfocused or the app is backgrounded. Reduce
 Motion and screen-reader users keep manual controls. The carousel keeps its
 existing height, paging, navigation controls and dismissal preference.

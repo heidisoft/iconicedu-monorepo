@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Easing,
   Pressable,
   ScrollView,
   Text,
@@ -45,6 +47,7 @@ function PromotionCarousel({
   const [active, setActive] = useState(0);
   const pager = useRef<ScrollView>(null);
   const [laidOut, setLaidOut] = useState(false);
+  const peekOffset = useRef(new Animated.Value(0)).current;
   const promotions = [
     ...(onRefer
       ? [
@@ -98,7 +101,28 @@ function PromotionCarousel({
   const stopIntro = useHomeCarouselIntro(
     scope,
     visible && laidOut && autoAdvanceEnabled && promotions.length > 1,
-    () => move(1),
+    () => {
+      const animation = Animated.sequence([
+        Animated.timing(peekOffset, {
+          toValue: -Math.min(44, height * 0.24),
+          duration: 460,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.delay(100),
+        Animated.spring(peekOffset, {
+          toValue: 0,
+          speed: 18,
+          bounciness: 5,
+          useNativeDriver: true,
+        }),
+      ]);
+      animation.start();
+      return () => {
+        animation.stop();
+        peekOffset.setValue(0);
+      };
+    },
   );
   if (!visible) return null;
   return (
@@ -154,101 +178,110 @@ function PromotionCarousel({
           move(current + (event.nativeEvent.actionName === 'increment' ? 1 : -1));
         }}
       >
-        {promotions.map((promotion, index) => (
-          <View
-            key={promotion.id}
-            accessibilityElementsHidden={current !== index}
-            importantForAccessibility={current === index ? 'auto' : 'no-hide-descendants'}
-            style={{
-              height,
-              padding: 16,
-              gap: 6,
-              backgroundColor: promotion.background,
-            }}
-          >
+        <Animated.View
+          testID="parent-promotion-peek"
+          style={{ transform: [{ translateY: peekOffset }] }}
+        >
+          {promotions.map((promotion, index) => (
             <View
-              accessibilityElementsHidden
-              importantForAccessibility="no-hide-descendants"
+              key={promotion.id}
+              accessibilityElementsHidden={current !== index}
+              importantForAccessibility={
+                current === index ? 'auto' : 'no-hide-descendants'
+              }
               style={{
-                width: 36,
-                height: 36,
-                borderRadius: 14,
-                alignItems: 'center',
-                justifyContent: 'center',
+                height,
+                padding: 16,
+                gap: 6,
+                backgroundColor: promotion.background,
               }}
             >
               <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
                 style={{
-                  position: 'absolute',
                   width: 36,
                   height: 36,
                   borderRadius: 14,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <View
+                  style={{
+                    position: 'absolute',
+                    width: 36,
+                    height: 36,
+                    borderRadius: 14,
+                    backgroundColor: promotion.foreground,
+                    opacity: 0.08,
+                  }}
+                />
+                <promotion.Icon size={18} strokeWidth={2} color={promotion.foreground} />
+              </View>
+              <View style={{ flex: 1, justifyContent: 'center', gap: 4 }}>
+                <Text
+                  accessibilityRole="header"
+                  style={{
+                    color: promotion.foreground,
+                    fontSize: 15,
+                    lineHeight: 18,
+                    fontWeight: '700',
+                  }}
+                >
+                  {promotion.title}
+                </Text>
+                <Text
+                  style={{ color: promotion.foreground, fontSize: 12, lineHeight: 16 }}
+                >
+                  {promotion.description}
+                </Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={promotion.action}
+                accessibilityHint={promotion.hint}
+                onPress={() => {
+                  stopIntro();
+                  promotion.onPress();
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                style={{
+                  minHeight: 30,
+                  paddingHorizontal: 8,
+                  paddingVertical: 7,
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: promotion.foreground,
                   backgroundColor: promotion.foreground,
-                  opacity: 0.08,
-                }}
-              />
-              <promotion.Icon size={18} strokeWidth={2} color={promotion.foreground} />
-            </View>
-            <View style={{ flex: 1, justifyContent: 'center', gap: 4 }}>
-              <Text
-                accessibilityRole="header"
-                style={{
-                  color: promotion.foreground,
-                  fontSize: 15,
-                  lineHeight: 18,
-                  fontWeight: '700',
+                  flexShrink: 0,
+                  alignSelf: 'flex-start',
+                  justifyContent: 'center',
+                  marginRight: promotions.length > 1 ? 20 : 0,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
                 }}
               >
-                {promotion.title}
-              </Text>
-              <Text style={{ color: promotion.foreground, fontSize: 12, lineHeight: 16 }}>
-                {promotion.description}
-              </Text>
+                <Text
+                  style={{
+                    color: promotion.background,
+                    fontSize: 12,
+                    flexShrink: 1,
+                    fontWeight: '700',
+                  }}
+                >
+                  {promotion.id === 'child'
+                    ? 'Add child'
+                    : promotion.id === 'class'
+                      ? 'Request class'
+                      : promotion.action}
+                </Text>
+                <ArrowRight size={12} color={promotion.background} />
+              </Pressable>
             </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={promotion.action}
-              accessibilityHint={promotion.hint}
-              onPress={() => {
-                stopIntro();
-                promotion.onPress();
-              }}
-              hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
-              style={{
-                minHeight: 30,
-                paddingHorizontal: 8,
-                paddingVertical: 7,
-                borderRadius: 999,
-                borderWidth: 1,
-                borderColor: promotion.foreground,
-                backgroundColor: promotion.foreground,
-                flexShrink: 0,
-                alignSelf: 'flex-start',
-                justifyContent: 'center',
-                marginRight: promotions.length > 1 ? 20 : 0,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 4,
-              }}
-            >
-              <Text
-                style={{
-                  color: promotion.background,
-                  fontSize: 12,
-                  flexShrink: 1,
-                  fontWeight: '700',
-                }}
-              >
-                {promotion.id === 'child'
-                  ? 'Add child'
-                  : promotion.id === 'class'
-                    ? 'Request class'
-                    : promotion.action}
-              </Text>
-              <ArrowRight size={12} color={promotion.background} />
-            </Pressable>
-          </View>
-        ))}
+          ))}
+        </Animated.View>
       </ScrollView>
       <Pressable
         accessibilityRole="button"
