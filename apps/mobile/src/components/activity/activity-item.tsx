@@ -18,6 +18,7 @@ import {
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
+  Clock3,
   NotepadText,
   Star,
 } from 'lucide-react-native';
@@ -482,21 +483,13 @@ export function makeActivityItemStyles(C: AppColors) {
     strong: { fontWeight: '700' },
     strongRead: { fontWeight: '600' },
 
-    // Time — top-right on the headline line
-    timeText: {
-      flexShrink: 0,
-      fontSize: 13,
-      lineHeight: 21,
-      fontVariant: ['tabular-nums'],
-    },
-
-    // Status tag — small pill under the detail line (system rows only)
+    // Status tag — top-right, beside the title
     tag: {
-      alignSelf: 'flex-start',
+      flexShrink: 0,
       borderRadius: 6,
       paddingHorizontal: 7,
       paddingVertical: 3,
-      marginTop: SPACE_SM,
+      marginTop: 1,
     },
     tagText: {
       fontSize: 11,
@@ -506,16 +499,17 @@ export function makeActivityItemStyles(C: AppColors) {
       textTransform: 'uppercase',
     },
 
-    // Unread dot — pinned to the leading visual's top-left corner
-    unreadDot: {
-      position: 'absolute',
-      top: -2,
-      left: -2,
-      width: 12,
-      height: 12,
-      borderRadius: 6,
-      borderWidth: 2,
+    // Meta row — clock + time on the left, unread dot on the right
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      marginTop: SPACE_SM,
     },
+    metaTime: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    metaText: { fontSize: 13, lineHeight: 18, fontVariant: ['tabular-nums'] },
+    unreadDot: { width: 8, height: 8, borderRadius: 4 },
 
     // Body — previews and actions align with the headline text
     body: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: SPACE_MD, gap: SPACE_SM },
@@ -667,33 +661,19 @@ type ActivityIconComponent = React.ComponentType<{ size: number; color: string }
 
 function ActivityLeading({
   avatar,
-  colors,
   s,
   IconComponent,
   iconBg,
   iconFg,
-  isRead,
   isSubActivity,
 }: {
   avatar: ActivityLeadingAvatar | null;
-  colors: AppColors;
   s: ActivityItemStyles;
   IconComponent: ActivityIconComponent;
   iconBg: string;
   iconFg: string;
-  isRead: boolean;
   isSubActivity: boolean;
 }) {
-  // Unread marker pinned to the leading visual's top-left corner, ringed with
-  // the page colour so it reads cleanly over avatars and icon chips.
-  const unreadDot = isRead ? null : (
-    <View
-      style={[s.unreadDot, { backgroundColor: colors.action, borderColor: colors.bg }]}
-      accessibilityLabel="Unread"
-      testID="activity-unread-indicator"
-    />
-  );
-
   if (!avatar) {
     return (
       <View
@@ -701,7 +681,6 @@ function ActivityLeading({
         testID="activity-leading-icon"
       >
         <IconComponent size={isSubActivity ? 14 : 18} color={iconFg} />
-        {unreadDot}
       </View>
     );
   }
@@ -745,7 +724,6 @@ function ActivityLeading({
           <IconComponent size={10} color={iconFg} />
         </View>
       )}
-      {unreadDot}
     </View>
   );
 }
@@ -810,12 +788,10 @@ function ActivityHeaderRow({
     <View style={s.itemRow}>
       <ActivityLeading
         avatar={avatar}
-        colors={colors}
         s={s}
         IconComponent={IconComponent}
         iconBg={iconBg}
         iconFg={iconFg}
-        isRead={isRead}
         isSubActivity={isSubActivity}
       />
 
@@ -843,21 +819,33 @@ function ActivityHeaderRow({
             </Text>
           )}
 
-          <Text
-            style={[s.timeText, { color: colors.textMuted }]}
-            accessibilityLabel={relativeTime(occurredAt)}
-          >
-            {metaTime(occurredAt)}
-          </Text>
+          {tag && !isSubActivity ? (
+            <ActivityTagPill isDark={isDark} s={s} tag={tag} />
+          ) : null}
         </View>
 
         {!isSentence && detail ? (
           <Text style={[s.detailText, { color: colors.textMuted }]}>{detail}</Text>
         ) : null}
 
-        {tag && !isSubActivity ? (
-          <ActivityTagPill isDark={isDark} s={s} tag={tag} />
-        ) : null}
+        <View style={s.metaRow}>
+          <View style={s.metaTime}>
+            <Clock3 size={13} color={colors.textMuted} />
+            <Text
+              style={[s.metaText, { color: colors.textMuted }]}
+              accessibilityLabel={relativeTime(occurredAt)}
+            >
+              {metaTime(occurredAt)}
+            </Text>
+          </View>
+          {isRead ? null : (
+            <View
+              style={[s.unreadDot, { backgroundColor: colors.action }]}
+              accessibilityLabel="Unread"
+              testID="activity-unread-indicator"
+            />
+          )}
+        </View>
       </View>
     </View>
   );
