@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ReactTestRendererJSON } from 'react-test-renderer';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { AddChildDraft } from './add-child-draft';
@@ -223,4 +224,24 @@ it('prevents duplicate confirmed requests and preserves the draft after a server
   expect(screen.getByLabelText('First name *').props.value).toBe('Jane');
   expect(screen.getByLabelText('First name *').props.editable).toBe(true);
   expect(mockReplace).not.toHaveBeenCalled();
+});
+
+it('never renders bare strings in native containers, including whitespace', () => {
+  function bareText(tree: ReactTestRendererJSON | ReactTestRendererJSON[] | null) {
+    const found: { parent: string; text: string }[] = [];
+    function visit(node: ReactTestRendererJSON | string) {
+      if (typeof node === 'string') return;
+      for (const child of node.children ?? []) {
+        if (typeof child === 'string' && node.type !== 'Text')
+          found.push({ parent: node.type, text: child });
+        visit(child);
+      }
+    }
+    if (tree) (Array.isArray(tree) ? tree : [tree]).forEach(visit);
+    return found;
+  }
+  const view = render(<AddChildDraft />);
+  expect(bareText(view.toJSON())).toEqual([]);
+  fillRequired();
+  expect(bareText(view.toJSON())).toEqual([]);
 });

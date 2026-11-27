@@ -349,7 +349,7 @@ export function AddChildDraft() {
                     Add an email if your child will sign in independently. You can send an
                     invitation after creating their profile.
                   </Text>
-                </View>{' '}
+                </View>
               </>,
             )}
             <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>
