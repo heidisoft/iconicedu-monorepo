@@ -215,3 +215,9 @@ describe('mobile feature flags', () => {
     delete process.env.EXPO_PUBLIC_ENABLE_MESSAGE_LIST_FORMATTING;
   });
 });
+
+it('defaults parent referrals off without a remote flag, including local development', () => {
+  expect(
+    getLocalMobileFeatureFlagFallback(mobileFeatureFlagKeys.enableParentReferrals),
+  ).toBe(false);
+});

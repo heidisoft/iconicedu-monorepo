@@ -1,3 +1,4 @@
+import { ReferralsModule } from '@iconicedu/api/modules/referrals/referrals.module';
 import { WhiteboardsModule } from './modules/whiteboards/whiteboards.module';
 import { Module } from '@nestjs/common';
 import { AdminToolsModule } from '@iconicedu/api/modules/admin-tools/admin-tools.module';
@@ -71,6 +72,7 @@ import { RequestLoggingInterceptor } from '@iconicedu/api/observability/request-
     SpacesModule,
     SchedulesModule,
     OnboardingModule,
+    ReferralsModule,
     AssessmentCurriculumModule,
     AssessmentItemsModule,
     AssessmentTestsModule,

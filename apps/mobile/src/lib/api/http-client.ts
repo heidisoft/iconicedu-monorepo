@@ -30,12 +30,25 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   };
 }
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
 async function parseResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as {
       message?: string;
     } | null;
-    throw new Error(errorBody?.message ?? `API error ${response.status}`);
+    throw new ApiError(
+      errorBody?.message ?? `API error ${response.status}`,
+      response.status,
+    );
   }
 
   if (response.status === 204) {
@@ -102,4 +115,15 @@ export async function apiGet<T>(
   });
 
   return parseResponse<T>(response);
+}
+
+/** Public API reads for invitations before authentication. No session is required. */
+export async function apiPublicGet<T>(path: string): Promise<T> {
+  return parseResponse<T>(
+    await fetch(`${resolveApiBaseUrl()}${path}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    }),
+  );
 }

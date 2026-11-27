@@ -23,7 +23,13 @@ export class OnboardingController {
   role(
     @Req() req: AuthenticatedRequest,
     @Query('org') orgSlug: string | undefined,
-    @Body() body: { role?: unknown; staffAccessCode?: unknown },
+    @Body()
+    body: {
+      role?: unknown;
+      staffAccessCode?: unknown;
+      referralCode?: string;
+      referrerName?: string;
+    },
   ) {
     return this.onboardingService.completeRole(
       extractBearerToken(req.headers.authorization),

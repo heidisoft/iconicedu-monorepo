@@ -20,6 +20,8 @@ const DEFAULT_TIMEOUT_MS = 2500;
 const PROVIDER_NAME = 'iconicedu-posthog-openfeature-provider';
 
 function getPosthogHost() {
+  if (process.env.NODE_ENV !== 'production' && process.env.POSTHOG_FLAGS_HOST?.trim())
+    return process.env.POSTHOG_FLAGS_HOST.trim();
   return (
     process.env.POSTHOG_HOST ??
     process.env.NEXT_PUBLIC_POSTHOG_HOST ??
@@ -28,6 +30,8 @@ function getPosthogHost() {
 }
 
 function getPosthogKey() {
+  if (process.env.NODE_ENV !== 'production' && process.env.POSTHOG_FLAGS_KEY?.trim())
+    return process.env.POSTHOG_FLAGS_KEY.trim();
   return (process.env.POSTHOG_KEY ?? process.env.NEXT_PUBLIC_POSTHOG_KEY ?? '').trim();
 }
 

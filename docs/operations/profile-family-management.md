@@ -111,3 +111,18 @@ section. Contact & Security also omits the Role/Status account card and its Edit
 In Appearance, Theme opens a native sheet listing System, Light, and Dark. Accent
 choices show circular initial avatars using the same colors as profile avatars.
 Both selections remain drafts until the section’s confirmed Save action.
+
+Parent homepage tiles offer **Refer another parent** and **Add another child**
+as the first tile inside the Overview row. A vertical, paged carousel shows one
+suggestion at a time; the next control and screen-reader adjustment actions also
+switch suggestions. They are hidden from other roles and while viewing as a child.
+Add Child opens the existing managed-child form. Referral details opens a reward
+explainer followed by native sharing of a personal website invitation. New parents
+can sign up on the web with automatic attribution, or enter a referring parent’s
+name during onboarding. The $20 discount is confirmed and fulfilled manually in
+Stripe. See [Parent Referrals](parent-referrals.md) for rollout and review details.
+
+The close button dismisses the entire suggestions tile. Dismissals are device-local presentation
+preferences in AsyncStorage, scoped by organization, guardian account, carousel ID
+and version. They survive app restarts without changing profile or family data.
+A failed save keeps the tile visible and offers a retry.

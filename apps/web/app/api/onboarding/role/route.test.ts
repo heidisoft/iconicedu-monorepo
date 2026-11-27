@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { POST } from '@iconicedu/web/app/api/onboarding/role/route';
 import { resolveAppUrl } from '@iconicedu/web/lib/config/app-url';
 
+vi.mock('@iconicedu/web/flags', () => ({ enableParentReferrals: async () => false }));
+vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+
 const APP_URL = resolveAppUrl();
 const { mockGetSession } = vi.hoisted(() => ({
   mockGetSession: vi.fn(),
