@@ -93,7 +93,7 @@ beforeEach(() => {
 });
 it('requires confirmation and preserves edits when review is cancelled', () => {
   render(<ProfileEditor id="p1" />);
-  fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit profile name'));
   fireEvent.press(screen.getByLabelText('Edit First name'));
   fireEvent.changeText(screen.getByLabelText('First name'), 'Janet');
   fireEvent.press(screen.getByLabelText('Done editing First name'));
@@ -108,7 +108,7 @@ it('requires confirmation and preserves edits when review is cancelled', () => {
 });
 it('saves the reviewed values only after explicit confirmation', async () => {
   render(<ProfileEditor id="p1" />);
-  fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit profile name'));
   fireEvent.press(screen.getByLabelText('Edit First name'));
   fireEvent.changeText(screen.getByLabelText('First name'), 'Janet');
   fireEvent.press(screen.getByLabelText('Done editing First name'));
@@ -130,7 +130,7 @@ it('shows restricted child details without save or remove controls', () => {
   mockCanEdit = false;
   render(<ProfileEditor id="p1" child />);
   expect(screen.queryByLabelText('First name')).toBeNull();
-  expect(screen.queryByLabelText('Edit Identity')).toBeNull();
+  expect(screen.queryByLabelText('Edit profile name')).toBeNull();
   expect(screen.getByText('Jane S')).toBeTruthy();
   expect(screen.queryByText('Review changes')).toBeNull();
   expect(screen.queryByText('Remove child')).toBeNull();
@@ -163,7 +163,7 @@ it('keeps the original data rows read-only until a section is opened', () => {
   expect(screen.getByText('First Name')).toBeTruthy();
   expect(screen.getByText('Last Name')).toBeTruthy();
   expect(screen.queryByLabelText('First name')).toBeNull();
-  expect(screen.getByLabelText('Edit Identity')).toBeTruthy();
+  expect(screen.getByLabelText('Edit profile name')).toBeTruthy();
   expect(screen.getByLabelText('Edit Photo')).toBeTruthy();
   expect(screen.queryByLabelText('Edit Location')).toBeNull();
   expect(screen.queryByLabelText('Edit Regional')).toBeNull();
@@ -171,14 +171,14 @@ it('keeps the original data rows read-only until a section is opened', () => {
 });
 it('edits only the selected section and discards changes on cancel', () => {
   render(<ProfileEditor id="p1" />);
-  fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit profile name'));
   fireEvent.press(screen.getByLabelText('Edit First name'));
   fireEvent.changeText(screen.getByLabelText('First name'), 'Discarded');
   fireEvent.press(screen.getByLabelText('Done editing First name'));
   expect(screen.queryByLabelText('Hide account role')).toBeNull();
   expect(screen.queryByLabelText('Choose profile photo')).toBeNull();
   fireEvent.press(screen.getByText('Cancel'));
-  fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit profile name'));
   expect(screen.getByLabelText('Edit First name').props.accessibilityValue.text).toBe(
     'Jane',
   );
@@ -336,7 +336,7 @@ it('previews accent colors as profile avatars and keeps dismissed theme choices 
 
 it('uses the shared profile sections for the separate child Profile screen', () => {
   render(<ProfileEditor id="p1" child profileOnly />);
-  expect(screen.getByLabelText('Edit Identity')).toBeTruthy();
+  expect(screen.getByLabelText('Edit profile name')).toBeTruthy();
   expect(screen.getByLabelText('Edit About')).toBeTruthy();
   expect(screen.getByLabelText('Edit Learning Details')).toBeTruthy();
   expect(screen.queryByText('Location')).toBeNull();
@@ -348,7 +348,7 @@ it.each([false, true])(
   'keeps per-field edits local and discards them when the section closes (child=%s)',
   (child) => {
     render(<ProfileEditor id="p1" child={child} profileOnly />);
-    fireEvent.press(screen.getByLabelText('Edit Identity'));
+    fireEvent.press(screen.getByLabelText('Edit profile name'));
     fireEvent.press(screen.getByLabelText('Edit First name'));
     fireEvent.changeText(screen.getByLabelText('First name'), 'Janet');
     fireEvent.press(screen.getByLabelText('Done editing First name'));
@@ -363,7 +363,7 @@ it.each([false, true])(
     );
     expect(mockSave).not.toHaveBeenCalled();
     fireEvent.press(screen.getByText('Cancel'));
-    fireEvent.press(screen.getByLabelText('Edit Identity'));
+    fireEvent.press(screen.getByLabelText('Edit profile name'));
     expect(screen.getByLabelText('Edit First name').props.accessibilityValue.text).toBe(
       'Jane',
     );
@@ -372,7 +372,7 @@ it.each([false, true])(
 
 it('checks required names after field editing before offering database confirmation', () => {
   render(<ProfileEditor id="p1" />);
-  fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit profile name'));
   fireEvent.press(screen.getByLabelText('Edit Last name'));
   fireEvent.changeText(screen.getByLabelText('Last name'), ' ');
   fireEvent.press(screen.getByLabelText('Done editing Last name'));
@@ -415,3 +415,20 @@ it('edits address text in a focused sheet and saves only the confirmed location 
     },
   });
 });
+
+it.each([false, true])(
+  'opens identity from the displayed name without an Identity Edit action (child=%s)',
+  (child) => {
+    render(<ProfileEditor id="p1" child={child} profileOnly />);
+    expect(screen.queryByLabelText('Edit Identity')).toBeNull();
+    expect(screen.getByLabelText('Edit profile name').props.accessibilityValue.text).toBe(
+      'Jane S',
+    );
+    fireEvent.press(screen.getByLabelText('Edit profile name'));
+    expect(screen.getByLabelText('Edit Display name')).toBeTruthy();
+    expect(mockSave).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByText('Cancel'));
+    fireEvent.press(screen.getByLabelText('Display Name'));
+    expect(screen.getByLabelText('Edit Display name')).toBeTruthy();
+  },
+);

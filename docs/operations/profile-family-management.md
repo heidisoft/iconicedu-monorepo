@@ -58,8 +58,9 @@ and Contact & Security screens for every role. Child details use the main accoun
 profile ID. Identity, About, and child Learning Details live on the separate
 Profile screen; invitations and removal remain on the child overview. They do not duplicate
 the address or regional fields. Profile and child details retain read-only,
-grouped settings rows. Each section
-has its own top-right Edit action, opening a native sheet with Cancel and Save.
+grouped settings rows. Identity opens by tapping the display name below the avatar or the Display Name
+row, without a separate Edit text action. Other sections retain their top-right
+Edit action. Editors open native sheets with Cancel and Save.
 Only fields in that section are validated and written; cancelling discards the
 local draft. Profile and child-profile text inputs use shared sizing, padding, theme
 colors, and focus borders, following the onboarding style. Creation and edit sheets use the

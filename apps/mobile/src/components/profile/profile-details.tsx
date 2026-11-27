@@ -68,7 +68,7 @@ export function ProfileDetails({
       <View>
         <View style={s.sectionHeader}>
           <Text style={s.sectionLabel}>{title}</Text>
-          {data.canEdit && (
+          {data.canEdit && key !== 'identity' && (
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Edit ${title}`}
@@ -98,6 +98,11 @@ export function ProfileDetails({
           label={label}
           labelColor={colors.text}
           hideChevron
+          onPress={
+            label === 'Display Name' && data.canEdit && !draft && !busy
+              ? () => onEdit('identity')
+              : undefined
+          }
           trailing={
             <Text
               style={content ? s.value : s.empty}
@@ -150,7 +155,22 @@ export function ProfileDetails({
             <Text style={s.editText}>Edit</Text>
           </Pressable>
         )}
-        <Text style={s.avatarName}>{displayName}</Text>
+        {data.canEdit && !draft ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Edit profile name"
+            accessibilityHint="Opens the identity editor for first, last and display names"
+            accessibilityValue={{ text: displayName }}
+            accessibilityState={{ disabled: busy }}
+            disabled={busy}
+            onPress={() => onEdit('identity')}
+            style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}
+          >
+            <Text style={s.avatarName}>{displayName}</Text>
+          </Pressable>
+        ) : (
+          <Text style={s.avatarName}>{displayName}</Text>
+        )}
       </View>
       {sectionsContent ??
         (!overview && (
