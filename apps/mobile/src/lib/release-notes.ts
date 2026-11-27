@@ -20,6 +20,6 @@ export const currentReleaseNotes: ReleaseNotes = {
   items: [
     'Set up your profile with a display name and easier birth year and grade selection.',
     'Find your country, region, and time zone with searchable options during setup.',
-    'Downloaded app updates now let you choose Restart now or Later, so you can finish your current work.',
+    'App updates download quietly and apply the next time the app starts, without interrupting your current work.',
   ],
 };
