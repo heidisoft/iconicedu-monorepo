@@ -47,6 +47,8 @@ export function ActivityCompletionCheckBatch({
   const sessions = useMemo(() => getSessions(activity), [activity]);
 
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
+  // Manual pressed state — NativeWind's interop drops Pressable function styles.
+  const [pressedKey, setPressedKey] = useState<string | null>(null);
   const [confirmedIds, setConfirmedIds] = useState<Set<string>>(
     () =>
       new Set(
@@ -81,8 +83,8 @@ export function ActivityCompletionCheckBatch({
           {sessions.length} classes ended
         </Text>
         {resolvedCount > 0 ? (
-          <View style={[styles.progressPill, { backgroundColor: `${colors.teal}22` }]}>
-            <Text style={[styles.progressText, { color: colors.teal }]}>
+          <View style={[styles.progressPill, { backgroundColor: colors.actionSubtle }]}>
+            <Text style={[styles.progressText, { color: colors.action }]}>
               {resolvedCount} of {sessions.length} confirmed
             </Text>
           </View>
@@ -99,6 +101,9 @@ export function ActivityCompletionCheckBatch({
         const isConfirmed = confirmedIds.has(sessionResponseKey);
         const isDisputed = disputedIds.has(sessionResponseKey);
         const isResolved = isConfirmed || isDisputed;
+        // Answered sessions collapse to a one-word status. A row the user just
+        // answered stays open (so the rating step can follow) until they close it.
+        const isCollapsedResolved = isResolved && !isExpanded;
 
         // Build a synthetic activity item for the single-session component
         const syntheticActivity: ActivityFeedLeafItemVM = {
@@ -121,70 +126,95 @@ export function ActivityCompletionCheckBatch({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`${session.title} — ${isResolved ? 'resolved' : 'needs confirmation'}`}
+              disabled={isCollapsedResolved}
               onPress={() => setExpandedIndex(isExpanded ? null : index)}
-              style={({ pressed }) => [
-                styles.sessionRow,
-                {
-                  borderColor: colors.border,
-                  backgroundColor: pressed ? colors.inputBg : colors.card,
-                },
-              ]}
+              onPressIn={() => setPressedKey(sessionResponseKey)}
+              onPressOut={() => setPressedKey(null)}
             >
-              <View style={styles.sessionRowLeft}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor: isConfirmed
-                        ? colors.teal
-                        : isDisputed
-                          ? colors.warning
-                          : colors.border,
-                    },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.sessionTitle,
-                    { color: isResolved ? colors.textMuted : colors.text },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {session.title}
-                </Text>
+              <View
+                style={[
+                  styles.sessionRow,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor:
+                      pressedKey === sessionResponseKey
+                        ? colors.inkSubtle
+                        : 'transparent',
+                  },
+                ]}
+              >
+                <View style={styles.sessionRowLeft}>
+                  <View
+                    style={[
+                      styles.statusDot,
+                      {
+                        backgroundColor: isConfirmed
+                          ? colors.action
+                          : isDisputed
+                            ? colors.warning
+                            : colors.border,
+                      },
+                    ]}
+                  />
+                  <Text
+                    style={[
+                      styles.sessionTitle,
+                      { color: isResolved ? colors.textMuted : colors.text },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {session.title}
+                  </Text>
+                </View>
+                {isCollapsedResolved ? (
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { color: isDisputed ? colors.warning : colors.success },
+                    ]}
+                  >
+                    {isDisputed ? 'Reported' : 'Completed'}
+                  </Text>
+                ) : isExpanded ? (
+                  <ChevronUp size={14} color={colors.textMuted} />
+                ) : (
+                  <ChevronDown size={14} color={colors.textMuted} />
+                )}
               </View>
-              {isExpanded ? (
-                <ChevronUp size={14} color={colors.textMuted} />
-              ) : (
-                <ChevronDown size={14} color={colors.textMuted} />
-              )}
             </Pressable>
 
             {isExpanded ? (
-              <ActivityCompletionCheck
-                activity={syntheticActivity}
-                colors={colors}
-                currentProfileId={currentProfileId}
-                onCompletionSubmit={(status) => {
-                  if (status === 'confirmed') {
-                    setConfirmedIds((current) =>
-                      new Set(current).add(sessionResponseKey),
-                    );
-                    setDisputedIds((current) => {
-                      const next = new Set(current);
-                      next.delete(sessionResponseKey);
-                      return next;
-                    });
-                  } else {
-                    setDisputedIds((current) => new Set(current).add(sessionResponseKey));
-                    setConfirmedIds((current) => {
-                      const next = new Set(current);
-                      next.delete(sessionResponseKey);
-                      return next;
-                    });
-                  }
-                }}
-              />
+              <View style={styles.sessionPanel}>
+                <ActivityCompletionCheck
+                  activity={syntheticActivity}
+                  colors={colors}
+                  currentProfileId={currentProfileId}
+                  // The row above already names the session, so drop the
+                  // check's own title and chrome rather than nest a card here.
+                  embedded
+                  onCompletionSubmit={(status) => {
+                    if (status === 'confirmed') {
+                      setConfirmedIds((current) =>
+                        new Set(current).add(sessionResponseKey),
+                      );
+                      setDisputedIds((current) => {
+                        const next = new Set(current);
+                        next.delete(sessionResponseKey);
+                        return next;
+                      });
+                    } else {
+                      setDisputedIds((current) =>
+                        new Set(current).add(sessionResponseKey),
+                      );
+                      setConfirmedIds((current) => {
+                        const next = new Set(current);
+                        next.delete(sessionResponseKey);
+                        return next;
+                      });
+                    }
+                  }}
+                />
+              </View>
             ) : null}
           </View>
         );
@@ -195,14 +225,18 @@ export function ActivityCompletionCheckBatch({
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
+    // White panel on the feed's page background.
     container: {
-      marginTop: 10,
-      marginLeft: 42,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderRadius: 14,
       backgroundColor: colors.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
       overflow: 'hidden',
+    },
+    sessionPanel: {
+      paddingHorizontal: 14,
+      paddingBottom: 14,
+      paddingTop: 4,
     },
     header: {
       flexDirection: 'row',
@@ -213,7 +247,7 @@ function makeStyles(colors: AppColors) {
       gap: 8,
     },
     headerTitle: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '700',
     },
     subTitle: {
@@ -247,6 +281,10 @@ function makeStyles(colors: AppColors) {
       width: 8,
       height: 8,
       borderRadius: 4,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '700',
     },
     sessionTitle: {
       flex: 1,

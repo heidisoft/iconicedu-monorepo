@@ -6,18 +6,30 @@ import {
   CalendarCheck,
   CalendarX,
   MessageSquare,
+  NotepadText,
   Star,
 } from 'lucide-react-native';
+
+import { StyleSheet } from 'react-native';
 
 import type { ActivityFeedItemVM } from '@iconicedu/shared-types';
 
 import {
   ACTIVITY_ICON_MAP,
   ActivityItem,
+  compactTime,
   formatActivityPrimaryHeadline,
+  formatFeedSectionLabel,
+  getActivityIcon,
+  getActivityTag,
   getIconKey,
+  getLeadingAvatar,
+  isCompletionCheckResolved,
+  isPreviewRedundant,
   makeActivityItemStyles,
+  metaTime,
 } from './activity-item';
+import { shouldShowCompletionPromptTitle } from './activity-completion-check';
 import { lightColors } from '@/lib/theme';
 
 const mockRateSessionCompletion = jest.fn();
@@ -100,12 +112,264 @@ describe('ActivityItem', () => {
     mockDisputeSessionCompletion.mockReset();
   });
 
-  it('renders the activity row without inline avatars', () => {
+  it('leads person-driven activity with the actor avatar and a type badge', () => {
     const { UNSAFE_getAllByType } = renderActivity(makeBaseActivity());
 
+    expect(screen.getByTestId('activity-leading-avatar')).toBeTruthy();
+    expect(screen.getByText('PS')).toBeTruthy();
     expect(UNSAFE_getAllByType(MessageSquare).length).toBeGreaterThan(0);
     expect(screen.getByText('Priya Sharma')).toBeTruthy();
     expect(screen.getByText('Math Foundations')).toBeTruthy();
+  });
+
+  it('keeps the tone icon chip for system activity even when an actor exists', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.reminder.sent',
+      content: {
+        ...makeBaseActivity().content,
+        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(getLeadingAvatar(item)).toBeNull();
+    expect(screen.getByTestId('activity-leading-icon')).toBeTruthy();
+    expect(screen.queryByTestId('activity-leading-avatar')).toBeNull();
+  });
+
+  it('uses the first leading avatar when the projection supplies avatars', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'class.schedule.created',
+      content: {
+        ...makeBaseActivity().content,
+        leading: {
+          kind: 'avatars',
+          avatars: [
+            {
+              name: 'Barbara Young',
+              avatar: { source: 'upload', url: 'https://example.test/b.png' },
+              profileId: 'profile-2',
+            },
+          ],
+        },
+      },
+    } as ActivityFeedItemVM;
+
+    expect(getLeadingAvatar(item)).toEqual({
+      name: 'Barbara Young',
+      url: 'https://example.test/b.png',
+      seed: 'profile-2',
+      themeKey: null,
+    });
+  });
+
+  it('hides a preview that only repeats the headline', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.reminder.sent',
+      content: {
+        leading: { kind: 'icon', iconKey: 'Bell', tone: 'info' },
+        headline: {
+          primary: 'ELA with Ms Denise',
+          secondary:
+            'Class session starts Wednesday, April 8 at 9:00 AM EDT · For Scott S with Denise R',
+        },
+        summary: 'Class session starts Wednesday, April 8 at 9:00 AM EDT',
+        actionButton: { label: 'Open class', variant: 'outline' },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(
+      screen.queryByText('Class session starts Wednesday, April 8 at 9:00 AM EDT'),
+    ).toBeNull();
+    expect(screen.queryByTestId('activity-preview')).toBeNull();
+  });
+
+  it('detects redundant previews regardless of case, spacing and trailing punctuation', () => {
+    expect(
+      isPreviewRedundant(
+        'Class   session STARTS soon · For Scott',
+        'class session starts soon.',
+      ),
+    ).toBe(true);
+    expect(isPreviewRedundant('Marc F sent a message', 'Hellow how are you')).toBe(false);
+    expect(isPreviewRedundant('Anything', '   ')).toBe(true);
+  });
+
+  it('splits system notifications into a title, a detail line and a status tag', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'class.session.rescheduled',
+      content: {
+        leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'warning' },
+        headline: {
+          primary: 'ELA with Ms Denise',
+          secondary: 'Moved to Thu, Apr 9 at 10:00 AM',
+        },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByText('ELA with Ms Denise')).toBeTruthy();
+    expect(screen.getByText('Moved to Thu, Apr 9 at 10:00 AM')).toBeTruthy();
+    expect(screen.getByText('Rescheduled')).toBeTruthy();
+  });
+
+  it('does not tag person-driven notifications', () => {
+    renderActivity(makeBaseActivity());
+
+    expect(getActivityTag(makeBaseActivity())).toBeNull();
+    expect(screen.queryByTestId('activity-tag')).toBeNull();
+  });
+
+  it('tags completion checks by their resolution status', () => {
+    const base = { ...makeBaseActivity(), verb: 'session.completion_check.sent' };
+    expect(getActivityTag(base as ActivityFeedItemVM)).toEqual({
+      label: 'Action needed',
+      tone: 'warning',
+    });
+    expect(
+      getActivityTag({
+        ...base,
+        metadata: { sessionCompletion: { status: 'auto_confirmed' } },
+      } as ActivityFeedItemVM),
+    ).toEqual({ label: 'Confirmed', tone: 'success' });
+    expect(
+      getActivityTag({
+        ...base,
+        metadata: { sessionCompletion: { status: 'disputed' } },
+      } as ActivityFeedItemVM),
+    ).toEqual({ label: 'Reported', tone: 'danger' });
+  });
+
+  it('hides Read more when the full text matches the preview', () => {
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        summary: 'Hellow how are you',
+        expandedContent: 'Hellow how are you',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByText('Hellow how are you')).toBeTruthy();
+    expect(screen.queryByText('Read more')).toBeNull();
+  });
+
+  it('replaces the preview with the full text when expanded', () => {
+    const onToggle = jest.fn();
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        summary: 'Can we move Thursday',
+        expandedContent: 'Can we move Thursday to 5pm? Scott has practice until 4:30.',
+      },
+    } as ActivityFeedItemVM;
+
+    const { rerender } = renderActivity(item, { onToggle });
+
+    fireEvent.press(screen.getByText('Read more'));
+    expect(onToggle).toHaveBeenCalledWith('activity-1');
+
+    rerender(
+      <ActivityItem
+        item={item}
+        colors={lightColors}
+        isDark={false}
+        s={makeActivityItemStyles(lightColors)}
+        onMarkRead={jest.fn()}
+        expandedIds={new Set(['activity-1'])}
+        onToggle={onToggle}
+      />,
+    );
+
+    expect(
+      screen.getByText('Can we move Thursday to 5pm? Scott has practice until 4:30.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Can we move Thursday')).toBeNull();
+    expect(screen.getByText('Show less')).toBeTruthy();
+  });
+
+  it('collapses an already-answered completion check to its status tag', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.completion_check.sent',
+      content: {
+        ...makeBaseActivity().content,
+        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+        headline: { primary: 'Confirm the lesson for Scott S with Barbara Y' },
+      },
+      metadata: {
+        sessionCompletionId: 'completion-1',
+        sessionCompletion: { id: 'completion-1', status: 'confirmed', rating: 5 },
+      },
+    } as ActivityFeedItemVM;
+
+    const { UNSAFE_getAllByType } = renderActivity(item);
+
+    expect(screen.getByText('Confirmed')).toBeTruthy();
+    expect(screen.queryByText('This session has been marked as completed.')).toBeNull();
+    expect(screen.queryByText('Rate your session')).toBeNull();
+    expect(screen.queryByLabelText('Confirm lesson')).toBeNull();
+    expect(isCompletionCheckResolved(item)).toBe(true);
+    expect(UNSAFE_getAllByType(NotepadText).length).toBeGreaterThan(0);
+  });
+
+  it('uses the notepad icon for completion checks', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.completion_check.batch.sent',
+      content: {
+        ...makeBaseActivity().content,
+        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+      },
+    } as ActivityFeedItemVM;
+
+    expect(getActivityIcon(item)).toBe(NotepadText);
+    expect(getActivityIcon(makeBaseActivity())).toBe(MessageSquare);
+  });
+
+  it('formats meta timestamps and dated section headers', () => {
+    const now = new Date('2026-04-10T12:00:00.000Z').getTime();
+    expect(metaTime('2026-04-10T11:59:30.000Z', now)).toBe('Just now');
+    expect(metaTime('2026-04-10T11:55:00.000Z', now)).toBe('5m ago');
+    expect(metaTime('2026-03-04T12:00:00.000Z', now)).toBe('Mar 4');
+
+    expect(formatFeedSectionLabel('Today', '2026-03-09T15:00:00.000Z')).toBe(
+      'Today, Mar 9',
+    );
+    expect(formatFeedSectionLabel('This week', '2026-03-06T15:00:00.000Z')).toBe(
+      'This week',
+    );
+    expect(formatFeedSectionLabel('Today', undefined)).toBe('Today');
+  });
+
+  it('formats compact timestamps for the top-right corner', () => {
+    const now = new Date('2026-04-10T12:00:00.000Z').getTime();
+    expect(compactTime('2026-04-10T11:59:30.000Z', now)).toBe('now');
+    expect(compactTime('2026-04-10T11:55:00.000Z', now)).toBe('5m');
+    expect(compactTime('2026-04-10T09:00:00.000Z', now)).toBe('3h');
+    expect(compactTime('2026-04-08T12:00:00.000Z', now)).toBe('2d');
+    expect(compactTime('2026-03-04T12:00:00.000Z', now)).toBe('Mar 4');
+    expect(compactTime('not-a-date', now)).toBe('');
+  });
+
+  it('only shows the completion prompt title when it adds to the headline', () => {
+    const headline = 'Confirm the lesson for Scott S and Andrea S with Barbara Y';
+    expect(shouldShowCompletionPromptTitle(headline.toUpperCase(), headline)).toBe(false);
+    expect(
+      shouldShowCompletionPromptTitle('Confirm your lesson', 'Math with Ms Barbara'),
+    ).toBe(true);
+    expect(shouldShowCompletionPromptTitle('Confirm your lesson', undefined)).toBe(true);
   });
 
   it.each([
@@ -154,6 +418,16 @@ describe('ActivityItem', () => {
     expect(getIconKey(item)).toBe(iconKey);
   });
 
+  it('keeps row padding on a static style (NativeWind drops Pressable style functions)', () => {
+    renderActivity(makeBaseActivity());
+
+    const row = screen.getByTestId('activity-row');
+    const style = StyleSheet.flatten(row.props.style);
+    expect(style.paddingHorizontal).toBe(20);
+    expect(style.paddingVertical).toBe(16);
+    expect(typeof row.props.style).not.toBe('function');
+  });
+
   it('marks unread activities read when the row is pressed', () => {
     const onMarkRead = jest.fn();
 
@@ -165,7 +439,7 @@ describe('ActivityItem', () => {
     expect(onMarkRead).toHaveBeenCalledWith('activity-1');
   });
 
-  it('shows a read check-check indicator for read activities', () => {
+  it('drops the unread dot once the activity is read', () => {
     const item = {
       ...makeBaseActivity(),
       state: { ...makeBaseActivity().state, isRead: true },
@@ -173,8 +447,8 @@ describe('ActivityItem', () => {
 
     renderActivity(item);
 
-    expect(screen.getByLabelText('Read')).toBeTruthy();
     expect(screen.queryByLabelText('Unread')).toBeNull();
+    expect(screen.queryByTestId('activity-unread-indicator')).toBeNull();
   });
 
   it('only displays Read more when expanded content exists', () => {
@@ -255,8 +529,9 @@ describe('ActivityItem', () => {
     expect(onMarkRead).not.toHaveBeenCalled();
   });
 
-  it('calls the activity action handler when the action button is pressed', () => {
+  it('navigates when the row is tapped instead of showing an Open pill', () => {
     const onActionPress = jest.fn();
+    const onMarkRead = jest.fn();
     const item = {
       ...makeBaseActivity(),
       content: {
@@ -265,11 +540,13 @@ describe('ActivityItem', () => {
       },
     } as ActivityFeedItemVM;
 
-    renderActivity(item, { onActionPress });
+    renderActivity(item, { onActionPress, onMarkRead });
 
-    fireEvent.press(screen.getByText('Open class'));
+    expect(screen.queryByText('Open class')).toBeNull();
+    fireEvent.press(screen.getByText('Priya Sharma'));
 
     expect(onActionPress).toHaveBeenCalledWith(item);
+    expect(onMarkRead).toHaveBeenCalledWith('activity-1');
   });
 
   it('renders feedback requests in the preview position without an action button', () => {
@@ -554,14 +831,14 @@ describe('ActivityItem', () => {
 
     expect(screen.getByText('1 of 2 confirmed')).toBeTruthy();
 
+    // Answered sessions collapse to a one-word status and do not expand.
+    expect(screen.getByText('Completed')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Math Foundations — resolved'));
-    // Already-confirmed on load (not a fresh in-session confirm) → the plain
-    // "marked as completed" message rather than the fresh-confirm feedback prompt.
-    expect(screen.getByText('This session has been marked as completed.')).toBeTruthy();
-    expect(screen.getByText('Rate your session')).toBeTruthy();
+    expect(screen.queryByText('This session has been marked as completed.')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Math Foundations — needs confirmation'));
-    expect(screen.getByText('Confirm Lesson')).toBeTruthy();
+    expect(screen.getByLabelText('Confirm lesson')).toBeTruthy();
+    expect(screen.getByText('Confirm')).toBeTruthy();
   });
 
   it('submits completion confirmation by stable row id', async () => {
@@ -585,7 +862,9 @@ describe('ActivityItem', () => {
 
     renderActivity(item, { currentProfileId: 'profile-1' });
 
-    fireEvent.press(screen.getByText('Confirm Lesson'));
+    expect(screen.getByText('Report')).toBeTruthy();
+    expect(screen.getByLabelText('Report a problem')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Confirm lesson'));
 
     await waitFor(() => {
       expect(mockConfirmSessionCompletion).toHaveBeenCalledWith(

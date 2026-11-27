@@ -18,6 +18,7 @@ import { QueryError } from '@/components/errors/query-error';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
   ActivityItem,
+  formatFeedSectionLabel,
   makeActivityItemStyles,
 } from '@/components/activity/activity-item';
 import type { AppColors } from '@/lib/theme';
@@ -94,17 +95,12 @@ function makeStyles(C: AppColors) {
     tabBadgeText: { fontSize: 11, fontWeight: '700', color: '#ffffff' },
 
     // Section header
-    sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
+    sectionHeader: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
     sectionLabel: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: C.textFaint,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
+      fontSize: 15,
+      fontWeight: '600',
+      color: C.text,
     },
-
-    // Spacer between cards
-    separator: { height: 8 },
 
     // Empty state
     emptyWrap: {
@@ -448,7 +444,12 @@ export default function InboxScreen() {
           }
           renderSectionHeader={({ section }) => (
             <View style={s.sectionHeader}>
-              <Text style={s.sectionLabel}>{section.label}</Text>
+              <Text style={s.sectionLabel}>
+                {formatFeedSectionLabel(
+                  section.label,
+                  section.data[0]?.timestamps.occurredAt,
+                )}
+              </Text>
             </View>
           )}
           renderItem={({ item }) => (
@@ -465,7 +466,7 @@ export default function InboxScreen() {
               currentProfileId={profile?.id ?? null}
             />
           )}
-          ItemSeparatorComponent={() => <View style={s.separator} />}
+          ItemSeparatorComponent={() => <View style={activityS.separator} />}
         />
       )}
 
