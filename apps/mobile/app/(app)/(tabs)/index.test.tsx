@@ -268,6 +268,7 @@ jest.mock('@iconicedu/ui-native', () => ({
 
 jest.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  SafeAreaProvider: require('react-native').View,
   SafeAreaView: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
@@ -275,6 +276,10 @@ jest.mock('lucide-react-native', () => {
   const { Text } = require('react-native');
   const Icon = ({ size }: { size?: number }) => <Text>{`icon-${size ?? 0}`}</Text>;
   return {
+    BookOpen: Icon,
+    ChevronDown: Icon,
+    X: Icon,
+    Search: Icon,
     CalendarClock: Icon,
     CalendarCheck: Icon,
     CalendarDays: Icon,
@@ -418,7 +423,9 @@ it('opens the existing first-time class request flow from the new suggestion and
   fireEvent.press(view.getByText('Submit request'));
   expect(view.getByText('Select at least one subject.')).toBeTruthy();
   expect(mockSubmitClassRequest).not.toHaveBeenCalled();
+  fireEvent.press(view.getByLabelText('Select subjects'));
   fireEvent.press(view.getByText('Math'));
+  fireEvent.press(view.getByLabelText('Done selecting'));
   fireEvent.press(view.getByText('Submit request'));
   await waitFor(() =>
     expect(mockSubmitClassRequest).toHaveBeenCalledWith(

@@ -28,6 +28,7 @@ type Colors = {
   inputBg: string;
   action: string;
   actionSubtle: string;
+  actionForeground?: string;
 };
 
 type Props = {
@@ -39,7 +40,10 @@ type Props = {
   searchPlaceholder: string;
   closeLabel: string;
   emptyMessage: string;
-  selectedId: string;
+  selectedId?: string;
+  /** Controlled multi-selection; caller owns the draft and its commit/cancel behavior. */
+  selectedIds?: readonly string[];
+  onDone?: () => void;
   preserveOrder?: boolean;
   colors: Colors;
   onSelect: (option: SelectionOption) => void;
@@ -49,7 +53,9 @@ type Props = {
 export function SearchableSelectionSheet({
   visible,
   options,
-  selectedId,
+  selectedId = '',
+  selectedIds,
+  onDone,
   preserveOrder = false,
   title,
   searchPlaceholder,
@@ -142,15 +148,17 @@ export function SearchableSelectionSheet({
               </Text>
             }
             renderItem={({ item }) => {
-              const selected = item.id === selectedId;
+              const selected = selectedIds
+                ? selectedIds.includes(item.id)
+                : item.id === selectedId;
               return (
                 <Pressable
                   testID={`selection-option-${item.id}`}
-                  accessibilityRole="button"
+                  accessibilityRole={selectedIds ? 'checkbox' : 'button'}
                   accessibilityLabel={[item.label, item.subtitle, item.detail]
                     .filter(Boolean)
                     .join(', ')}
-                  accessibilityState={{ selected }}
+                  accessibilityState={selectedIds ? { checked: selected } : { selected }}
                   onPress={() => onSelect(item)}
                   style={[
                     styles.row,
@@ -182,6 +190,40 @@ export function SearchableSelectionSheet({
               );
             }}
           />
+          {onDone && (
+            <View
+              style={{
+                paddingHorizontal: 20,
+                paddingTop: 12,
+                paddingBottom: 16,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+              }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Done selecting"
+                onPress={onDone}
+                style={{
+                  minHeight: 52,
+                  borderRadius: 18,
+                  backgroundColor: colors.action,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.actionForeground ?? colors.card,
+                    fontSize: 17,
+                    fontWeight: '600',
+                  }}
+                >
+                  Done{selectedIds ? ` (${selectedIds.length})` : ''}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </KeyboardAvoidingView>
       </SheetContent>
     </Modal>

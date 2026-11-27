@@ -166,3 +166,14 @@ preference remembers the introduction. Manual interaction cancels it; it does no
 repeat or run while the homepage is unfocused or the app is backgrounded. Reduce
 Motion and screen-reader users keep manual controls. The carousel keeps its
 existing height, paging, navigation controls and dismissal preference.
+
+Explore Classes uses a native page sheet with a left-side close action, a mint
+header, larger text and a fixed Submit request button above the safe area and
+keyboard. Students and Subjects open searchable multi-select sheets rather than
+chips. Done applies a local selection draft; Cancel/native Back preserves the
+previous choices. Multiple students/subjects and the custom Other subject remain
+supported. Learning goals and special requirements are optional text areas. No
+request is written until Submit request; duplicate submissions are guarded, failed
+requests retain the draft for retry, and successful submission opens the same
+request conversation. The homepage empty state and suggestion intro share this
+single form component.

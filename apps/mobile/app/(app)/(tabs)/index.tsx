@@ -12,12 +12,10 @@ import {
   View,
   Text,
   Image,
-  TextInput,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
   RefreshControl,
-  ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -57,12 +55,11 @@ import {
   buildHomeUpcomingSessionsMetricDisplay,
   splitHomeSessionsByTimeline,
 } from '@/lib/home-metrics';
-import { fetchOrgSessions, queryKeys, submitClassRequest } from '@/lib/api/queries';
+import { fetchOrgSessions, queryKeys } from '@/lib/api/queries';
 import {
-  OTHER_SUBJECT_OPTION,
-  STANDARD_SUBJECT_OPTIONS,
-  type ClassRequestIntent,
-} from '@iconicedu/shared-types';
+  ClassRequestSheet,
+  type RequestableStudent,
+} from '@/components/home/class-request-sheet';
 import type { AppColors } from '@/lib/theme';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
@@ -112,238 +109,6 @@ const FAMILY_SWITCH_CARD_PADDING = 36;
 const FAMILY_SWITCH_ROW_HEIGHT = 62;
 const FAMILY_SWITCH_ROW_GAP = 12;
 const FAMILY_SWITCH_BOTTOM_PADDING = 18;
-const DEFAULT_SUBJECT_OPTIONS = [...STANDARD_SUBJECT_OPTIONS, OTHER_SUBJECT_OPTION];
-const DEFAULT_CLASS_REQUEST_INTENT: ClassRequestIntent = 'ongoing-tutoring';
-
-type RequestableStudent = {
-  profileId: string;
-  displayName: string;
-};
-
-function toggleSelectedValue(values: string[], value: string) {
-  return values.includes(value)
-    ? values.filter((item) => item !== value)
-    : [...values, value];
-}
-
-function ClassRequestSheet({
-  visible,
-  onClose,
-  students,
-  defaultStudentIds,
-  colors,
-  s,
-  onCreated,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  students: RequestableStudent[];
-  defaultStudentIds: string[];
-  colors: AppColors;
-  s: ReturnType<typeof makeStyles>;
-  onCreated: (channelId: string) => void;
-}) {
-  const requestInsets = useSafeAreaInsets();
-  const [studentProfileIds, setStudentProfileIds] = useState<string[]>(defaultStudentIds);
-  const [subjects, setSubjects] = useState<string[]>([]);
-  const [otherSubject, setOtherSubject] = useState('');
-  const [learningGoals, setLearningGoals] = useState('');
-  const [specialRequirements, setSpecialRequirements] = useState('');
-  const [requestError, setRequestError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  React.useEffect(() => {
-    if (!visible) return;
-    setStudentProfileIds(defaultStudentIds);
-    setSubjects([]);
-    setOtherSubject('');
-    setLearningGoals('');
-    setSpecialRequirements('');
-    setRequestError(null);
-  }, [defaultStudentIds, visible]);
-
-  const handleSubmit = useCallback(async () => {
-    if (!studentProfileIds.length) {
-      setRequestError('Select at least one student.');
-      return;
-    }
-    if (!subjects.length) {
-      setRequestError('Select at least one subject.');
-      return;
-    }
-    if (subjects.includes(OTHER_SUBJECT_OPTION) && !otherSubject.trim()) {
-      setRequestError('Enter the custom subject when "Other" is selected.');
-      return;
-    }
-
-    setSubmitting(true);
-    setRequestError(null);
-    try {
-      const response = await submitClassRequest({
-        requestIntent: DEFAULT_CLASS_REQUEST_INTENT,
-        studentProfileIds,
-        subjects,
-        otherSubject: otherSubject.trim() || null,
-        learningGoals: learningGoals.trim(),
-        specialRequirements: specialRequirements.trim() || null,
-      });
-      onClose();
-      onCreated(response.channelId);
-    } catch (error) {
-      setRequestError(
-        error instanceof Error ? error.message : 'Unable to create class request.',
-      );
-    } finally {
-      setSubmitting(false);
-    }
-  }, [
-    learningGoals,
-    onClose,
-    onCreated,
-    otherSubject,
-    specialRequirements,
-    studentProfileIds,
-    subjects,
-  ]);
-
-  return (
-    <BottomSheet
-      visible={visible}
-      onClose={onClose}
-      partialHeight={640}
-      sheetStyle={{ backgroundColor: colors.pageBg }}
-    >
-      <ScrollView
-        style={{ maxHeight: 584 }}
-        contentContainerStyle={[
-          s.requestSheet,
-          { paddingBottom: requestInsets.bottom + 24 },
-        ]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={s.requestHeader}>
-          <Text style={s.requestTitle}>Explore Classes</Text>
-          <Text style={s.requestSubtitle}>
-            Tell us what you need, and we will match your family with the best tutors in
-            the world to help your kids learn, grow, and thrive.
-          </Text>
-        </View>
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Student name *</Text>
-          <View style={s.requestChipRow}>
-            {students.map((student) => {
-              const selected = studentProfileIds.includes(student.profileId);
-              return (
-                <TouchableOpacity
-                  key={student.profileId}
-                  style={[s.requestChip, selected && s.requestChipSelected]}
-                  onPress={() =>
-                    setStudentProfileIds((current) =>
-                      toggleSelectedValue(current, student.profileId),
-                    )
-                  }
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[s.requestChipText, selected && s.requestChipTextSelected]}
-                  >
-                    {student.displayName}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Subject *</Text>
-          <View style={s.requestChipRow}>
-            {DEFAULT_SUBJECT_OPTIONS.map((subject) => {
-              const selected = subjects.includes(subject);
-              return (
-                <TouchableOpacity
-                  key={subject}
-                  style={[s.requestChip, selected && s.requestChipSelected]}
-                  onPress={() =>
-                    setSubjects((current) => toggleSelectedValue(current, subject))
-                  }
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={[s.requestChipText, selected && s.requestChipTextSelected]}
-                  >
-                    {subject}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-
-        {subjects.includes(OTHER_SUBJECT_OPTION) ? (
-          <View style={s.requestField}>
-            <Text style={s.requestLabel}>Other subject</Text>
-            <TextInput
-              style={s.requestInput}
-              value={otherSubject}
-              onChangeText={setOtherSubject}
-              placeholder="Enter custom subject"
-              placeholderTextColor={colors.textFaint}
-            />
-          </View>
-        ) : null}
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Learning goals</Text>
-          <Text style={s.requestHelper}>
-            What specific topics or skills should the tutor focus on?
-          </Text>
-          <TextInput
-            style={[s.requestInput, s.requestTextArea]}
-            value={learningGoals}
-            onChangeText={setLearningGoals}
-            placeholder="Describe the support you want"
-            placeholderTextColor={colors.textFaint}
-            multiline
-          />
-        </View>
-
-        <View style={s.requestField}>
-          <Text style={s.requestLabel}>Special requirements</Text>
-          <Text style={s.requestHelper}>
-            Any accommodations, learning preferences, or other notes for the tutor.
-          </Text>
-          <TextInput
-            style={[s.requestInput, s.requestTextArea]}
-            value={specialRequirements}
-            onChangeText={setSpecialRequirements}
-            placeholder="Optional notes"
-            placeholderTextColor={colors.textFaint}
-            multiline
-          />
-        </View>
-
-        {requestError ? <Text style={s.requestError}>{requestError}</Text> : null}
-
-        <TouchableOpacity
-          style={[s.boostButton, submitting && { opacity: 0.6 }]}
-          onPress={handleSubmit}
-          disabled={submitting}
-          activeOpacity={0.85}
-        >
-          {submitting ? (
-            <ActivityIndicator color={colors.actionForeground} />
-          ) : (
-            <Text style={s.boostButtonText}>Submit request</Text>
-          )}
-        </TouchableOpacity>
-      </ScrollView>
-    </BottomSheet>
-  );
-}
-
 function makeStyles(C: AppColors) {
   const supportPalette = getSupportPalette(C);
 
@@ -682,86 +447,6 @@ function makeStyles(C: AppColors) {
       color: C.actionForeground,
       fontSize: 15,
       fontWeight: '800',
-    },
-    requestSheet: {
-      paddingHorizontal: 18,
-      paddingBottom: 24,
-      gap: 16,
-    },
-    requestHeader: {
-      gap: 6,
-      paddingBottom: 2,
-    },
-    requestTitle: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: C.text,
-      lineHeight: 25,
-    },
-    requestSubtitle: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: C.textMuted,
-    },
-    requestField: {
-      gap: 7,
-    },
-    requestLabel: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: C.text,
-    },
-    requestHelper: {
-      fontSize: 13,
-      color: C.textMuted,
-      lineHeight: 18,
-    },
-    requestChipRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-    },
-    requestChip: {
-      minHeight: 36,
-      borderRadius: 999,
-      borderWidth: 1,
-      borderColor: C.border,
-      backgroundColor: C.card,
-      paddingHorizontal: 12,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    requestChipSelected: {
-      borderColor: C.teal,
-      backgroundColor: C.tealBg,
-    },
-    requestChipText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: C.textMuted,
-    },
-    requestChipTextSelected: {
-      color: C.teal,
-    },
-    requestInput: {
-      minHeight: 46,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: C.border,
-      backgroundColor: C.card,
-      color: C.text,
-      fontSize: 14,
-      paddingHorizontal: 13,
-      paddingVertical: 11,
-    },
-    requestTextArea: {
-      minHeight: 88,
-      textAlignVertical: 'top',
-    },
-    requestError: {
-      color: C.red,
-      fontSize: 13,
-      lineHeight: 18,
     },
   });
 }
@@ -1671,8 +1356,6 @@ export default function HomeScreen() {
         onClose={() => setClassRequestOpen(false)}
         students={requestableStudents}
         defaultStudentIds={defaultRequestStudentIds}
-        colors={colors}
-        s={s}
         onCreated={handleClassRequestCreated}
       />
     </SafeAreaView>
