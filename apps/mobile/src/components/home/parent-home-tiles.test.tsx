@@ -250,3 +250,54 @@ it('uses a flat mint dark variant for the class request slide', async () => {
     darkColors.promotionMintForeground,
   );
 });
+
+it('advances one slide after the first visible layout and then stops', async () => {
+  const { AccessibilityInfo, AppState } = require('react-native');
+  jest.useFakeTimers();
+  const reduce = jest
+    .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+    .mockResolvedValue(false);
+  const reader = jest
+    .spyOn(AccessibilityInfo, 'isScreenReaderEnabled')
+    .mockResolvedValue(false);
+  const original = Object.getOwnPropertyDescriptor(AppState, 'currentState');
+  Object.defineProperty(AppState, 'currentState', {
+    configurable: true,
+    writable: true,
+    value: 'active',
+  });
+  try {
+    render(
+      <ParentHomeTiles
+        orgId="intro-org"
+        accountId="intro-parent"
+        onAddChild={jest.fn()}
+        onRequestClass={jest.fn()}
+      />,
+    );
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent(screen.getByTestId('parent-promotion-carousel'), 'layout');
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.now).toBe(
+      1,
+    );
+    act(() => jest.advanceTimersByTime(2200));
+    expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.now).toBe(
+      2,
+    );
+    act(() => jest.advanceTimersByTime(10000));
+    expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.now).toBe(
+      2,
+    );
+  } finally {
+    reduce.mockRestore();
+    reader.mockRestore();
+    if (original) Object.defineProperty(AppState, 'currentState', original);
+    jest.useRealTimers();
+  }
+});

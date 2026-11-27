@@ -151,3 +151,18 @@ resulting request conversation are shared with the original homepage CTA. Parent
 can request another class even when they already have active subjects. The slide
 is independent of the referral flag; parent-role and child-view restrictions still
 apply to the entire stack. Existing carousel dismissals remain respected.
+
+Add child and Request a class homepage suggestions first open introductory native
+sheets matching the referral explainer: colored hero, required information, next
+steps and a fixed continue action. Add child also links to Invite by email. Closing
+an intro creates no profile or request. Continuing closes the intro before opening
+the existing form; iOS waits for native dismissal before presenting another sheet.
+Child creation retains its final confirmation. Class requests retain the existing
+Explore Classes form and request-conversation behavior.
+
+The suggestion carousel advances once, after 2.2 seconds on its first visible,
+laid-out homepage presentation with multiple slides. A parent/device-scoped local
+preference remembers the introduction. Manual interaction cancels it; it does not
+repeat or run while the homepage is unfocused or the app is backgrounded. Reduce
+Motion and screen-reader users keep manual controls. The carousel keeps its
+existing height, paging, navigation controls and dismissal preference.

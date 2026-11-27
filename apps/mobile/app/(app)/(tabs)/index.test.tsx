@@ -47,6 +47,35 @@ jest.mock('@/components/home/parent-referral-explainer', () => ({
     );
   },
 }));
+jest.mock('@/components/home/family-action-explainer', () => ({
+  FamilyActionExplainer: ({
+    kind,
+    onContinue,
+    onClose,
+    onInvite,
+  }: {
+    kind: string;
+    onContinue: () => void;
+    onClose: () => void;
+    onInvite: () => void;
+  }) => {
+    const { Text, Pressable, View } = require('react-native');
+    return (
+      <View>
+        <Text>{`Introduction: ${kind}`}</Text>
+        <Pressable accessibilityLabel="Continue family introduction" onPress={onContinue}>
+          <Text>Continue</Text>
+        </Pressable>
+        <Pressable accessibilityLabel="Close family introduction" onPress={onClose}>
+          <Text>Close</Text>
+        </Pressable>
+        <Pressable accessibilityLabel="Invite from introduction" onPress={onInvite}>
+          <Text>Invite</Text>
+        </Pressable>
+      </View>
+    );
+  },
+}));
 const mockInvalidateQueries = jest.fn(() => Promise.resolve());
 const mockRefetchAccount = jest.fn(() => Promise.resolve());
 const mockRefetchProfile = jest.fn(() => Promise.resolve());
@@ -60,6 +89,7 @@ const mockRefetchCompletedSessions = jest.fn(() => Promise.resolve());
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
   return {
+    useIsFocused: () => true,
     useFocusEffect: (callback: () => void | (() => void)) => {
       React.useEffect(() => callback(), [callback]);
     },
@@ -310,11 +340,13 @@ beforeEach(() => {
     channelId: 'request-channel',
   });
 });
-it('opens the existing Add Child flow from parent homepage tiles', () => {
-  render(<HomeScreen />);
+it('opens the Add Child introduction before the existing form', () => {
+  const view = render(<HomeScreen />);
   const props = mockParentTiles.mock.calls.at(-1)![0];
   expect(props).toMatchObject({ orgId: 'org-1', accountId: 'account-1' });
-  props.onAddChild();
+  act(() => props.onAddChild());
+  expect(mockRouterPush).not.toHaveBeenCalled();
+  fireEvent.press(view.getByLabelText('Continue family introduction'));
   expect(mockRouterPush).toHaveBeenCalledWith('/(app)/settings/child');
 });
 it.each(['child', 'educator', 'staff', 'admin'])(
@@ -355,7 +387,9 @@ it('keeps Add Child available but provides no referral action when referrals are
   const view = render(<HomeScreen />);
   const props = mockParentTiles.mock.calls.at(-1)![0];
   expect(props.onRefer).toBeUndefined();
-  props.onAddChild();
+  act(() => props.onAddChild());
+  expect(mockRouterPush).not.toHaveBeenCalled();
+  fireEvent.press(view.getByLabelText('Continue family introduction'));
   expect(mockRouterPush).toHaveBeenCalledWith('/(app)/settings/child');
   expect(view.queryByText('Referral explainer for org-1')).toBeNull();
 });
@@ -376,6 +410,9 @@ it('opens the existing first-time class request flow from the new suggestion and
   mockReferralEnabled = false;
   const view = render(<HomeScreen />);
   act(() => mockParentTiles.mock.calls.at(-1)![0].onRequestClass!());
+  expect(view.getByText('Introduction: class')).toBeTruthy();
+  expect(view.queryByText('Explore Classes')).toBeNull();
+  fireEvent.press(view.getByLabelText('Continue family introduction'));
   expect(view.getByText('Explore Classes')).toBeTruthy();
   expect(view.getByText('Child One')).toBeTruthy();
   fireEvent.press(view.getByText('Submit request'));
@@ -403,4 +440,29 @@ it('opens the existing first-time class request flow from the new suggestion and
 it('does not offer the class request slide until there is a student', () => {
   render(<HomeScreen />);
   expect(mockParentTiles.mock.calls.at(-1)![0].onRequestClass).toBeUndefined();
+});
+
+it('can dismiss an introduction without navigating or creating anything', () => {
+  const view = render(<HomeScreen />);
+  act(() => mockParentTiles.mock.calls.at(-1)![0].onAddChild());
+  fireEvent.press(view.getByLabelText('Close family introduction'));
+  expect(view.queryByText('Introduction: child')).toBeNull();
+  expect(mockRouterPush).not.toHaveBeenCalled();
+  expect(mockSubmitClassRequest).not.toHaveBeenCalled();
+});
+it('offers the original email invite from the Add child introduction', () => {
+  const view = render(<HomeScreen />);
+  act(() => mockParentTiles.mock.calls.at(-1)![0].onAddChild());
+  fireEvent.press(view.getByLabelText('Invite from introduction'));
+  expect(mockRouterPush).toHaveBeenCalledWith('/(app)/settings/invite-child');
+});
+it('clears the introduction when switching to a child view', () => {
+  const view = render(<HomeScreen />);
+  act(() => mockParentTiles.mock.calls.at(-1)![0].onAddChild());
+  mockViewingAsChild = true;
+  view.rerender(<HomeScreen />);
+  mockViewingAsChild = false;
+  view.rerender(<HomeScreen />);
+  expect(view.queryByText('Introduction: child')).toBeNull();
+  expect(mockRouterPush).not.toHaveBeenCalled();
 });

@@ -1,3 +1,7 @@
+import {
+  FamilyActionExplainer,
+  type FamilyAction,
+} from '@/components/home/family-action-explainer';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import { ParentReferralExplainer } from '@/components/home/parent-referral-explainer';
@@ -17,7 +21,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -767,6 +771,7 @@ function makeStyles(C: AppColors) {
 // ---------------------------------------------------------------------------
 
 export default function HomeScreen() {
+  const isHomeFocused = useIsFocused();
   const enableParentReferrals = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableParentReferrals,
   );
@@ -929,6 +934,10 @@ export default function HomeScreen() {
   const todaySessions = sessionBuckets.today;
   const thisWeekSessions = sessionBuckets.thisWeek;
   const nextWeekSessions = sessionBuckets.nextWeek;
+  const [familyIntro, setFamilyIntro] = useState<FamilyAction | null>(null);
+  React.useEffect(() => {
+    setFamilyIntro(null);
+  }, [orgId, guardianAccountId, isViewingAsChild, profileData?.kind]);
   const [classRequestOpen, setClassRequestOpen] = useState(false);
   const requestableStudents = React.useMemo<RequestableStudent[]>(() => {
     const children = familySwitchOptions
@@ -1296,12 +1305,13 @@ export default function HomeScreen() {
                 orgId && (
                   <ParentHomeTiles
                     width={metricCardWidth}
+                    autoAdvanceEnabled={isHomeFocused}
                     referralsEnabled={enableParentReferrals}
                     orgId={orgId}
                     accountId={guardianAccountId}
-                    onAddChild={() => router.push('/(app)/settings/child')}
+                    onAddChild={() => setFamilyIntro('child')}
                     onRequestClass={
-                      canRequestClasses ? () => setClassRequestOpen(true) : undefined
+                      canRequestClasses ? () => setFamilyIntro('class') : undefined
                     }
                     onRefer={
                       enableParentReferrals
@@ -1641,6 +1651,21 @@ export default function HomeScreen() {
           </Card>
         </View>
       </BottomSheet>
+      {familyIntro && !isViewingAsChild && profileData?.kind === 'guardian' && (
+        <FamilyActionExplainer
+          kind={familyIntro}
+          onClose={() => setFamilyIntro(null)}
+          onContinue={() => {
+            setFamilyIntro(null);
+            if (familyIntro === 'child') router.push('/(app)/settings/child');
+            else if (canRequestClasses) setClassRequestOpen(true);
+          }}
+          onInvite={() => {
+            setFamilyIntro(null);
+            router.push('/(app)/settings/invite-child');
+          }}
+        />
+      )}
       <ClassRequestSheet
         visible={classRequestOpen}
         onClose={() => setClassRequestOpen(false)}

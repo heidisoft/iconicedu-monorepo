@@ -17,12 +17,14 @@ import {
 } from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import { useHomeTileDismissal } from '@/hooks/use-home-tile-dismissal';
+import { useHomeCarouselIntro } from '@/hooks/use-home-carousel-intro';
 
 type Props = {
   orgId: string;
   accountId: string;
   width?: number;
   referralsEnabled?: boolean;
+  autoAdvanceEnabled?: boolean;
   onAddChild: () => void;
   onRefer?: () => void;
   onRequestClass?: () => void;
@@ -34,6 +36,7 @@ function PromotionCarousel({
   onAddChild,
   onRefer,
   onRequestClass,
+  autoAdvanceEnabled = true,
 }: Omit<Props, 'orgId' | 'accountId' | 'referralsEnabled'> & { scope: string }) {
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -41,6 +44,7 @@ function PromotionCarousel({
   const { visible, dismiss, saving } = useHomeTileDismissal(scope, 'family-promotions');
   const [active, setActive] = useState(0);
   const pager = useRef<ScrollView>(null);
+  const [laidOut, setLaidOut] = useState(false);
   const promotions = [
     ...(onRefer
       ? [
@@ -91,10 +95,16 @@ function PromotionCarousel({
     setActive(next);
     pager.current?.scrollTo({ y: next * height, animated: true });
   }
+  const stopIntro = useHomeCarouselIntro(
+    scope,
+    visible && laidOut && autoAdvanceEnabled && promotions.length > 1,
+    () => move(1),
+  );
   if (!visible) return null;
   return (
     <View
       testID="parent-promotion-tile"
+      onTouchStart={stopIntro}
       style={{
         width,
         height,
@@ -112,7 +122,10 @@ function PromotionCarousel({
         showsVerticalScrollIndicator={false}
         bounces={false}
         style={{ height }}
-        onLayout={() => pager.current?.scrollTo({ y: current * height, animated: false })}
+        onLayout={() => {
+          pager.current?.scrollTo({ y: current * height, animated: false });
+          setLaidOut(true);
+        }}
         onMomentumScrollEnd={(event) =>
           setActive(
             Math.max(
@@ -136,9 +149,10 @@ function PromotionCarousel({
           { name: 'increment', label: 'Next suggestion' },
           { name: 'decrement', label: 'Previous suggestion' },
         ]}
-        onAccessibilityAction={(event) =>
-          move(current + (event.nativeEvent.actionName === 'increment' ? 1 : -1))
-        }
+        onAccessibilityAction={(event) => {
+          stopIntro();
+          move(current + (event.nativeEvent.actionName === 'increment' ? 1 : -1));
+        }}
       >
         {promotions.map((promotion, index) => (
           <View
@@ -195,7 +209,10 @@ function PromotionCarousel({
               accessibilityRole="button"
               accessibilityLabel={promotion.action}
               accessibilityHint={promotion.hint}
-              onPress={promotion.onPress}
+              onPress={() => {
+                stopIntro();
+                promotion.onPress();
+              }}
               hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
               style={{
                 minHeight: 30,
@@ -239,6 +256,7 @@ function PromotionCarousel({
         accessibilityState={{ disabled: saving }}
         disabled={saving}
         onPress={() => {
+          stopIntro();
           void dismiss().catch(() =>
             Alert.alert('Unable to dismiss', 'Please try again.'),
           );
@@ -280,7 +298,10 @@ function PromotionCarousel({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Next family suggestion"
-            onPress={() => move((current + 1) % promotions.length)}
+            onPress={() => {
+              stopIntro();
+              move((current + 1) % promotions.length);
+            }}
             style={{
               position: 'absolute',
               right: 4,
