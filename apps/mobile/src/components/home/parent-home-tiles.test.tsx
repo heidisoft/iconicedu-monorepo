@@ -1,6 +1,6 @@
 import { darkColors, lightColors } from '@/lib/theme';
 import React from 'react';
-import { AccessibilityInfo, Alert, Dimensions, Platform } from 'react-native';
+import { AccessibilityInfo, Alert, Animated, Dimensions, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { ParentHomeTiles } from './parent-home-tiles';
 import { FamilyActionsTile } from './family-actions-tile';
@@ -383,3 +383,61 @@ it('keeps the permanent action list available after every suggestion has been di
   expect(add).toHaveBeenCalledTimes(1);
   platform.restore();
 });
+
+it.each([2, 1])(
+  'keeps %s remaining slides opaque after a late native animation update',
+  async (remainingCount) => {
+    if (remainingCount === 1)
+      mockStored.set('home-tile-v1:org:native-race:family-promotion-class', '1');
+    jest.mocked(AccessibilityInfo.isReduceMotionEnabled).mockResolvedValue(false);
+    let syncLastNativeFrame: (() => void) | undefined;
+    const timing = jest.spyOn(Animated, 'timing').mockImplementation((value, config) => ({
+      start: (callback) => {
+        if (value instanceof Animated.Value && typeof config.toValue === 'number') {
+          const finalValue = config.toValue;
+          syncLastNativeFrame = () => value.setValue(finalValue);
+        }
+        callback?.({ finished: true });
+      },
+      stop: jest.fn(),
+      reset: jest.fn(),
+    }));
+    try {
+      render(
+        <ParentHomeTiles
+          referralsEnabled
+          orgId="org"
+          accountId="native-race"
+          onAddChild={jest.fn()}
+          onRefer={jest.fn()}
+          onRequestClass={jest.fn()}
+        />,
+      );
+      await screen.findByTestId('parent-promotion-tile');
+      fireEvent.press(screen.getByLabelText('Next family suggestion'));
+      if (remainingCount === 2)
+        fireEvent.press(screen.getByLabelText('Next family suggestion'));
+      await act(async () =>
+        fireEvent.press(
+          screen.getByLabelText(
+            remainingCount === 2 ? 'Dismiss Request a class' : 'Dismiss Add a child',
+          ),
+        ),
+      );
+      expect(syncLastNativeFrame).toBeDefined();
+      act(() => syncLastNativeFrame!());
+      let remaining = screen.getByLabelText('How it works').parent;
+      while (remaining && remaining.props.style?.opacity === undefined)
+        remaining = remaining.parent;
+      expect(remaining).not.toBeNull();
+      const opacity = remaining!.props.style.opacity;
+      expect(typeof opacity === 'number' ? opacity : opacity.__getValue()).toBe(1);
+      expect(screen.getByLabelText('How it works')).toBeTruthy();
+      expect(
+        screen.getByLabelText('Family suggestions').props.accessibilityValue,
+      ).toMatchObject({ now: 1, max: remainingCount });
+    } finally {
+      timing.mockRestore();
+    }
+  },
+);

@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   AccessibilityInfo,
@@ -60,7 +60,11 @@ function PromotionCarousel({
   const pager = useRef<ScrollView>(null);
   const [laidOut, setLaidOut] = useState(false);
   const peekOffset = useRef(new Animated.Value(0)).current;
-  const dismissOpacity = useRef(new Animated.Value(1)).current;
+  const slideOpacity = useRef<Record<string, Animated.Value>>({
+    refer: new Animated.Value(1),
+    child: new Animated.Value(1),
+    class: new Animated.Value(1),
+  }).current;
   const dismissalAnimation = useRef<Animated.CompositeAnimation | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
@@ -116,17 +120,15 @@ function PromotionCarousel({
   const visible = loaded && promotions.length > 0;
   const current = Math.max(0, Math.min(active, promotions.length - 1));
   const selected = promotions[current];
-  useLayoutEffect(() => {
-    dismissOpacity.setValue(1);
-  }, [dismissOpacity, selected?.id]);
   async function animateDismissal() {
     const [reduced, reader] = await Promise.all([
       AccessibilityInfo.isReduceMotionEnabled(),
       AccessibilityInfo.isScreenReaderEnabled(),
     ]).catch(() => [true, true]);
-    if (!mounted.current || reduced || reader) return;
+    if (!mounted.current || reduced || reader || !selected) return;
+    const opacity = slideOpacity[selected.id]!;
     await new Promise<void>((resolve) => {
-      const animation = Animated.timing(dismissOpacity, {
+      const animation = Animated.timing(opacity, {
         toValue: 0,
         duration: 200,
         easing: Easing.out(Easing.quad),
@@ -243,16 +245,13 @@ function PromotionCarousel({
                 padding: 16,
                 gap: 6,
                 backgroundColor: promotion.background,
-                opacity: index === current ? dismissOpacity : 1,
+                opacity: slideOpacity[promotion.id],
                 transform: [
                   {
-                    scale:
-                      index === current
-                        ? dismissOpacity.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [0.94, 1],
-                          })
-                        : 1,
+                    scale: slideOpacity[promotion.id]!.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.94, 1],
+                    }),
                   },
                 ],
               }}
