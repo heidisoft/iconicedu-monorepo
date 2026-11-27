@@ -61,8 +61,10 @@ the address or regional fields. Profile and child details retain read-only,
 grouped settings rows. Each section
 has its own top-right Edit action, opening a native sheet with Cancel and Save.
 Only fields in that section are validated and written; cancelling discards the
-local draft. Profile and child-profile text inputs share the onboarding field
-size, padding, theme colors, and focus border. Name fields support keyboard Next/Done;
+local draft. Profile and child-profile text inputs use shared sizing, padding, theme
+colors, and focus borders, following the onboarding style. Creation and edit sheets use the
+same card insets so the fields retain matching proportions. Name placeholders are
+short labels with normal text weight and spacing. Name fields support keyboard Next/Done;
 email fields keep email keyboards and disable autocorrection. Address, birth-year,
 grade, and regional selectors are disabled during confirmation and saving, including
 for accessibility actions. Regional editors use searchable timezone and language/region pickers, and allow

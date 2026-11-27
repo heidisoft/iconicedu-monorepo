@@ -185,18 +185,7 @@ export function AddChildDraft() {
             {title}
           </Text>
         </View>
-        <View
-          style={{
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: colors.border,
-            backgroundColor: colors.card,
-            padding: 16,
-            gap: 18,
-          }}
-        >
-          {fields}
-        </View>
+        <View style={profileFieldStyles(colors).card}>{fields}</View>
       </View>
     );
   }
@@ -246,7 +235,7 @@ export function AddChildDraft() {
                     accessibilityLabelledBy="child-first-name-label"
                     value={firstName}
                     onChangeText={setFirstName}
-                    placeholder="Child first name"
+                    placeholder="First name"
                     placeholderTextColor={colors.textFaint}
                     autoCapitalize="words"
                     autoComplete="given-name"
@@ -269,7 +258,7 @@ export function AddChildDraft() {
                     accessibilityLabelledBy="child-last-name-label"
                     value={lastName}
                     onChangeText={setLastName}
-                    placeholder="Child last name"
+                    placeholder="Last name"
                     placeholderTextColor={colors.textFaint}
                     autoCapitalize="words"
                     autoComplete="family-name"
@@ -292,7 +281,7 @@ export function AddChildDraft() {
                     accessibilityLabelledBy="child-display-name-label"
                     value={displayName}
                     onChangeText={setDisplayName}
-                    placeholder={suggestedDisplayName || 'Child display name'}
+                    placeholder={suggestedDisplayName || 'Display name'}
                     placeholderTextColor={colors.textFaint}
                     autoCapitalize="words"
                     autoCorrect={false}
@@ -346,7 +335,7 @@ export function AddChildDraft() {
                     accessibilityLabelledBy="child-email-label"
                     value={email}
                     onChangeText={setEmail}
-                    placeholder="Child email address"
+                    placeholder="Email address"
                     placeholderTextColor={colors.textFaint}
                     keyboardType="email-address"
                     autoCapitalize="none"

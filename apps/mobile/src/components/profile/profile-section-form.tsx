@@ -112,14 +112,21 @@ export function ProfileSectionForm({
       borderColor: colors.border,
       borderWidth: 1,
       borderRadius: 12,
-      minHeight: 52,
+      minHeight: 56,
       paddingHorizontal: 16,
       marginBottom: 16,
       flexDirection: 'row' as const,
       alignItems: 'center' as const,
     },
     inputWrapFocused: { borderColor: colors.teal },
-    input: { color: colors.text, flex: 1, fontSize: 16, paddingVertical: 14 },
+    input: {
+      color: colors.text,
+      flex: 1,
+      fontSize: 16,
+      lineHeight: 22,
+      paddingVertical: 16,
+      includeFontPadding: false,
+    },
     placeholderColor: colors.textFaint,
   };
   const error = (e: unknown) =>
@@ -288,6 +295,9 @@ export function ProfileSectionForm({
     );
   }
 
+  const hasFields = ['identity', 'child', 'location', 'regional', 'about'].includes(
+    section,
+  );
   const avatar = photo ?? value('avatar_url');
   return (
     <KeyboardAvoidingView
@@ -346,247 +356,257 @@ export function ProfileSectionForm({
       <ScrollView
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 48 }}
+        contentContainerStyle={profileFieldStyles(colors).content}
       >
-        {show('photo') && avatar ? (
-          <Image
-            accessibilityLabel="Profile photo preview"
-            source={{ uri: avatar }}
-            style={{ width: 80, height: 80, borderRadius: 40 }}
-          />
-        ) : null}
-        {show('photo') && (
-          <Pressable
-            disabled={disabled}
-            onPress={() => void pickPhoto()}
-            accessibilityRole="button"
-            accessibilityLabel="Change photo"
-          >
-            <Text style={{ color: colors.teal }}>Change photo</Text>
-          </Pressable>
-        )}
-        {show('identity') &&
-          (
-            [
-              ['First name', firstName, setFirst],
-              ['Last name', lastName, setLast],
-              ['Display name', displayName, setDisplay],
-            ] as const
-          )
-            .filter(([label]) => !onDraftSave || label !== 'Display name')
-            .map(([label, val, setter], index, fields) => (
-              <View key={label} style={{ gap: 8 }}>
-                <Text style={profileFieldStyles(colors).label}>{label}</Text>
-                <ProfileTextInput
-                  accessibilityLabel={label}
-                  value={val}
-                  editable={!disabled}
-                  maxLength={100}
-                  onChangeText={setter}
-                  ref={(input) => {
-                    identityInputs.current[label] = input;
-                  }}
-                  placeholder={label}
-                  autoCapitalize="words"
-                  autoCorrect={false}
-                  autoComplete={
-                    index === 0 ? 'given-name' : index === 1 ? 'family-name' : 'off'
-                  }
-                  returnKeyType={index < fields.length - 1 ? 'next' : 'done'}
-                  blurOnSubmit={index === fields.length - 1}
-                  onSubmitEditing={() => {
-                    const next = fields[index + 1];
-                    if (next) identityInputs.current[next[0]]?.focus();
-                    else Keyboard.dismiss();
-                  }}
-                />
-              </View>
-            ))}
-        {show('appearance') && (
-          <>
-            <Text style={text}>Theme</Text>
-            <ThemeModePicker
-              value={draftMode}
-              onChange={setDraftMode}
-              disabled={disabled}
+        <View style={hasFields ? profileFieldStyles(colors).card : { gap: 12 }}>
+          {show('photo') && avatar ? (
+            <Image
+              accessibilityLabel="Profile photo preview"
+              source={{ uri: avatar }}
+              style={{ width: 80, height: 80, borderRadius: 40 }}
             />
-            <Text style={text}>Accent color</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-              {THEMES.map((theme) => {
-                const accent = profileAvatarColors({
-                  themeKey: theme,
-                  seed: String(profile.id),
-                });
-                const selected = themeKey === theme;
-                return (
-                  <Pressable
-                    key={theme}
-                    accessibilityRole="radio"
-                    accessibilityLabel={theme}
-                    accessibilityState={{ selected, disabled }}
-                    disabled={disabled}
-                    onPress={() => setTheme(theme)}
-                    style={{
-                      width: 76,
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingVertical: 4,
+          ) : null}
+          {show('photo') && (
+            <Pressable
+              disabled={disabled}
+              onPress={() => void pickPhoto()}
+              accessibilityRole="button"
+              accessibilityLabel="Change photo"
+            >
+              <Text style={{ color: colors.teal }}>Change photo</Text>
+            </Pressable>
+          )}
+          {show('identity') &&
+            (
+              [
+                ['First name', firstName, setFirst],
+                ['Last name', lastName, setLast],
+                ['Display name', displayName, setDisplay],
+              ] as const
+            )
+              .filter(([label]) => !onDraftSave || label !== 'Display name')
+              .map(([label, val, setter], index, fields) => (
+                <View key={label} style={{ gap: 8 }}>
+                  <Text style={profileFieldStyles(colors).label}>{label}</Text>
+                  <ProfileTextInput
+                    accessibilityLabel={label}
+                    value={val}
+                    editable={!disabled}
+                    maxLength={100}
+                    onChangeText={setter}
+                    ref={(input) => {
+                      identityInputs.current[label] = input;
                     }}
-                  >
-                    <View
+                    placeholder={label}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    autoComplete={
+                      index === 0 ? 'given-name' : index === 1 ? 'family-name' : 'off'
+                    }
+                    returnKeyType={index < fields.length - 1 ? 'next' : 'done'}
+                    blurOnSubmit={index === fields.length - 1}
+                    onSubmitEditing={() => {
+                      const next = fields[index + 1];
+                      if (next) identityInputs.current[next[0]]?.focus();
+                      else Keyboard.dismiss();
+                    }}
+                  />
+                </View>
+              ))}
+          {show('appearance') && (
+            <>
+              <Text style={text}>Theme</Text>
+              <ThemeModePicker
+                value={draftMode}
+                onChange={setDraftMode}
+                disabled={disabled}
+              />
+              <Text style={text}>Accent color</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                {THEMES.map((theme) => {
+                  const accent = profileAvatarColors({
+                    themeKey: theme,
+                    seed: String(profile.id),
+                  });
+                  const selected = themeKey === theme;
+                  return (
+                    <Pressable
+                      key={theme}
+                      accessibilityRole="radio"
+                      accessibilityLabel={theme}
+                      accessibilityState={{ selected, disabled }}
+                      disabled={disabled}
+                      onPress={() => setTheme(theme)}
                       style={{
-                        width: 72,
-                        height: 72,
-                        borderRadius: 36,
-                        borderWidth: 2,
-                        borderColor: selected ? colors.teal : 'transparent',
-                        padding: 4,
+                        width: 76,
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingVertical: 4,
                       }}
                     >
                       <View
-                        testID={`accent-avatar-${theme}`}
                         style={{
-                          flex: 1,
-                          borderRadius: 30,
-                          backgroundColor: accent.bg,
-                          alignItems: 'center',
-                          justifyContent: 'center',
+                          width: 72,
+                          height: 72,
+                          borderRadius: 36,
+                          borderWidth: 2,
+                          borderColor: selected ? colors.teal : 'transparent',
+                          padding: 4,
                         }}
                       >
-                        <Text
-                          style={{ color: accent.fg, fontSize: 26, fontWeight: '800' }}
+                        <View
+                          testID={`accent-avatar-${theme}`}
+                          style={{
+                            flex: 1,
+                            borderRadius: 30,
+                            backgroundColor: accent.bg,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
                         >
-                          {(displayName || firstName || 'Profile')[0]?.toUpperCase()}
-                        </Text>
+                          <Text
+                            style={{ color: accent.fg, fontSize: 26, fontWeight: '800' }}
+                          >
+                            {(displayName || firstName || 'Profile')[0]?.toUpperCase()}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                    <Text
-                      style={{
-                        color: colors.text,
-                        fontSize: 14,
-                        textTransform: 'capitalize',
-                      }}
-                    >
-                      {theme}
-                    </Text>
-                    {selected && (
-                      <Text style={{ color: colors.teal, fontSize: 12 }}>Selected</Text>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
-          </>
-        )}
-        {(show('location') || show('child')) && (
-          <View
-            pointerEvents={disabled ? 'none' : 'auto'}
-            accessibilityElementsHidden={false}
-          >
-            {show('location') && (
-              <LocationCountryField
-                countries={PROFILE_COUNTRIES}
-                countryCode={countryCode}
-                onChange={(code) => {
-                  setCountry(code);
-                  setCity('');
-                  setRegion('');
-                  setPostal('');
-                }}
-                colors={colors}
-                disabled={disabled}
-              />
-            )}
-            {show('location') && countryCode ? (
-              <LocationAddressFields
-                countryCode={countryCode}
-                city={city}
-                region={region}
-                postalCode={postalCode}
-                setCity={setCity}
-                setRegion={setRegion}
-                setPostalCode={setPostal}
-                s={fieldStyles}
-                disabled={disabled}
-              />
-            ) : null}
-            {show('child') && (
-              <>
-                <Text style={profileFieldStyles(colors).label}>Birth year</Text>
-                <BirthYearSelect disabled={disabled} value={year} onChange={setYear} />
-                <Text style={profileFieldStyles(colors).label}>Grade</Text>
-                <GradeLevelSelect
+                      <Text
+                        style={{
+                          color: colors.text,
+                          fontSize: 14,
+                          textTransform: 'capitalize',
+                        }}
+                      >
+                        {theme}
+                      </Text>
+                      {selected && (
+                        <Text style={{ color: colors.teal, fontSize: 12 }}>Selected</Text>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
+          {(show('location') || show('child')) && (
+            <View
+              pointerEvents={disabled ? 'none' : 'auto'}
+              accessibilityElementsHidden={false}
+            >
+              {show('location') && (
+                <LocationCountryField
+                  countries={PROFILE_COUNTRIES}
+                  countryCode={countryCode}
+                  onChange={(code) => {
+                    setCountry(code);
+                    setCity('');
+                    setRegion('');
+                    setPostal('');
+                  }}
+                  colors={colors}
                   disabled={disabled}
-                  value={grade}
-                  onChange={setGrade}
-                  options={optionsForCountry(normalizeCountryCode(countryCode))}
                 />
-              </>
-            )}
-          </View>
-        )}
-        {show('regional') && (
-          <RegionalFields
-            timezone={timezone}
-            locale={locale}
-            setTimezone={setTimezone}
-            setLocale={setLocale}
-            languages={languages}
-            setLanguages={setLanguages}
-            disabled={disabled}
-          />
-        )}
-        {show('visibility') && (
-          <>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text style={text}>Hide account role</Text>
-              <Switch
-                accessibilityLabel="Hide account role"
-                disabled={disabled}
-                value={hideRole}
-                onValueChange={setHideRole}
-              />
+              )}
+              {show('location') && countryCode ? (
+                <LocationAddressFields
+                  countryCode={countryCode}
+                  city={city}
+                  region={region}
+                  postalCode={postalCode}
+                  setCity={setCity}
+                  setRegion={setRegion}
+                  setPostalCode={setPostal}
+                  s={fieldStyles}
+                  disabled={disabled}
+                />
+              ) : null}
+              {show('child') && (
+                <>
+                  <View style={{ gap: 8 }}>
+                    <Text style={profileFieldStyles(colors).label}>Birth year</Text>
+                    <BirthYearSelect
+                      disabled={disabled}
+                      value={year}
+                      onChange={setYear}
+                    />
+                  </View>
+                  <View style={{ gap: 8 }}>
+                    <Text style={profileFieldStyles(colors).label}>Grade</Text>
+                    <GradeLevelSelect
+                      disabled={disabled}
+                      value={grade}
+                      onChange={setGrade}
+                      options={optionsForCountry(normalizeCountryCode(countryCode))}
+                    />
+                  </View>
+                </>
+              )}
             </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text style={text}>Hide account status</Text>
-              <Switch
-                accessibilityLabel="Hide account status"
-                disabled={disabled}
-                value={hideStatus}
-                onValueChange={setHideStatus}
-              />
-            </View>
-            <Text style={{ color: colors.textMuted }}>
-              Display preferences do not change account permissions.
-            </Text>
-          </>
-        )}
-        {section === 'about' && (
-          <>
-            <Text style={profileFieldStyles(colors).label}>Bio</Text>
-            <ProfileTextInput
-              accessibilityLabel="Bio"
-              value={bio}
-              onChangeText={setBio}
-              editable={!disabled}
-              multiline
-              maxLength={2000}
+          )}
+          {show('regional') && (
+            <RegionalFields
+              timezone={timezone}
+              locale={locale}
+              setTimezone={setTimezone}
+              setLocale={setLocale}
+              languages={languages}
+              setLanguages={setLanguages}
+              disabled={disabled}
             />
-            <Text style={{ color: colors.textMuted }}>{bio.length} / 2,000</Text>
-          </>
-        )}
+          )}
+          {show('visibility') && (
+            <>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Text style={text}>Hide account role</Text>
+                <Switch
+                  accessibilityLabel="Hide account role"
+                  disabled={disabled}
+                  value={hideRole}
+                  onValueChange={setHideRole}
+                />
+              </View>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Text style={text}>Hide account status</Text>
+                <Switch
+                  accessibilityLabel="Hide account status"
+                  disabled={disabled}
+                  value={hideStatus}
+                  onValueChange={setHideStatus}
+                />
+              </View>
+              <Text style={{ color: colors.textMuted }}>
+                Display preferences do not change account permissions.
+              </Text>
+            </>
+          )}
+          {section === 'about' && (
+            <>
+              <Text style={profileFieldStyles(colors).label}>Bio</Text>
+              <ProfileTextInput
+                accessibilityLabel="Bio"
+                value={bio}
+                onChangeText={setBio}
+                editable={!disabled}
+                multiline
+                maxLength={2000}
+              />
+              <Text style={{ color: colors.textMuted }}>{bio.length} / 2,000</Text>
+            </>
+          )}
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

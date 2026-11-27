@@ -99,7 +99,8 @@ function fillRequired() {
 it('shows fields directly without section edit actions', () => {
   render(<AddChildDraft />);
   expect(screen.getByLabelText('First name *')).toBeTruthy();
-  expect(screen.getByLabelText('Last name *')).toBeTruthy();
+  expect(screen.getByLabelText('Last name *').props.placeholder).toBe('Last name');
+  expect(screen.getByLabelText('First name *').props.placeholder).toBe('First name');
   expect(screen.getByLabelText('Display name (optional)')).toBeTruthy();
   expect(screen.getByLabelText('Email (optional)')).toBeTruthy();
   expect(screen.queryByLabelText('Edit Identity')).toBeNull();

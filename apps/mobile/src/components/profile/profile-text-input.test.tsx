@@ -27,6 +27,14 @@ it('shows the themed focus border and preserves caller focus/blur behavior', () 
     />,
   );
   const input = screen.getByLabelText('First name');
+  expect(input).toHaveStyle({
+    minHeight: 56,
+    fontSize: 16,
+    lineHeight: 22,
+    fontWeight: '400',
+    fontStyle: 'normal',
+    letterSpacing: 0,
+  });
   fireEvent(input, 'focus', {});
   expect(input).toHaveStyle({ borderColor: lightColors.teal });
   expect(focus).toHaveBeenCalledTimes(1);
