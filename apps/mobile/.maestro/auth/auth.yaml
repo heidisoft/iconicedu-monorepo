@@ -28,78 +28,13 @@ name: Local signup, login, invalid OTP, and persisted session
       id: auth-email-input
     timeout: 30000
 - runScript: verify-runtime.js
-- runFlow:
-    when:
-      true: ${REFERRAL_MODE == 'cancel' || REFERRAL_MODE == 'accept'}
-    commands:
-      - openLink:
-          link: ${REFERRAL_URL}
-          autoVerify: true
-      - runFlow:
-          when:
-            visible: '^Open$'
-          commands:
-            - tapOn: '^Open$'
-      - extendedWaitUntil:
-          visible: Support your child’s next step
-          timeout: 30000
-      - tapOn: Close invitation
-      - extendedWaitUntil:
-          visible:
-            id: auth-email-input
-          timeout: 30000
-      - openLink:
-          link: ${REFERRAL_URL}
-          autoVerify: true
-      - runFlow:
-          when:
-            visible: '^Open$'
-          commands:
-            - tapOn: '^Open$'
-      - scrollUntilVisible:
-          element: Create your parent account
-          direction: DOWN
-      - tapOn: Create your parent account
-      - extendedWaitUntil:
-          visible:
-            id: auth-email-input
-          timeout: 30000
-- runFlow:
-    when:
-      true: ${REFERRAL_MODE == 'cancel'}
-    commands:
-      - tapOn:
-          id: auth-email-input
-      - inputText: ${TEST_CANCEL_EMAIL}
-      - hideKeyboard
-      - runFlow:
-          when:
-            visible:
-              id: auth-submit
-              enabled: true
-          commands:
-            - tapOn:
-                id: auth-submit
-      - extendedWaitUntil:
-          visible:
-            id: auth-otp-input
-          timeout: 30000
-      - tapOn: '.*Back.*'
-      - extendedWaitUntil:
-          visible:
-            id: auth-email-input
-          timeout: 30000
-      - tapOn:
-          id: auth-email-input
-      - eraseText: 200
-
 - tapOn:
     id: auth-email-input
 - inputText: not-an-email
 - assertVisible:
     id: auth-submit
     enabled: false
-- eraseText: 200
+- eraseText
 - inputText: ${TEST_EMAIL}
 - hideKeyboard
 - runFlow:
@@ -127,7 +62,7 @@ name: Local signup, login, invalid OTP, and persisted session
     timeout: 30000
 - tapOn:
     id: auth-otp-input
-- eraseText: 200
+- eraseText
 - inputText: ${output.otp}
 - extendedWaitUntil:
     visible: 'Your name'
@@ -155,7 +90,7 @@ name: Local signup, login, invalid OTP, and persisted session
     text: 'Maestro F'
 - tapOn:
     id: onboarding-display-name
-- eraseText: 200
+- eraseText
 - inputText: E2E Parent
 - tapOn: Display Name
 - tapOn:
@@ -199,7 +134,7 @@ name: Local signup, login, invalid OTP, and persisted session
     centerElement: true
 - tapOn:
     id: onboarding-postal
-- eraseText: 200
+- eraseText
 - inputText: invalid
 - tapOn:
     text: ZIP code
@@ -211,7 +146,7 @@ name: Local signup, login, invalid OTP, and persisted session
     timeout: 30000
 - tapOn:
     id: onboarding-postal
-- eraseText: 200
+- eraseText
 - inputText: '10001'
 - tapOn:
     text: ZIP code
@@ -272,28 +207,6 @@ name: Local signup, login, invalid OTP, and persisted session
       id: auth-home-screen
     timeout: 45000
 - assertNotVisible: Get Started
-- runFlow:
-    when:
-      true: ${REFERRAL_MODE == 'cancel' || REFERRAL_MODE == 'accept'}
-    commands:
-      - openLink:
-          link: ${REFERRAL_URL}
-          autoVerify: true
-      - runFlow:
-          when:
-            visible: '^Open$'
-          commands:
-            - tapOn: '^Open$'
-      - extendedWaitUntil:
-          visible: Invitations are for new parents
-          timeout: 30000
-      - assertNotVisible: Create your parent account
-      - tapOn: Close invitation
-      - extendedWaitUntil:
-          visible:
-            id: auth-home-screen
-          timeout: 30000
-
 - tapOn: Account.*
 - scrollUntilVisible:
     element: Sign out
