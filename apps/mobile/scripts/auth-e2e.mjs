@@ -399,7 +399,9 @@ async function run() {
       `BIRTH_YEAR=${new Date().getFullYear() - 10}`,
       '--test-output-dir',
       resolve(artifacts, 'maestro'),
-      'apps/mobile/.maestro/auth/auth.yaml',
+      referralMode
+        ? 'apps/mobile/.maestro/auth/referrals.yaml'
+        : 'apps/mobile/.maestro/auth/auth.yaml',
     ];
     const fd = openSync(resolve(artifacts, 'maestro.log'), 'w', 0o600);
     const result = await new Promise((resolveExit) => {
@@ -415,6 +417,37 @@ async function run() {
     });
     if (result !== 0)
       throw new Error('Maestro auth flows failed. Inspect the private local artifacts.');
+    if (referralMode) {
+      const users = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+      assert.ifError(users.error);
+      const user = users.data.users.find((user) => user.email === email);
+      assert.ok(
+        user?.email_confirmed_at,
+        'The native signup must verify its real local OTP',
+      );
+      const accounts = await admin
+        .from('accounts')
+        .select('id')
+        .eq('auth_user_id', user.id);
+      assert.ifError(accounts.error);
+      const ids = accounts.data.map((account) => account.id);
+      const claims = ids.length
+        ? await admin
+            .from('parent_referrals')
+            .select('referrer_account_id,status')
+            .in('referred_account_id', ids)
+        : { data: [], error: null };
+      assert.ifError(claims.error);
+      assert.equal(claims.data.length, referralMode === 'accept' ? 1 : 0);
+      if (referralMode === 'accept') {
+        assert.equal(claims.data[0].referrer_account_id, referralFixture.accountId);
+        assert.equal(claims.data[0].status, 'pending_review');
+      }
+      console.log(
+        `PASS: native invitation close/reopen, ${referralMode === 'cancel' ? 'verification back-out and signup without a reward' : 'verified signup with one pending reward'}, and signed-in invitation rejection.`,
+      );
+      return;
+    }
     const { data: account, error: accountError } = await admin
       .from('accounts')
       .select('id,org_id,onboarding_completed_at')
@@ -506,6 +539,27 @@ async function run() {
       }
       execFileSync('xcrun', ['simctl', 'delete', simulator.udid], { stdio: 'ignore' });
     }
+    if (referralFixture) {
+      execFileSync(
+        'docker',
+        [
+          'exec',
+          '-i',
+          'supabase_db_iconicedu-monorepo',
+          'psql',
+          '-U',
+          'postgres',
+          '-v',
+          'ON_ERROR_STOP=1',
+          '-At',
+        ],
+        {
+          input: `delete from public.family_links where org_id='${referralFixture.orgId}'; delete from public.profiles where org_id='${referralFixture.orgId}'; delete from public.parent_referral_events where org_id='${referralFixture.orgId}'; delete from public.parent_referrals where org_id='${referralFixture.orgId}'; delete from public.parent_referral_links where org_id='${referralFixture.orgId}'; delete from public.profile_change_events where org_id='${referralFixture.orgId}'; delete from public.orgs where id='${referralFixture.orgId}';`,
+          stdio: ['pipe', 'ignore', 'pipe'],
+        },
+      );
+      await admin.auth.admin.deleteUser(referralFixture.authId);
+    }
     // Cleanup is deliberately scoped to this exact generated email and its child links.
     requireTestEmail(email);
     const { data: users, error } = await admin.auth.admin.listUsers({
@@ -538,27 +592,6 @@ async function run() {
     }
     const cancelled = users.users.find((user) => user.email === cancelledEmail);
     if (cancelled) await admin.auth.admin.deleteUser(cancelled.id);
-    if (referralFixture) {
-      execFileSync(
-        'docker',
-        [
-          'exec',
-          '-i',
-          'supabase_db_iconicedu-monorepo',
-          'psql',
-          '-U',
-          'postgres',
-          '-v',
-          'ON_ERROR_STOP=1',
-          '-At',
-        ],
-        {
-          input: `delete from public.profiles where org_id='${referralFixture.orgId}'; delete from public.parent_referral_events where org_id='${referralFixture.orgId}'; delete from public.parent_referrals where org_id='${referralFixture.orgId}'; delete from public.parent_referral_links where org_id='${referralFixture.orgId}'; delete from public.profile_change_events where org_id='${referralFixture.orgId}'; delete from public.orgs where id='${referralFixture.orgId}';`,
-          stdio: ['pipe', 'ignore', 'pipe'],
-        },
-      );
-      await admin.auth.admin.deleteUser(referralFixture.authId);
-    }
     await cleanupTestMailbox(local.INBUCKET_URL, cancelledEmail);
     await cleanupTestMailbox(local.INBUCKET_URL, email);
   }
