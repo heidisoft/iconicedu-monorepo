@@ -2,6 +2,7 @@ import React from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   CreditCard,
+  Camera,
   User,
   GraduationCap,
   MapPin,
@@ -19,11 +20,13 @@ import { useTheme } from '@/providers/theme-provider';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import type { ProfileSettingsResult } from '@/lib/api/profile-settings';
 import type { AppColors } from '@/lib/theme';
+import { type ProfileItem } from './profile-item-editor';
 
 export function ProfileDetails({
   data,
   child,
   onEdit,
+  onEditItem,
   onRemove,
   busy,
   draft = false,
@@ -37,6 +40,7 @@ export function ProfileDetails({
   data: ProfileSettingsResult;
   child: boolean;
   onEdit: (section: ProfileSettingsSection) => void;
+  onEditItem?: (field: ProfileItem) => void;
   onRemove: () => void;
   busy: boolean;
   draft?: boolean;
@@ -65,26 +69,22 @@ export function ProfileDetails({
     children: React.ReactNode,
   ) {
     return (
-      <View>
+      <View key={key}>
         <View style={s.sectionHeader}>
           <Text style={s.sectionLabel}>{title}</Text>
-          {data.canEdit && key !== 'identity' && (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${title}`}
-              disabled={busy}
-              hitSlop={4}
-              onPress={() => onEdit(key)}
-              style={s.edit}
-            >
-              <Text style={s.editText}>Edit</Text>
-            </Pressable>
-          )}
         </View>
         {children}
       </View>
     );
   }
+  const rowFields: Record<string, ProfileItem> = {
+    'Display Name': 'display_name',
+    'First Name': 'first_name',
+    'Last Name': 'last_name',
+    Bio: 'bio',
+    'Birth Year': 'birth_year',
+    Grade: 'grade_level',
+  };
   function row(
     label: string,
     content: string | undefined | null,
@@ -99,8 +99,8 @@ export function ProfileDetails({
           labelColor={colors.text}
           hideChevron
           onPress={
-            label === 'Display Name' && data.canEdit && !draft && !busy
-              ? () => onEdit('identity')
+            data.canEdit && !draft && !busy && onEditItem && rowFields[label]
+              ? () => onEditItem(rowFields[label]!)
               : undefined
           }
           trailing={
@@ -152,7 +152,7 @@ export function ProfileDetails({
             onPress={() => onEdit('photo')}
             style={s.edit}
           >
-            <Text style={s.editText}>Edit</Text>
+            <Camera size={20} color={colors.teal} />
           </Pressable>
         )}
         {data.canEdit && !draft ? (
@@ -163,7 +163,7 @@ export function ProfileDetails({
             accessibilityValue={{ text: displayName }}
             accessibilityState={{ disabled: busy }}
             disabled={busy}
-            onPress={() => onEdit('identity')}
+            onPress={() => onEditItem?.('display_name')}
             style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }}
           >
             <Text style={s.avatarName}>{displayName}</Text>

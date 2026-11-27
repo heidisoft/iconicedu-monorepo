@@ -1,4 +1,4 @@
-import { ProfileSectionEditButton } from '@/components/profile/profile-editor';
+import { useProfileItemEditor } from '@/components/profile/profile-item-editor';
 import React, { useMemo } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -77,15 +77,10 @@ export default function LocationScreen() {
   const router = useRouter();
   const { colors } = useTheme();
   const { data: profile, isPending, isError, refetch } = useSettingsProfile();
+  const items = useProfileItemEditor(profile?.id);
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const prof = profile as Record<string, unknown> | undefined;
-  const hasAnyLocation =
-    prof?.country_name ||
-    prof?.country_code ||
-    prof?.region ||
-    prof?.city ||
-    prof?.postal_code;
 
   return (
     <SafeAreaView style={s.safe}>
@@ -113,28 +108,14 @@ export default function LocationScreen() {
               }}
             >
               <Text style={s.sectionLabel}>Address</Text>
-              <ProfileSectionEditButton
-                id={profile?.id}
-                section="location"
-                title="Address"
-              />
             </View>
 
-            {!hasAnyLocation ? (
-              <View style={[s.card, s.emptyCard]}>
-                <View style={s.emptyIconWrap}>
-                  <MapPin size={28} color={colors.textMuted} />
-                </View>
-                <Text style={s.emptyTitle}>No location set</Text>
-                <Text style={s.emptyDesc}>
-                  Location details appear here once your profile is updated.
-                </Text>
-              </View>
-            ) : (
+            {
               <View style={s.card}>
                 <SettingsRow
                   icon={<MapPin size={20} color={colors.textMuted} />}
                   label="Country"
+                  onPress={items.edit ? () => items.edit?.('country_code') : undefined}
                   labelColor={colors.text}
                   hideChevron
                   trailing={
@@ -150,6 +131,11 @@ export default function LocationScreen() {
                 <SettingsRow
                   icon={<MapPin size={20} color={colors.textMuted} />}
                   label="Region / State"
+                  onPress={
+                    items.edit
+                      ? () => items.edit?.(prof?.country_code ? 'region' : 'country_code')
+                      : undefined
+                  }
                   labelColor={colors.text}
                   hideChevron
                   trailing={<Val value={prof?.region as string} s={s} />}
@@ -158,6 +144,11 @@ export default function LocationScreen() {
                 <SettingsRow
                   icon={<MapPin size={20} color={colors.textMuted} />}
                   label="City"
+                  onPress={
+                    items.edit
+                      ? () => items.edit?.(prof?.country_code ? 'city' : 'country_code')
+                      : undefined
+                  }
                   labelColor={colors.text}
                   hideChevron
                   trailing={<Val value={prof?.city as string} s={s} />}
@@ -166,15 +157,24 @@ export default function LocationScreen() {
                 <SettingsRow
                   icon={<MapPin size={20} color={colors.textMuted} />}
                   label="Postal Code"
+                  onPress={
+                    items.edit
+                      ? () =>
+                          items.edit?.(
+                            prof?.country_code ? 'postal_code' : 'country_code',
+                          )
+                      : undefined
+                  }
                   labelColor={colors.text}
                   hideChevron
                   trailing={<Val value={prof?.postal_code as string} s={s} />}
                 />
               </View>
-            )}
+            }
           </>
         )}
       </ScrollView>
+      {items.editor}
     </SafeAreaView>
   );
 }

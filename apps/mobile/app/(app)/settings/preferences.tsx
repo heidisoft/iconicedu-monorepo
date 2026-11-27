@@ -1,16 +1,7 @@
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MODE_OPTIONS, ThemeModeOptions } from '@/components/profile/theme-mode-options';
-import { ProfileSectionEditButton } from '@/components/profile/profile-editor';
-import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-} from 'react-native';
+import { MODE_OPTIONS } from '@/components/profile/theme-mode-options';
+import { useProfileItemEditor } from '@/components/profile/profile-item-editor';
+import React, { useMemo } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, Sun, Moon, Clock, Globe, Languages } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
@@ -60,40 +51,15 @@ function makeStyles(C: AppColors) {
     divider: { height: 1, backgroundColor: C.border, marginLeft: 60 },
     valueText: { fontSize: 14, color: C.textMuted, marginRight: 4 },
     emptyValue: { fontSize: 14, color: C.textFaint, fontStyle: 'italic', marginRight: 4 },
-    // Appearance modal
-    overlay: { flex: 1, backgroundColor: C.modalOverlay, justifyContent: 'flex-end' },
-    sheet: {
-      backgroundColor: C.card,
-      borderTopLeftRadius: 32,
-      borderTopRightRadius: 32,
-      paddingTop: 12,
-      paddingBottom: 40,
-    },
-    sheetHandle: {
-      width: 36,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: C.border,
-      alignSelf: 'center',
-      marginBottom: 20,
-    },
-    sheetTitle: {
-      fontSize: 19,
-      fontWeight: '700',
-      color: C.text,
-      textAlign: 'center',
-      marginBottom: 16,
-    },
   });
 }
 
 export default function PreferencesScreen() {
   const router = useRouter();
-  const { colors, mode, setMode, colorScheme } = useTheme();
-  const popupInsets = useSafeAreaInsets();
+  const { colors, mode, colorScheme } = useTheme();
   const { data: profile, isPending, isError, refetch } = useSettingsProfile();
   const s = useMemo(() => makeStyles(colors), [colors]);
-  const [showAppearance, setShowAppearance] = useState(false);
+  const items = useProfileItemEditor(profile?.id);
 
   const prof = profile as Record<string, unknown> | undefined;
   const modeLabel = MODE_OPTIONS.find((o) => o.value === mode)?.label ?? 'System';
@@ -131,7 +97,6 @@ export default function PreferencesScreen() {
               }}
             >
               <Text style={s.sectionLabel}>Appearance</Text>
-              <ProfileSectionEditButton id={profile?.id} section="appearance" />
             </View>
             <View style={s.card}>
               <SettingsRow
@@ -139,13 +104,14 @@ export default function PreferencesScreen() {
                 label="Theme"
                 labelColor={colors.text}
                 chevronColor={colors.textFaint}
-                onPress={() => setShowAppearance(true)}
+                onPress={items.edit ? () => items.edit?.('mode') : undefined}
                 trailing={<Text style={s.valueText}>{appearanceLabel}</Text>}
               />
               <View style={s.divider} />
               <SettingsRow
                 icon={<Sun size={20} color={colors.textMuted} />}
                 label="Accent Color"
+                onPress={items.edit ? () => items.edit?.('ui_theme_key') : undefined}
                 labelColor={colors.text}
                 hideChevron
                 trailing={
@@ -163,12 +129,12 @@ export default function PreferencesScreen() {
               }}
             >
               <Text style={s.sectionLabel}>Regional</Text>
-              <ProfileSectionEditButton id={profile?.id} section="regional" />
             </View>
             <View style={s.card}>
               <SettingsRow
                 icon={<Clock size={20} color={colors.textMuted} />}
                 label="Timezone"
+                onPress={items.edit ? () => items.edit?.('timezone') : undefined}
                 labelColor={colors.text}
                 hideChevron
                 trailing={
@@ -185,6 +151,7 @@ export default function PreferencesScreen() {
               <SettingsRow
                 icon={<Globe size={20} color={colors.textMuted} />}
                 label="Locale"
+                onPress={items.edit ? () => items.edit?.('locale') : undefined}
                 labelColor={colors.text}
                 hideChevron
                 trailing={
@@ -199,6 +166,7 @@ export default function PreferencesScreen() {
               <SettingsRow
                 icon={<Languages size={20} color={colors.textMuted} />}
                 label="Languages"
+                onPress={items.edit ? () => items.edit?.('languages_spoken') : undefined}
                 labelColor={colors.text}
                 hideChevron
                 trailing={
@@ -216,38 +184,7 @@ export default function PreferencesScreen() {
         )}
       </ScrollView>
 
-      {/* Appearance picker sheet */}
-      <Modal
-        visible={showAppearance}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowAppearance(false)}
-      >
-        <Pressable style={s.overlay} onPress={() => setShowAppearance(false)}>
-          <Pressable onPress={(e) => e.stopPropagation()}>
-            <View
-              style={[
-                s.sheet,
-                {
-                  paddingBottom: 16 + popupInsets.bottom,
-                  paddingLeft: popupInsets.left,
-                  paddingRight: popupInsets.right,
-                },
-              ]}
-            >
-              <View style={s.sheetHandle} />
-              <Text style={s.sheetTitle}>Appearance</Text>
-              <ThemeModeOptions
-                value={mode}
-                onChange={(value) => {
-                  setMode(value);
-                  setShowAppearance(false);
-                }}
-              />
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {items.editor}
     </SafeAreaView>
   );
 }

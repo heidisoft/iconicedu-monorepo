@@ -11,8 +11,9 @@ import { useFamilyView } from '@/providers/family-view-provider';
 import { chooseProfilePhoto } from '@/lib/profile-photo-picker';
 import { fetchProfileSettings, removeFamilyChild } from '@/lib/api/profile-settings';
 import { ProfileDetails } from './profile-details';
-import { ProfileSectionForm, sectionTitles } from './profile-section-form';
+import { ProfileSectionForm } from './profile-section-form';
 import { AddChildDraft } from './add-child-draft';
+import { ProfileItemEditor, type ProfileItem } from './profile-item-editor';
 export function ProfileEditor({
   id,
   child = false,
@@ -34,6 +35,7 @@ export function ProfileEditor({
   const [editingSection, setEditingSection] = useState<ProfileSettingsSection | null>(
     null,
   );
+  const [editingItem, setEditingItem] = useState<ProfileItem | null>(null);
   const [removing, setRemoving] = useState(false);
   const [pickingPhoto, setPickingPhoto] = useState(false);
   const [initialPhoto, setInitialPhoto] = useState<string | null>(null);
@@ -150,6 +152,7 @@ export function ProfileEditor({
           child={child}
           overview={child && !profileOnly}
           onEdit={(section) => void editSection(section)}
+          onEditItem={setEditingItem}
           onInvite={() =>
             router.push({
               pathname: '/(app)/settings/invite-child',
@@ -158,6 +161,13 @@ export function ProfileEditor({
           }
           onRemove={remove}
           busy={removing || pickingPhoto}
+        />
+      )}
+      {editingItem && query.data?.canEdit && (
+        <ProfileItemEditor
+          data={query.data}
+          field={editingItem}
+          onClose={() => setEditingItem(null)}
         />
       )}
       {editingSection && query.data?.canEdit && (
@@ -179,64 +189,5 @@ export function ProfileEditor({
         </Modal>
       )}
     </SafeAreaView>
-  );
-}
-
-/** Reuses the same section editor without changing the surrounding settings rows. */
-export function ProfileSectionEditButton({
-  id,
-  section,
-  title,
-}: {
-  id?: string | null;
-  section: ProfileSettingsSection;
-  title?: string;
-}) {
-  const { colors } = useTheme();
-  const [open, setOpen] = useState(false);
-  const query = useQuery({
-    queryKey: ['profile-settings', id],
-    queryFn: () => fetchProfileSettings(id!),
-    enabled: !!id,
-  });
-  if (!query.data?.canEdit) return null;
-  const profile = {
-    ...query.data.profile,
-    birth_year: query.data.childDetails?.birth_year,
-    grade_level: query.data.gradeLevel,
-  };
-  return (
-    <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`Edit ${title ?? sectionTitles[section]}`}
-        onPress={() => setOpen(true)}
-        style={{
-          minWidth: 44,
-          minHeight: 44,
-          paddingHorizontal: 8,
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ fontSize: 15, fontWeight: '600', color: colors.teal }}>Edit</Text>
-      </Pressable>
-      {open && (
-        <Modal
-          visible
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setOpen(false)}
-        >
-          <SheetContent backgroundColor={colors.pageBg}>
-            <ProfileSectionForm
-              profile={profile}
-              section={section}
-              onClose={() => setOpen(false)}
-            />
-          </SheetContent>
-        </Modal>
-      )}
-    </>
   );
 }

@@ -57,28 +57,29 @@ and Contact & Security screens for every role. Child details use the main accoun
 (Preferences) groups. Each opens the existing screen with the selected child’s
 profile ID. Identity, About, and child Learning Details live on the separate
 Profile screen; invitations and removal remain on the child overview. They do not duplicate
-the address or regional fields. Profile and child details retain read-only,
-grouped settings rows. Identity opens by tapping the display name below the avatar or the Display Name
-row, without a separate Edit text action. Other sections retain their top-right
-Edit action. Editors open native sheets with Cancel and Save.
-Only fields in that section are validated and written; cancelling discards the
-local draft. Profile and child-profile text inputs use shared sizing, padding, theme
-colors, and focus borders, following the onboarding style. Creation and edit sheets use the
-same card insets so the fields retain matching proportions. Name placeholders are
-short labels with normal text weight and spacing. In saved-profile section editors, text fields display their current values as tappable rows.
-Names, address text, bio and spoken languages open focused native sheets. Close or
-native Back discards the field edit; Done updates only the section draft. Country,
-region, birth year, grade, timezone and language/region retain their existing selection
-sheets. Accent colors also open in a separate sheet, with the current avatar color
-selected. The section Save still requires confirmation before persistence. This
-applies to main and child profiles; Add child keeps inline inputs for first-time entry.
-Name field editors support keyboard Done;
-email fields keep email keyboards and disable autocorrection. Address, birth-year,
-grade, and regional selectors are disabled during confirmation and saving, including
-for accessibility actions. Regional editors use searchable timezone and language/region pickers, and allow
-editing spoken languages. The Location and Preferences screens share these section
-editors while retaining their existing data rows.
-Every save and removal requires a mobile confirmation. The photo Edit action sits
+the address or regional fields. Main and child profiles retain grouped settings rows.
+Each editable row opens its own input or selection sheet directly; section-level
+Edit text is removed. The display name below the avatar opens only Display Name.
+Photo uses a camera action below the avatar and the native source chooser.
+Names, bio, city, free-text region, postal code and spoken languages open focused
+text editors with Save and a left-side close action. Birth year, grade, country,
+region, timezone, locale and theme open selection lists with the current value
+selected. Accent Color opens the avatar color choices. Each change requires
+confirmation before the existing authorized, audited API write. Theme mode remains
+a device preference and requires confirmation before changing locally.
+Closing an editor discards unsaved input; cancelling confirmation retains it for
+correction. Failed saves keep the editor open for retry. Read-only guardians see
+the values without edit actions. Add child retains inline entry.
+Country changes first select the country, then collect the address fields required
+for that country in a local draft. Confirmation saves the complete valid address;
+cancelling preserves the previous address. When no country is set, tapping an
+address row starts this country/address flow. Existing addresses allow individual
+city, region and postal-code editing while preserving the other address values.
+Profile and child-profile inputs share onboarding sizing, padding, theme colors
+and focus borders. No section editor is shown between a settings row and its
+individual field input or picker, except the dependent address setup after changing
+country.
+Every save and removal requires a mobile confirmation. The photo camera action sits
 directly below the avatar and opens native Take Photo / Choose from Album choices.
 Camera permission is requested only when taking a picture; denied access provides
 a Settings action where needed. Selection opens a local preview; cancelling the
@@ -125,7 +126,7 @@ section. Contact & Security also omits the Role/Status account card and its Edit
 
 In Appearance, Theme opens a native sheet listing System, Light, and Dark. Accent
 choices show circular initial avatars using the same colors as profile avatars.
-Both selections remain drafts until the section’s confirmed Save action.
+Each selection requires confirmation; accent changes are audited by the API.
 
 Parent homepage tiles offer **Refer another parent** and **Add another child**
 as the first tile inside the Overview row. A vertical, paged carousel shows one
