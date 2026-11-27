@@ -1,6 +1,7 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import {
   Alert,
+  AccessibilityInfo,
   Animated,
   Easing,
   Pressable,
@@ -30,6 +31,7 @@ type Props = {
   onAddChild: () => void;
   onRefer?: () => void;
   onRequestClass?: () => void;
+  onSuggestionDismissed?: () => void;
 };
 
 function PromotionCarousel({
@@ -39,6 +41,7 @@ function PromotionCarousel({
   onRefer,
   onRequestClass,
   autoAdvanceEnabled = true,
+  onSuggestionDismissed,
 }: Omit<Props, 'orgId' | 'accountId' | 'referralsEnabled'> & { scope: string }) {
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -57,6 +60,16 @@ function PromotionCarousel({
   const pager = useRef<ScrollView>(null);
   const [laidOut, setLaidOut] = useState(false);
   const peekOffset = useRef(new Animated.Value(0)).current;
+  const dismissOpacity = useRef(new Animated.Value(1)).current;
+  const dismissalAnimation = useRef<Animated.CompositeAnimation | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      dismissalAnimation.current?.stop();
+    };
+  }, []);
   const promotions = [
     ...(onRefer
       ? [
@@ -103,6 +116,26 @@ function PromotionCarousel({
   const visible = loaded && promotions.length > 0;
   const current = Math.max(0, Math.min(active, promotions.length - 1));
   const selected = promotions[current];
+  useLayoutEffect(() => {
+    dismissOpacity.setValue(1);
+  }, [dismissOpacity, selected?.id]);
+  async function animateDismissal() {
+    const [reduced, reader] = await Promise.all([
+      AccessibilityInfo.isReduceMotionEnabled(),
+      AccessibilityInfo.isScreenReaderEnabled(),
+    ]).catch(() => [true, true]);
+    if (!mounted.current || reduced || reader) return;
+    await new Promise<void>((resolve) => {
+      const animation = Animated.timing(dismissOpacity, {
+        toValue: 0,
+        duration: 200,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      });
+      dismissalAnimation.current = animation;
+      animation.start(() => resolve());
+    });
+  }
   function move(index: number) {
     if (saving) return;
     const next = Math.max(0, Math.min(promotions.length - 1, index));
@@ -137,7 +170,7 @@ function PromotionCarousel({
   );
   if (!visible || !selected) return null;
   return (
-    <View
+    <Animated.View
       testID="parent-promotion-tile"
       onTouchStart={stopIntro}
       style={{
@@ -146,6 +179,15 @@ function PromotionCarousel({
         borderRadius: 20,
         backgroundColor: selected.background,
         overflow: 'hidden',
+        opacity: dismissOpacity,
+        transform: [
+          {
+            scale: dismissOpacity.interpolate({
+              inputRange: [0, 1],
+              outputRange: [0.94, 1],
+            }),
+          },
+        ],
       }}
     >
       <ScrollView
@@ -307,9 +349,11 @@ function PromotionCarousel({
         onPress={() => {
           stopIntro();
           const nextIndex = current < promotions.length - 1 ? current : 0;
-          void dismissals[selected.id]!.dismiss()
+          void dismissals[selected.id]!.dismiss(animateDismissal)
             .then(() => {
+              if (!mounted.current) return;
               setActive(nextIndex);
+              onSuggestionDismissed?.();
             })
             .catch(() => Alert.alert('Unable to dismiss', 'Please try again.'));
         }}
@@ -370,7 +414,7 @@ function PromotionCarousel({
           </Pressable>
         </>
       )}
-    </View>
+    </Animated.View>
   );
 }
 

@@ -23,16 +23,20 @@ export function useHomeTileDismissal(scope: string, tileId: string) {
       active = false;
     };
   }, [key]);
-  const dismiss = useCallback(async () => {
-    if (saving) return;
-    setSaving(true);
-    try {
-      await AsyncStorage.setItem(key, '1');
-      if (currentKey.current === key) setState({ key, dismissed: true });
-    } finally {
-      if (currentKey.current === key) setSaving(false);
-    }
-  }, [key, saving]);
+  const dismiss = useCallback(
+    async (beforeHide?: () => Promise<void>) => {
+      if (saving) return;
+      setSaving(true);
+      try {
+        await AsyncStorage.setItem(key, '1');
+        if (currentKey.current === key) await beforeHide?.();
+        if (currentKey.current === key) setState({ key, dismissed: true });
+      } finally {
+        if (currentKey.current === key) setSaving(false);
+      }
+    },
+    [key, saving],
+  );
   return {
     loaded: state.key === key,
     visible: state.key === key && !state.dismissed,

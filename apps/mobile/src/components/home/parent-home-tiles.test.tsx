@@ -1,8 +1,13 @@
 import { darkColors, lightColors } from '@/lib/theme';
 import React from 'react';
-import { Alert, Dimensions } from 'react-native';
+import { AccessibilityInfo, Alert, Dimensions, Platform } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { ParentHomeTiles } from './parent-home-tiles';
+import { FamilyActionsTile } from './family-actions-tile';
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: require('react-native').View,
+  SafeAreaView: require('react-native').View,
+}));
 let mockColors = lightColors;
 jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ colors: mockColors }),
@@ -16,6 +21,8 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: (key: string, value: string) => mockSet(key, value),
 }));
 beforeEach(() => {
+  jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(true);
+  jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
   mockColors = lightColors;
   mockStored.clear();
   mockSet.mockClear();
@@ -337,4 +344,31 @@ it('peeks once and returns without changing the current slide', async () => {
     if (original) Object.defineProperty(AppState, 'currentState', original);
     jest.useRealTimers();
   }
+});
+
+it('keeps the permanent action list available after every suggestion has been dismissed', async () => {
+  for (const id of ['refer', 'child', 'class'])
+    mockStored.set(`home-tile-v1:org:parent:family-promotion-${id}`, '1');
+  const platform = jest.replaceProperty(Platform, 'OS', 'android');
+  const add = jest.fn();
+  render(
+    <>
+      <ParentHomeTiles
+        orgId="org"
+        accountId="parent"
+        onAddChild={add}
+        onRequestClass={jest.fn()}
+      />
+      <FamilyActionsTile onAddChild={add} onRequestClass={jest.fn()} />
+    </>,
+  );
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(screen.queryByTestId('parent-promotion-tile')).toBeNull();
+  fireEvent.press(screen.getByLabelText('More for your family'));
+  expect(screen.getByLabelText('Request a class')).toBeTruthy();
+  fireEvent.press(screen.getByLabelText('Add a child'));
+  expect(add).toHaveBeenCalledTimes(1);
+  platform.restore();
 });

@@ -21,8 +21,25 @@ const mockParentTiles = jest.fn(
     onAddChild: () => void;
     onRefer?: () => void;
     onRequestClass?: () => void;
+    onSuggestionDismissed?: () => void;
   }) => null,
 );
+const mockFamilyActions = jest.fn(
+  (_props: {
+    highlight?: number;
+    referralsEnabled?: boolean;
+    onAddChild: () => void;
+    onRefer?: () => void;
+    onRequestClass?: () => void;
+  }) => null,
+);
+jest.mock('@/components/home/family-actions-tile', () => ({
+  FamilyActionsTile: (props: Parameters<typeof mockFamilyActions>[0]) => {
+    const { Text } = require('react-native');
+    mockFamilyActions(props);
+    return <Text>Permanent family actions tile</Text>;
+  },
+}));
 jest.mock('@/components/home/parent-home-tiles', () => ({
   ParentHomeTiles: (props: Parameters<typeof mockParentTiles>[0]) => {
     const { Text } = require('react-native');
@@ -360,6 +377,7 @@ it.each(['child', 'educator', 'staff', 'admin'])(
     mockProfileKind = kind;
     render(<HomeScreen />);
     expect(mockParentTiles).not.toHaveBeenCalled();
+    expect(mockFamilyActions).not.toHaveBeenCalled();
   },
 );
 it('hides parent promotions while viewing a child', () => {
@@ -472,4 +490,30 @@ it('clears the introduction when switching to a child view', () => {
   view.rerender(<HomeScreen />);
   expect(view.queryByText('Introduction: child')).toBeNull();
   expect(mockRouterPush).not.toHaveBeenCalled();
+});
+
+it('keeps the permanent family tile last in Overview and highlights it after dismissal', async () => {
+  const view = render(<HomeScreen />);
+  const row = view.getByTestId('home-overview-row');
+  const tiles = row
+    .findAll((node) => node.type === require('react-native').Text)
+    .map((node) => node.props.children);
+  expect(tiles.at(-1)).toBe('Permanent family actions tile');
+  expect(mockFamilyActions.mock.calls.at(-1)![0].highlight).toBe(0);
+  await act(async () => mockParentTiles.mock.calls.at(-1)![0].onSuggestionDismissed!());
+  expect(mockFamilyActions.mock.calls.at(-1)![0].highlight).toBe(1);
+});
+it('opens the same introductions from the permanent family actions tile', () => {
+  mockHasChild = true;
+  const view = render(<HomeScreen />);
+  act(() => mockFamilyActions.mock.calls.at(-1)![0].onAddChild());
+  expect(view.getByText('Introduction: child')).toBeTruthy();
+  fireEvent.press(view.getByLabelText('Close family introduction'));
+  act(() => mockFamilyActions.mock.calls.at(-1)![0].onRequestClass!());
+  expect(view.getByText('Introduction: class')).toBeTruthy();
+});
+it('keeps referrals gated in the permanent action list', () => {
+  mockReferralEnabled = false;
+  render(<HomeScreen />);
+  expect(mockFamilyActions.mock.calls.at(-1)![0].onRefer).toBeUndefined();
 });

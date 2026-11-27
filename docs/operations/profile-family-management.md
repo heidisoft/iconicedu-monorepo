@@ -184,3 +184,18 @@ request is written until Submit request; duplicate submissions are guarded, fail
 requests retain the draft for retry, and successful submission opens the same
 request conversation. The homepage empty state and suggestion intro share this
 single form component.
+
+A permanent **More for your family** tile sits after the other Overview metrics for
+parents outside child view. It opens an action list linking to the same referral,
+Add child and class-request introductions, including dismissed suggestions.
+Referral actions remain behind `enable-parent-referrals`; class requests require a
+child profile. This tile is independent of suggestion dismissal preferences.
+
+After a suggestion dismissal is saved, the active suggestion gently shrinks and
+fades out before revealing the next remaining suggestion in the first slot.
+Overview reveals and briefly outlines the permanent action tile so parents know
+where to find it later. Screen-reader users get an announcement instead of an
+automatic scroll; Reduce Motion skips the exit animation and uses an immediate
+scroll with a static outline. A storage failure leaves the suggestion visible and
+does not trigger the transition. Native sheets finish dismissing before their
+selected action opens another introduction.

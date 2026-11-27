@@ -56,3 +56,39 @@ it('shows the tile if the stored preference cannot be read', async () => {
   const { result } = renderHook(() => useHomeTileDismissal('org:parent', 'add-child'));
   await waitFor(() => expect(result.current.visible).toBe(true));
 });
+
+it('waits for the exit transition after persistence before hiding the suggestion', async () => {
+  const { result } = renderHook(() => useHomeTileDismissal('org:parent', 'class'));
+  await waitFor(() => expect(result.current.visible).toBe(true));
+  let finish!: () => void;
+  const transition = jest.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  let dismissal!: Promise<void>;
+  act(() => {
+    dismissal = result.current.dismiss(transition);
+  });
+  await waitFor(() => expect(transition).toHaveBeenCalled());
+  expect(mockSet).toHaveBeenCalled();
+  expect(result.current.visible).toBe(true);
+  expect(result.current.saving).toBe(true);
+  await act(async () => {
+    finish();
+    await dismissal;
+  });
+  expect(result.current.visible).toBe(false);
+});
+it('does not animate away a suggestion when persistence fails', async () => {
+  mockSet.mockRejectedValueOnce(new Error('Storage unavailable'));
+  const transition = jest.fn();
+  const { result } = renderHook(() => useHomeTileDismissal('org:parent', 'class'));
+  await waitFor(() => expect(result.current.visible).toBe(true));
+  await act(async () => {
+    await expect(result.current.dismiss(transition)).rejects.toThrow();
+  });
+  expect(transition).not.toHaveBeenCalled();
+  expect(result.current.visible).toBe(true);
+});

@@ -1,3 +1,4 @@
+import { FamilyActionsTile } from '@/components/home/family-actions-tile';
 import {
   FamilyActionExplainer,
   type FamilyAction,
@@ -10,6 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
+  AccessibilityInfo,
   Text,
   Image,
   ScrollView,
@@ -462,6 +464,29 @@ export default function HomeScreen() {
   );
   const { user } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
+  const overviewRef = useRef<ScrollView>(null);
+  const focusedHome = useRef(isHomeFocused);
+  focusedHome.current = isHomeFocused;
+  const [familyActionsHighlight, setFamilyActionsHighlight] = useState(0);
+  const revealFamilyActions = useCallback(() => {
+    if (!focusedHome.current) return;
+    setFamilyActionsHighlight((value) => value + 1);
+    void Promise.all([
+      AccessibilityInfo.isReduceMotionEnabled(),
+      AccessibilityInfo.isScreenReaderEnabled(),
+    ])
+      .then(([reduced, reader]) => {
+        if (focusedHome.current && !reader)
+          overviewRef.current?.scrollToEnd({ animated: !reduced });
+      })
+      .catch(() => {});
+  }, []);
+  React.useEffect(() => {
+    focusedHome.current = isHomeFocused;
+    return () => {
+      focusedHome.current = false;
+    };
+  }, [isHomeFocused]);
   const queryClient = useQueryClient();
   const {
     familySwitchOptions,
@@ -980,6 +1005,8 @@ export default function HomeScreen() {
             </ScrollView>
           ) : (
             <ScrollView
+              ref={overviewRef}
+              testID="home-overview-row"
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.metricsRow}
@@ -991,6 +1018,7 @@ export default function HomeScreen() {
                   <ParentHomeTiles
                     width={metricCardWidth}
                     autoAdvanceEnabled={isHomeFocused}
+                    onSuggestionDismissed={revealFamilyActions}
                     referralsEnabled={enableParentReferrals}
                     orgId={orgId}
                     accountId={guardianAccountId}
@@ -1073,6 +1101,25 @@ export default function HomeScreen() {
                   </Text>
                 </View>
               </View>
+              {!isViewingAsChild &&
+                profileData?.kind === 'guardian' &&
+                guardianProfileId &&
+                orgId && (
+                  <FamilyActionsTile
+                    width={metricCardWidth}
+                    highlight={familyActionsHighlight}
+                    referralsEnabled={enableParentReferrals}
+                    onAddChild={() => setFamilyIntro('child')}
+                    onRequestClass={
+                      canRequestClasses ? () => setFamilyIntro('class') : undefined
+                    }
+                    onRefer={
+                      enableParentReferrals
+                        ? () => setReferralExplainerOpen(true)
+                        : undefined
+                    }
+                  />
+                )}
             </ScrollView>
           )}
         </View>
