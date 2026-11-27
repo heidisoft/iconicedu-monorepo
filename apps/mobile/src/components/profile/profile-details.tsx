@@ -30,6 +30,7 @@ export function ProfileDetails({
   overview = false,
   header,
   extraSections,
+  sectionsContent,
   footer,
   onInvite,
 }: {
@@ -42,6 +43,7 @@ export function ProfileDetails({
   overview?: boolean;
   header?: React.ReactNode;
   extraSections?: React.ReactNode;
+  sectionsContent?: React.ReactNode;
   footer?: React.ReactNode;
   onInvite?: () => void;
 }) {
@@ -114,7 +116,12 @@ export function ProfileDetails({
       (option) => option.value === data.gradeLevel,
     )?.label ?? data.gradeLevel;
   return (
-    <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      contentContainerStyle={s.scroll}
+      showsVerticalScrollIndicator={false}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+    >
       {header}
       <View style={s.avatarSection}>
         {value('avatar_url') ? (
@@ -145,41 +152,42 @@ export function ProfileDetails({
         )}
         <Text style={s.avatarName}>{displayName}</Text>
       </View>
-      {!overview && (
-        <>
-          {section(
-            'Identity',
-            'identity',
-            <View style={s.card}>
-              {row('Display Name', value('display_name'))}
-              {row('First Name', value('first_name'))}
-              {row('Last Name', value('last_name'), User, true)}
-            </View>,
-          )}
-          {!draft &&
-            (value('bio') || data.canEdit) &&
-            section(
-              'About',
-              'about',
-              <View style={s.card}>{row('Bio', value('bio'), CreditCard, true)}</View>,
-            )}
-          {child &&
-            section(
-              'Learning Details',
-              'child',
+      {sectionsContent ??
+        (!overview && (
+          <>
+            {section(
+              'Identity',
+              'identity',
               <View style={s.card}>
-                {row(
-                  'Birth Year',
-                  data.childDetails?.birth_year
-                    ? String(data.childDetails.birth_year)
-                    : '',
-                  GraduationCap,
-                )}
-                {row('Grade', gradeLabel, GraduationCap, true)}
+                {row('Display Name', value('display_name'))}
+                {row('First Name', value('first_name'))}
+                {row('Last Name', value('last_name'), User, true)}
               </View>,
             )}
-        </>
-      )}
+            {!draft &&
+              (value('bio') || data.canEdit) &&
+              section(
+                'About',
+                'about',
+                <View style={s.card}>{row('Bio', value('bio'), CreditCard, true)}</View>,
+              )}
+            {child &&
+              section(
+                'Learning Details',
+                'child',
+                <View style={s.card}>
+                  {row(
+                    'Birth Year',
+                    data.childDetails?.birth_year
+                      ? String(data.childDetails.birth_year)
+                      : '',
+                    GraduationCap,
+                  )}
+                  {row('Grade', gradeLabel, GraduationCap, true)}
+                </View>,
+              )}
+          </>
+        ))}
       {extraSections}
       {child && !draft && overview && (
         <>

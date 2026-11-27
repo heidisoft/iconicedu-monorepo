@@ -18,9 +18,10 @@ checks; hiding a control is not authorization.
 Family retains both **Invite child by email** and **Add new child**. The managed
 profile flow mirrors the web: first name, last name, grade and birth year are
 required; email is optional; display name starts as first name plus last initial;
-timezone and location are inherited from the parent. Add Child uses the same
-read-only Identity and Learning Details cards and native section editors as a
-saved profile. Section saves update only a local draft; final confirmation creates
+timezone and location are inherited from the parent. Add Child uses editable fields within the existing Identity, Learning Details, and Contact
+sections, with the avatar above. Names and optional email are entered inline; birth
+year and grade reuse the onboarding selectors and input styling. A blank display name defaults to the first name and
+last initial. Fields remain local until the final Add child confirmation creates
 the child. The new child opens in the normal sectioned profile view. Photos and
 other settings can then be edited through the same controls as the main profile.
 

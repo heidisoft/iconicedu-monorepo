@@ -1,18 +1,25 @@
-import { SheetContent } from '@iconicedu/ui-native/components/sheet-content';
-import React, { useState } from 'react';
-import { Alert, Modal, Pressable, Text, TextInput, View } from 'react-native';
+import React, { useRef, useState } from 'react';
+import {
+  Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
-import { Mail } from 'lucide-react-native';
-import { SettingsRow } from '@iconicedu/ui-native';
-import type { ProfileSettingsSectionInput } from '@iconicedu/shared-types';
+import { normalizeCountryCode, optionsForCountry } from '@iconicedu/shared-types';
 import { useAuth } from '@/providers/auth-provider';
 import { useFamilyView } from '@/providers/family-view-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { fetchProfileSettings } from '@/lib/api/profile-settings';
 import { createChildProfile } from '@/lib/api/queries';
+import { BirthYearSelect } from '@/components/auth/birth-year-select';
+import { GradeLevelSelect } from '@/components/auth/grade-level-select';
 import { ProfileDetails } from './profile-details';
-import { ProfileSectionForm } from './profile-section-form';
 
 export function AddChildDraft() {
   const { colors } = useTheme();
@@ -25,18 +32,20 @@ export function AddChildDraft() {
     queryFn: () => fetchProfileSettings(family.guardianProfileId),
     enabled: !!family.guardianProfileId,
   });
-  const [draft, setDraft] = useState({
-    first_name: '',
-    last_name: '',
-    display_name: '',
-    birth_year: undefined as number | undefined,
-    grade_level: undefined as string | undefined,
-  });
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [birthYear, setBirthYear] = useState('');
+  const [grade, setGrade] = useState<string | null>(null);
   const [email, setEmail] = useState('');
-  const [emailDraft, setEmailDraft] = useState('');
-  const [editing, setEditing] = useState<'identity' | 'child' | 'email' | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  const submitting = useRef(false);
+  const lastNameInput = useRef<TextInput>(null);
+  const displayNameInput = useRef<TextInput>(null);
+  const disabled = busy || reviewing;
+
   if (!family.guardianProfileId)
     return (
       <Text style={{ color: colors.text, padding: 20 }}>
@@ -49,68 +58,55 @@ export function AddChildDraft() {
     );
   if (parent.isError || !parent.data)
     return (
-      <Pressable onPress={() => void parent.refetch()}>
+      <Pressable accessibilityRole="button" onPress={() => void parent.refetch()}>
         <Text style={{ color: colors.text, padding: 20 }}>
           Unable to load family details. Tap to retry.
         </Text>
       </Pressable>
     );
+
   const p = parent.data.profile;
   const inherited = (key: string) =>
     typeof p[key] === 'string' ? (p[key] as string) : '';
   const themeKey = ['teal', 'blue', 'purple', 'orange', 'pink'][
     Math.max(0, family.familySwitchOptions.length - 1) % 5
   ]!;
-  const profile = {
-    ...draft,
-    id: 'new-child',
-    org_id: p.org_id,
-    kind: 'child',
-    country_code: p.country_code,
-    ui_theme_key: themeKey,
+  const suggestedDisplayName =
+    `${firstName.trim().slice(0, 98)} ${lastName.trim().charAt(0).toUpperCase()}`.trim();
+  const labelStyle = {
+    color: colors.textMuted,
+    fontSize: 14,
+    fontWeight: '500' as const,
   };
-  function saveDraft(input: ProfileSettingsSectionInput) {
-    if (input.section === 'identity')
-      setDraft((previous) => ({
-        ...previous,
-        first_name: input.values.firstName,
-        last_name: input.values.lastName,
-        display_name: input.values.displayName,
-      }));
-    if (input.section === 'child')
-      setDraft((previous) => ({
-        ...previous,
-        birth_year: input.values.birthYear,
-        grade_level: input.values.gradeLevel,
-      }));
-  }
-  function saveEmail() {
-    const normalized = emailDraft.trim().toLowerCase();
-    if (
-      normalized &&
-      (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || normalized.length > 254)
-    ) {
-      Alert.alert('Check email', 'Enter a valid child email address.');
-      return;
-    }
-    if (normalized && normalized === user?.email?.trim().toLowerCase()) {
-      Alert.alert('Check email', 'Child email cannot match the parent email.');
-      return;
-    }
-    setEmail(normalized);
-    setEditing(null);
-  }
-  async function create() {
+  const inputStyle = {
+    color: colors.text,
+    backgroundColor: colors.inputBg,
+    borderColor: colors.border,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    minHeight: 52,
+    fontSize: 16,
+  };
+
+  async function create(values: {
+    firstName: string;
+    lastName: string;
+    displayName: string;
+    email: string;
+    birthYear: number;
+    gradeLevel: string;
+  }) {
+    if (submitting.current) return;
+    submitting.current = true;
     setBusy(true);
     try {
+      const { email: childEmail, ...details } = values;
       const child = await createChildProfile({
         orgId: String(p.org_id),
-        firstName: draft.first_name,
-        lastName: draft.last_name,
-        displayName: draft.display_name,
-        birthYear: draft.birth_year!,
-        gradeLevel: draft.grade_level!,
-        ...(email ? { email } : {}),
+        ...details,
+        ...(childEmail ? { email: childEmail } : {}),
         timezone: inherited('timezone') || 'UTC',
         locale: inherited('locale') || 'en-US',
         countryCode: inherited('country_code') || null,
@@ -128,123 +124,290 @@ export function AddChildDraft() {
         error instanceof Error ? error.message : 'Please try again.',
       );
     } finally {
+      submitting.current = false;
       setBusy(false);
     }
   }
+
   function confirm() {
-    if (busy || reviewing) return;
-    if (
-      !draft.first_name ||
-      !draft.last_name ||
-      !draft.birth_year ||
-      !draft.grade_level
-    ) {
+    if (disabled || submitting.current) return;
+    const first = firstName.trim();
+    const last = lastName.trim();
+    if (!first || !last || !birthYear || !grade) {
       Alert.alert(
         'Complete child details',
-        'Edit Identity and Learning Details to add the required first name, last name, grade and birth year.',
+        'Enter a first name and last name, then select a grade and birth year.',
       );
       return;
     }
+    if ([first, last, displayName.trim()].some((value) => value.length > 100)) {
+      Alert.alert('Check names', 'Use no more than 100 characters for each name.');
+      return;
+    }
+    const normalizedEmail = email.trim().toLowerCase();
+    if (
+      normalizedEmail &&
+      (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) ||
+        normalizedEmail.length > 254)
+    ) {
+      Alert.alert('Check email', 'Enter a valid child email address.');
+      return;
+    }
+    if (normalizedEmail && normalizedEmail === user?.email?.trim().toLowerCase()) {
+      Alert.alert('Check email', 'Child email cannot match the parent email.');
+      return;
+    }
+    const values = {
+      firstName: first,
+      lastName: last,
+      displayName: displayName.trim() || suggestedDisplayName,
+      birthYear: Number(birthYear),
+      gradeLevel: grade,
+      email: normalizedEmail,
+    };
+    Keyboard.dismiss();
     setReviewing(true);
     Alert.alert(
       'Add child profile?',
-      `${draft.first_name} ${draft.last_name}\nBirth year: ${draft.birth_year}\nGrade: ${draft.grade_level}${email ? `\nEmail: ${email}` : ''}\n\nLocation and time zone are inherited from your profile.`,
+      `${first} ${last}\nDisplay name: ${values.displayName}\nBirth year: ${birthYear}\nGrade: ${optionsForCountry(normalizeCountryCode(inherited('country_code'))).find((option) => option.value === grade)?.label ?? grade}${normalizedEmail ? `\nEmail: ${normalizedEmail}` : ''}\n\nLocation and time zone are inherited from your profile.`,
       [
         { text: 'Cancel', style: 'cancel', onPress: () => setReviewing(false) },
         {
           text: 'Add child',
           onPress: () => {
             setReviewing(false);
-            void create();
+            void create(values);
           },
         },
       ],
       { cancelable: true, onDismiss: () => setReviewing(false) },
     );
   }
+
+  function section(title: string, fields: React.ReactNode) {
+    return (
+      <View style={{ marginTop: 8 }}>
+        <View style={{ minHeight: 44, justifyContent: 'center', paddingLeft: 4 }}>
+          <Text
+            style={{
+              color: colors.textFaint,
+              fontSize: 13,
+              fontWeight: '700',
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+            }}
+          >
+            {title}
+          </Text>
+        </View>
+        <View
+          style={{
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.card,
+            padding: 16,
+            gap: 18,
+          }}
+        >
+          {fields}
+        </View>
+      </View>
+    );
+  }
   return (
-    <>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <ProfileDetails
         draft
+        child
         data={{
-          profile,
+          profile: {
+            id: 'new-child',
+            org_id: p.org_id,
+            kind: 'child',
+            ui_theme_key: themeKey,
+            country_code: p.country_code,
+            first_name: firstName,
+            last_name: lastName,
+            display_name: displayName.trim() || suggestedDisplayName,
+          },
           canEdit: true,
           canRemove: false,
           removalBlocked: false,
-          childDetails: { birth_year: draft.birth_year },
-          gradeLevel: draft.grade_level,
         }}
-        child
-        onEdit={(section) => {
-          if (section === 'identity' || section === 'child') setEditing(section);
-        }}
+        onEdit={() => {}}
         onRemove={() => {}}
-        busy={busy || reviewing}
+        busy={disabled}
         header={
-          <Text style={{ color: colors.textMuted, paddingTop: 12 }}>
-            Add the required details below. Email is optional; location and time zone are
-            inherited from your profile.
+          <Text style={{ color: colors.textMuted, paddingTop: 12, lineHeight: 22 }}>
+            Add the required details below. Fields marked with * are required; location
+            and time zone are inherited from your profile.
           </Text>
+        }
+        sectionsContent={
+          <>
+            {section(
+              'Identity',
+              <>
+                <View style={{ gap: 8 }}>
+                  <Text style={labelStyle} nativeID="child-first-name-label">
+                    First name *
+                  </Text>
+                  <TextInput
+                    accessibilityLabel="First name"
+                    accessibilityLabelledBy="child-first-name-label"
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    placeholder="Child first name"
+                    placeholderTextColor={colors.textFaint}
+                    autoCapitalize="words"
+                    autoComplete="given-name"
+                    textContentType="givenName"
+                    autoCorrect={false}
+                    maxLength={100}
+                    editable={!disabled}
+                    returnKeyType="next"
+                    onSubmitEditing={() => lastNameInput.current?.focus()}
+                    blurOnSubmit={false}
+                    onFocus={() => setFocusedField('firstName')}
+                    onBlur={() => setFocusedField(null)}
+                    style={[
+                      inputStyle,
+                      focusedField === 'firstName' && { borderColor: colors.teal },
+                    ]}
+                  />
+                </View>
+                <View style={{ gap: 8 }}>
+                  <Text style={labelStyle} nativeID="child-last-name-label">
+                    Last name *
+                  </Text>
+                  <TextInput
+                    ref={lastNameInput}
+                    accessibilityLabel="Last name"
+                    accessibilityLabelledBy="child-last-name-label"
+                    value={lastName}
+                    onChangeText={setLastName}
+                    placeholder="Child last name"
+                    placeholderTextColor={colors.textFaint}
+                    autoCapitalize="words"
+                    autoComplete="family-name"
+                    textContentType="familyName"
+                    autoCorrect={false}
+                    maxLength={100}
+                    editable={!disabled}
+                    returnKeyType="next"
+                    onSubmitEditing={() => displayNameInput.current?.focus()}
+                    blurOnSubmit={false}
+                    onFocus={() => setFocusedField('lastName')}
+                    onBlur={() => setFocusedField(null)}
+                    style={[
+                      inputStyle,
+                      focusedField === 'lastName' && { borderColor: colors.teal },
+                    ]}
+                  />
+                </View>
+                <View style={{ gap: 8 }}>
+                  <Text style={labelStyle} nativeID="child-display-name-label">
+                    Display name (optional)
+                  </Text>
+                  <TextInput
+                    ref={displayNameInput}
+                    accessibilityLabel="Display name"
+                    accessibilityLabelledBy="child-display-name-label"
+                    value={displayName}
+                    onChangeText={setDisplayName}
+                    placeholder={suggestedDisplayName || 'Child display name'}
+                    placeholderTextColor={colors.textFaint}
+                    autoCapitalize="words"
+                    autoCorrect={false}
+                    maxLength={100}
+                    editable={!disabled}
+                    returnKeyType="done"
+                    onFocus={() => setFocusedField('displayName')}
+                    onBlur={() => setFocusedField(null)}
+                    style={[
+                      inputStyle,
+                      focusedField === 'displayName' && { borderColor: colors.teal },
+                    ]}
+                  />
+                  <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                    Leave blank to use their first name and last initial.
+                  </Text>
+                </View>
+              </>,
+            )}
+            {section(
+              'Learning Details',
+              <>
+                <View
+                  style={{ gap: 8 }}
+                  accessibilityElementsHidden={disabled}
+                  importantForAccessibility={disabled ? 'no-hide-descendants' : 'auto'}
+                  pointerEvents={disabled ? 'none' : 'auto'}
+                >
+                  <Text style={labelStyle}>Birth year *</Text>
+                  <BirthYearSelect value={birthYear} onChange={setBirthYear} />
+                </View>
+                <View
+                  style={{ gap: 8 }}
+                  accessibilityElementsHidden={disabled}
+                  importantForAccessibility={disabled ? 'no-hide-descendants' : 'auto'}
+                  pointerEvents={disabled ? 'none' : 'auto'}
+                >
+                  <Text style={labelStyle}>Grade level *</Text>
+                  <GradeLevelSelect
+                    value={grade}
+                    onChange={setGrade}
+                    options={optionsForCountry(
+                      normalizeCountryCode(inherited('country_code')),
+                    )}
+                  />
+                </View>
+              </>,
+            )}
+          </>
         }
         extraSections={
           <>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-              }}
-            >
-              <Text
-                style={{
-                  color: colors.textFaint,
-                  fontSize: 13,
-                  fontWeight: '700',
-                  textTransform: 'uppercase',
-                }}
-              >
-                Contact
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Edit child email"
-                disabled={busy || reviewing}
-                onPress={() => {
-                  setEmailDraft(email);
-                  setEditing('email');
-                }}
-                style={{
-                  minWidth: 44,
-                  minHeight: 44,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ color: colors.teal, fontWeight: '600' }}>Edit</Text>
-              </Pressable>
-            </View>
-            <View
-              style={{
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: colors.border,
-                backgroundColor: colors.card,
-                overflow: 'hidden',
-              }}
-            >
-              <SettingsRow
-                icon={<Mail size={20} color={colors.textMuted} />}
-                label="Email (optional)"
-                labelColor={colors.text}
-                hideChevron
-                trailing={
-                  <Text style={{ color: colors.textMuted, maxWidth: 160 }}>
-                    {email || 'Not set'}
+            {section(
+              'Contact',
+              <>
+                <View style={{ gap: 8 }}>
+                  <Text style={labelStyle} nativeID="child-email-label">
+                    Email (optional)
                   </Text>
-                }
-              />
-            </View>
-            <Text style={{ color: colors.textMuted, fontSize: 13 }}>
+                  <TextInput
+                    accessibilityLabel="Child email"
+                    accessibilityLabelledBy="child-email-label"
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="Child email address"
+                    placeholderTextColor={colors.textFaint}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    maxLength={254}
+                    editable={!disabled}
+                    returnKeyType="done"
+                    onFocus={() => setFocusedField('email')}
+                    onBlur={() => setFocusedField(null)}
+                    style={[
+                      inputStyle,
+                      focusedField === 'email' && { borderColor: colors.teal },
+                    ]}
+                  />
+                  <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
+                    Add an email if your child will sign in independently. You can send an
+                    invitation after creating their profile.
+                  </Text>
+                </View>{' '}
+              </>,
+            )}
+            <Text style={{ color: colors.textMuted, fontSize: 13, marginTop: 8 }}>
               Time zone: {inherited('timezone') || 'UTC'}
               {inherited('city') ? ` · ${inherited('city')}` : ''}
             </Text>
@@ -253,97 +416,30 @@ export function AddChildDraft() {
         footer={
           <Pressable
             accessibilityRole="button"
-            disabled={busy || reviewing}
+            accessibilityState={{ disabled, busy }}
+            disabled={disabled}
             onPress={confirm}
             style={{
               backgroundColor: colors.teal,
               borderRadius: 12,
               padding: 16,
-              marginTop: 16,
+              minHeight: 52,
+              opacity: disabled ? 0.6 : 1,
             }}
           >
             <Text
-              style={{ color: colors.tealFg, textAlign: 'center', fontWeight: '700' }}
+              style={{
+                color: colors.tealFg,
+                textAlign: 'center',
+                fontWeight: '700',
+                fontSize: 16,
+              }}
             >
               {busy ? 'Adding…' : 'Add child'}
             </Text>
           </Pressable>
         }
       />
-      {editing && (
-        <Modal
-          visible
-          animationType="slide"
-          presentationStyle="pageSheet"
-          onRequestClose={() => setEditing(null)}
-        >
-          <SheetContent backgroundColor={colors.pageBg}>
-            {editing === 'email' ? (
-              <>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingHorizontal: 20,
-                    paddingBottom: 12,
-                  }}
-                >
-                  <Pressable
-                    onPress={() => setEditing(null)}
-                    style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: colors.teal }}>Cancel</Text>
-                  </Pressable>
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>
-                    Child email
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="Save child email"
-                    onPress={saveEmail}
-                    style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}
-                  >
-                    <Text style={{ color: colors.teal, fontWeight: '600' }}>Save</Text>
-                  </Pressable>
-                </View>
-                <View style={{ padding: 20, gap: 12 }}>
-                  <Text style={{ color: colors.text }}>Email (optional)</Text>
-                  <TextInput
-                    accessibilityLabel="Child email"
-                    value={emailDraft}
-                    onChangeText={setEmailDraft}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete="email"
-                    maxLength={254}
-                    style={{
-                      color: colors.text,
-                      backgroundColor: colors.inputBg,
-                      borderWidth: 1,
-                      borderColor: colors.border,
-                      padding: 12,
-                      borderRadius: 10,
-                    }}
-                  />
-                  <Text style={{ color: colors.textMuted }}>
-                    Add an email if your child will sign in independently. You can send an
-                    invitation after creating their profile.
-                  </Text>
-                </View>
-              </>
-            ) : (
-              <ProfileSectionForm
-                profile={profile}
-                section={editing}
-                onDraftSave={saveDraft}
-                onClose={() => setEditing(null)}
-              />
-            )}
-          </SheetContent>
-        </Modal>
-      )}
-    </>
+    </KeyboardAvoidingView>
   );
 }
