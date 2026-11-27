@@ -1,18 +1,12 @@
 import React from 'react';
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import {
   AlertCircle,
   Bell,
   CalendarCheck,
   CalendarX,
   MessageSquare,
+  NotepadText,
   Star,
 } from 'lucide-react-native';
 
@@ -24,9 +18,11 @@ import {
   compactTime,
   formatActivityPrimaryHeadline,
   formatFeedSectionLabel,
+  getActivityIcon,
   getActivityTag,
   getIconKey,
   getLeadingAvatar,
+  isCompletionCheckResolved,
   isPreviewRedundant,
   makeActivityItemStyles,
   metaTime,
@@ -189,7 +185,7 @@ describe('ActivityItem', () => {
     expect(
       screen.queryByText('Class session starts Wednesday, April 8 at 9:00 AM EDT'),
     ).toBeNull();
-    expect(screen.getByText('Open class')).toBeTruthy();
+    expect(screen.queryByTestId('activity-preview')).toBeNull();
   });
 
   it('detects redundant previews regardless of case, spacing and trailing punctuation', () => {
@@ -250,24 +246,94 @@ describe('ActivityItem', () => {
     ).toEqual({ label: 'Reported', tone: 'danger' });
   });
 
-  it('places Read more beside the action button in one row', () => {
+  it('hides Read more when the full text matches the preview', () => {
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        summary: 'Hellow how are you',
+        expandedContent: 'Hellow how are you',
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByText('Hellow how are you')).toBeTruthy();
+    expect(screen.queryByText('Read more')).toBeNull();
+  });
+
+  it('replaces the preview with the full text when expanded', () => {
     const onToggle = jest.fn();
     const item = {
       ...makeBaseActivity(),
       content: {
         ...makeBaseActivity().content,
-        expandedContent: 'Full message body',
-        actionButton: { label: 'Open message', variant: 'outline' },
+        summary: 'Can we move Thursday',
+        expandedContent: 'Can we move Thursday to 5pm? Scott has practice until 4:30.',
       },
     } as ActivityFeedItemVM;
 
-    renderActivity(item, { onToggle });
+    const { rerender } = renderActivity(item, { onToggle });
 
-    const row = screen.getByTestId('activity-actions-row');
-    expect(within(row).getByLabelText('Open message')).toBeTruthy();
-    expect(within(row).getByText('Read more')).toBeTruthy();
-    fireEvent.press(within(row).getByText('Read more'));
+    fireEvent.press(screen.getByText('Read more'));
     expect(onToggle).toHaveBeenCalledWith('activity-1');
+
+    rerender(
+      <ActivityItem
+        item={item}
+        colors={lightColors}
+        isDark={false}
+        s={makeActivityItemStyles(lightColors)}
+        onMarkRead={jest.fn()}
+        expandedIds={new Set(['activity-1'])}
+        onToggle={onToggle}
+      />,
+    );
+
+    expect(
+      screen.getByText('Can we move Thursday to 5pm? Scott has practice until 4:30.'),
+    ).toBeTruthy();
+    expect(screen.queryByText('Can we move Thursday')).toBeNull();
+    expect(screen.getByText('Show less')).toBeTruthy();
+  });
+
+  it('collapses an already-answered completion check to its status tag', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.completion_check.sent',
+      content: {
+        ...makeBaseActivity().content,
+        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+        headline: { primary: 'Confirm the lesson for Scott S with Barbara Y' },
+      },
+      metadata: {
+        sessionCompletionId: 'completion-1',
+        sessionCompletion: { id: 'completion-1', status: 'confirmed', rating: 5 },
+      },
+    } as ActivityFeedItemVM;
+
+    const { UNSAFE_getAllByType } = renderActivity(item);
+
+    expect(screen.getByText('Confirmed')).toBeTruthy();
+    expect(screen.queryByText('This session has been marked as completed.')).toBeNull();
+    expect(screen.queryByText('Rate your session')).toBeNull();
+    expect(screen.queryByLabelText('Confirm lesson')).toBeNull();
+    expect(isCompletionCheckResolved(item)).toBe(true);
+    expect(UNSAFE_getAllByType(NotepadText).length).toBeGreaterThan(0);
+  });
+
+  it('uses the notepad icon for completion checks', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'session.completion_check.batch.sent',
+      content: {
+        ...makeBaseActivity().content,
+        leading: { kind: 'icon', iconKey: 'CheckCircle2', tone: 'success' },
+      },
+    } as ActivityFeedItemVM;
+
+    expect(getActivityIcon(item)).toBe(NotepadText);
+    expect(getActivityIcon(makeBaseActivity())).toBe(MessageSquare);
   });
 
   it('formats meta timestamps and dated section headers', () => {
@@ -451,8 +517,9 @@ describe('ActivityItem', () => {
     expect(onMarkRead).not.toHaveBeenCalled();
   });
 
-  it('calls the activity action handler when the action button is pressed', () => {
+  it('navigates when the row is tapped instead of showing an Open pill', () => {
     const onActionPress = jest.fn();
+    const onMarkRead = jest.fn();
     const item = {
       ...makeBaseActivity(),
       content: {
@@ -461,11 +528,13 @@ describe('ActivityItem', () => {
       },
     } as ActivityFeedItemVM;
 
-    renderActivity(item, { onActionPress });
+    renderActivity(item, { onActionPress, onMarkRead });
 
-    fireEvent.press(screen.getByText('Open class'));
+    expect(screen.queryByText('Open class')).toBeNull();
+    fireEvent.press(screen.getByText('Priya Sharma'));
 
     expect(onActionPress).toHaveBeenCalledWith(item);
+    expect(onMarkRead).toHaveBeenCalledWith('activity-1');
   });
 
   it('renders feedback requests in the preview position without an action button', () => {
@@ -750,11 +819,10 @@ describe('ActivityItem', () => {
 
     expect(screen.getByText('1 of 2 confirmed')).toBeTruthy();
 
+    // Answered sessions collapse to a one-word status and do not expand.
+    expect(screen.getByText('Completed')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Math Foundations — resolved'));
-    // Already-confirmed on load (not a fresh in-session confirm) → the plain
-    // "marked as completed" message rather than the fresh-confirm feedback prompt.
-    expect(screen.getByText('This session has been marked as completed.')).toBeTruthy();
-    expect(screen.getByText('Rate your session')).toBeTruthy();
+    expect(screen.queryByText('This session has been marked as completed.')).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Math Foundations — needs confirmation'));
     expect(screen.getByLabelText('Confirm lesson')).toBeTruthy();
@@ -782,6 +850,8 @@ describe('ActivityItem', () => {
 
     renderActivity(item, { currentProfileId: 'profile-1' });
 
+    expect(screen.getByText('Report')).toBeTruthy();
+    expect(screen.getByLabelText('Report a problem')).toBeTruthy();
     fireEvent.press(screen.getByLabelText('Confirm lesson'));
 
     await waitFor(() => {

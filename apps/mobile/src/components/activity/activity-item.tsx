@@ -1,8 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, Image, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
 import {
   AlertCircle,
-  ArrowRight,
   AtSign,
   Bell,
   BookImage,
@@ -19,6 +18,7 @@ import {
   MessageSquareReply,
   MessagesSquare,
   SmilePlus,
+  NotepadText,
   Star,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
@@ -138,6 +138,20 @@ export function getIconKey(item: ActivityFeedItemVM): InboxIconKeyVM {
   }
 }
 
+type ActivityIconComponentType = React.ComponentType<{ size: number; color: string }>;
+
+// Client-side icon overrides for verbs whose meaning reads better with an icon
+// outside the shared InboxIconKeyVM set (kept out of the API contract).
+const VERB_ICON_OVERRIDES: Partial<Record<ActivityVerbVM, ActivityIconComponentType>> = {
+  // "Confirm the lesson…" — a lesson note, not a generic check mark.
+  'session.completion_check.sent': NotepadText,
+  'session.completion_check.batch.sent': NotepadText,
+};
+
+export function getActivityIcon(item: ActivityFeedItemVM): ActivityIconComponentType {
+  return VERB_ICON_OVERRIDES[item.verb] ?? ACTIVITY_ICON_MAP[getIconKey(item)] ?? Bell;
+}
+
 export function relativeTime(iso: string): string {
   const diff = Math.max(0, Date.now() - new Date(iso).getTime());
   const mins = Math.floor(diff / 60_000);
@@ -207,6 +221,20 @@ export function isPreviewRedundant(headline: string, preview: string): boolean {
   return normalizeForCompare(headline).includes(normalizedPreview);
 }
 
+/**
+ * "Read more" only earns its place when the expanded text says something the
+ * preview and headline do not — e.g. a short chat message whose full body is
+ * identical to its preview should not offer to expand.
+ */
+export function hasMoreToRead(
+  headline: string,
+  previewText: string | null,
+  expandedContent: string | undefined,
+): boolean {
+  if (!expandedContent) return false;
+  return !isPreviewRedundant(`${headline} ${previewText ?? ''}`, expandedContent);
+}
+
 // Verbs driven by a person's action — these lead with that person's avatar so
 // the reader sees *who* before *what*. System-generated verbs (reminders,
 // schedule changes, completion checks) keep the tone icon chip.
@@ -270,6 +298,46 @@ function completionStatus(item: ActivityFeedItemVM): string | null {
   return typeof completion?.status === 'string' ? completion.status : null;
 }
 
+const RESOLVED_COMPLETION_STATUSES = new Set(['confirmed', 'auto_confirmed', 'disputed']);
+
+function batchSessionStatuses(item: ActivityFeedItemVM): Array<string | null> {
+  const metadata = (item.metadata ?? {}) as Record<string, unknown>;
+  if (!Array.isArray(metadata.sessions)) return [];
+  return (metadata.sessions as unknown[]).map((session) => {
+    const completion =
+      session && typeof session === 'object'
+        ? (session as Record<string, unknown>).sessionCompletion
+        : null;
+    const status =
+      completion && typeof completion === 'object'
+        ? (completion as Record<string, unknown>).status
+        : null;
+    return typeof status === 'string' ? status : null;
+  });
+}
+
+/**
+ * True when a completion check has already been answered (confirmed,
+ * auto-confirmed or reported). Those rows collapse to their status tag — the
+ * prompt, "marked as completed" copy and rating tile are no longer useful.
+ */
+export function isCompletionCheckResolved(item: ActivityFeedItemVM): boolean {
+  if (item.verb === 'session.completion_check.sent') {
+    const status = completionStatus(item);
+    return status !== null && RESOLVED_COMPLETION_STATUSES.has(status);
+  }
+  if (item.verb === 'session.completion_check.batch.sent') {
+    const statuses = batchSessionStatuses(item);
+    return (
+      statuses.length > 0 &&
+      statuses.every(
+        (status) => status !== null && RESOLVED_COMPLETION_STATUSES.has(status),
+      )
+    );
+  }
+  return false;
+}
+
 /**
  * Short status tag shown top-right on system notifications. It describes what
  * *happened* (Rescheduled, Canceled, Action needed…) rather than the inbox tab,
@@ -295,7 +363,9 @@ export function getActivityTag(item: ActivityFeedItemVM): ActivityTag | null {
     case 'message.unviewed_intended_participants':
       return { label: 'Unseen', tone: 'warning' };
     case 'session.completion_check.batch.sent':
-      return { label: 'Action needed', tone: 'warning' };
+      return isCompletionCheckResolved(item)
+        ? { label: 'Completed', tone: 'success' }
+        : { label: 'Action needed', tone: 'warning' };
     case 'session.completion_check.sent': {
       const status = completionStatus(item);
       if (status === 'confirmed' || status === 'auto_confirmed') {
@@ -336,21 +406,13 @@ const SUB_BODY_INDENT = SUB_LEADING_SIZE + 10;
 
 export function makeActivityItemStyles(C: AppColors) {
   return StyleSheet.create({
-    // Outer wrapper owns horizontal margin (inbox SectionList / home ScrollView)
-    itemOuter: { marginHorizontal: 16 },
-
-    // Item card — borderless, soft shadow (matches SessionCard)
+    // Flat row on the page background; the list draws hairline separators.
+    itemOuter: {},
     itemWrap: {
-      borderRadius: 18,
-      backgroundColor: C.card,
-      paddingHorizontal: 16,
+      paddingHorizontal: 20,
       paddingVertical: 16,
-      shadowColor: '#1f2a26',
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
-      shadowOffset: { width: 0, height: 3 },
-      elevation: 1,
     },
+    itemWrapPressed: { backgroundColor: C.inkSubtle },
     itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: CONTENT_GAP },
 
     // Leading visual — actor avatar or tone icon chip
@@ -414,13 +476,21 @@ export function makeActivityItemStyles(C: AppColors) {
     strong: { fontWeight: '700' },
     strongRead: { fontWeight: '600' },
 
-    // Status tag (top-right)
-    tag: {
+    // Time — top-right on the headline line
+    timeText: {
       flexShrink: 0,
+      fontSize: 13,
+      lineHeight: 21,
+      fontVariant: ['tabular-nums'],
+    },
+
+    // Status tag — small pill under the detail line (system rows only)
+    tag: {
+      alignSelf: 'flex-start',
       borderRadius: 6,
       paddingHorizontal: 7,
       paddingVertical: 3,
-      marginTop: 1,
+      marginTop: 8,
     },
     tagText: {
       fontSize: 11,
@@ -430,28 +500,35 @@ export function makeActivityItemStyles(C: AppColors) {
       textTransform: 'uppercase',
     },
 
-    // Meta row — time on the left, unread dot on the right
-    metaRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 8,
-      marginTop: 6,
+    // Unread dot — pinned to the leading visual's top-left corner
+    unreadDot: {
+      position: 'absolute',
+      top: -2,
+      left: -2,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      borderWidth: 2,
     },
-    metaText: { fontSize: 13, fontVariant: ['tabular-nums'] },
-    unreadDot: { width: 8, height: 8, borderRadius: 4 },
 
     // Body — previews and actions align with the headline text
     body: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: 12, gap: 10 },
     subBody: { marginLeft: SUB_BODY_INDENT, marginTop: 8, gap: 8 },
-    // Interactive widgets (completion check, rating) use the full card width so
+    // Interactive widgets (completion check, rating) use the full row width so
     // their side-by-side buttons have room on narrow phones.
     widget: { marginTop: 14 },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: C.border,
+      marginHorizontal: 20,
+    },
 
-    // Inset panel (preview / expanded content) — recessed, no border
+    // Inset panel (preview / expanded content) — white panel on the page bg
     inset: {
       borderRadius: 12,
-      backgroundColor: C.bg,
+      backgroundColor: C.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: C.border,
       paddingHorizontal: 12,
       paddingVertical: 10,
       gap: 8,
@@ -459,20 +536,9 @@ export function makeActivityItemStyles(C: AppColors) {
     insetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.border },
     insetText: { fontSize: 14, lineHeight: 20, color: C.text },
 
-    // Actions — one horizontal row: primary action, then Read more / Show less
-    actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    actionBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      minHeight: 36,
-      paddingHorizontal: 14,
-      borderRadius: 999,
-    },
-    actionBtnPrimary: { backgroundColor: C.action },
-    actionBtnTonal: { backgroundColor: C.actionSubtle },
-    actionBtnGhost: { paddingHorizontal: 10 },
-    actionBtnText: { fontSize: 14, fontWeight: '600' },
+    // Read more / Show less — quiet text link under the preview
+    expandLink: { alignSelf: 'flex-start', paddingVertical: 2 },
+    expandLinkText: { fontSize: 14, fontWeight: '600' },
 
     // Sub-activity: compact leaf view
     subItemInner: { paddingVertical: 10 },
@@ -591,19 +657,33 @@ type ActivityIconComponent = React.ComponentType<{ size: number; color: string }
 
 function ActivityLeading({
   avatar,
+  colors,
   s,
   IconComponent,
   iconBg,
   iconFg,
+  isRead,
   isSubActivity,
 }: {
   avatar: ActivityLeadingAvatar | null;
+  colors: AppColors;
   s: ActivityItemStyles;
   IconComponent: ActivityIconComponent;
   iconBg: string;
   iconFg: string;
+  isRead: boolean;
   isSubActivity: boolean;
 }) {
+  // Unread marker pinned to the leading visual's top-left corner, ringed with
+  // the page colour so it reads cleanly over avatars and icon chips.
+  const unreadDot = isRead ? null : (
+    <View
+      style={[s.unreadDot, { backgroundColor: colors.action, borderColor: colors.bg }]}
+      accessibilityLabel="Unread"
+      testID="activity-unread-indicator"
+    />
+  );
+
   if (!avatar) {
     return (
       <View
@@ -611,6 +691,7 @@ function ActivityLeading({
         testID="activity-leading-icon"
       >
         <IconComponent size={isSubActivity ? 14 : 18} color={iconFg} />
+        {unreadDot}
       </View>
     );
   }
@@ -654,6 +735,7 @@ function ActivityLeading({
           <IconComponent size={10} color={iconFg} />
         </View>
       )}
+      {unreadDot}
     </View>
   );
 }
@@ -718,10 +800,12 @@ function ActivityHeaderRow({
     <View style={s.itemRow}>
       <ActivityLeading
         avatar={avatar}
+        colors={colors}
         s={s}
         IconComponent={IconComponent}
         iconBg={iconBg}
         iconFg={iconFg}
+        isRead={isRead}
         isSubActivity={isSubActivity}
       />
 
@@ -749,30 +833,21 @@ function ActivityHeaderRow({
             </Text>
           )}
 
-          {tag && !isSubActivity ? (
-            <ActivityTagPill isDark={isDark} s={s} tag={tag} />
-          ) : null}
+          <Text
+            style={[s.timeText, { color: colors.textMuted }]}
+            accessibilityLabel={relativeTime(occurredAt)}
+          >
+            {metaTime(occurredAt)}
+          </Text>
         </View>
 
         {!isSentence && detail ? (
           <Text style={[s.detailText, { color: colors.textMuted }]}>{detail}</Text>
         ) : null}
 
-        <View style={s.metaRow}>
-          <Text
-            style={[s.metaText, { color: colors.textMuted }]}
-            accessibilityLabel={relativeTime(occurredAt)}
-          >
-            {metaTime(occurredAt)}
-          </Text>
-          {isRead ? null : (
-            <View
-              style={[s.unreadDot, { backgroundColor: colors.action }]}
-              accessibilityLabel="Unread"
-              testID="activity-unread-indicator"
-            />
-          )}
-        </View>
+        {tag && !isSubActivity ? (
+          <ActivityTagPill isDark={isDark} s={s} tag={tag} />
+        ) : null}
       </View>
     </View>
   );
@@ -794,9 +869,16 @@ function ActivityInset({
   const showExpanded = Boolean(expandedContent) && isExpanded;
   if (!previewText && !showExpanded) return null;
 
+  // When the expanded text already contains the preview (a long message and its
+  // first lines), show it in place of the preview instead of repeating it.
+  const expandedReplacesPreview =
+    showExpanded &&
+    Boolean(previewText) &&
+    isPreviewRedundant(expandedContent!, previewText!);
+
   return (
-    <View style={s.inset}>
-      {previewText ? (
+    <View style={s.inset} testID="activity-preview">
+      {previewText && !expandedReplacesPreview ? (
         <Text style={s.insetText} numberOfLines={isExpanded ? undefined : numberOfLines}>
           {previewText}
         </Text>
@@ -804,7 +886,9 @@ function ActivityInset({
 
       {showExpanded ? (
         <>
-          {previewText ? <View style={s.insetDivider} /> : null}
+          {previewText && !expandedReplacesPreview ? (
+            <View style={s.insetDivider} />
+          ) : null}
           <Text style={s.insetText}>{expandedContent}</Text>
         </>
       ) : null}
@@ -812,56 +896,30 @@ function ActivityInset({
   );
 }
 
-function ActivityActions({
-  action,
+function ActivityExpandLink({
   colors,
-  expandLabel,
-  onExpandToggle,
+  isExpanded,
+  onPress,
   s,
 }: {
-  action: {
-    label: string;
-    onPress: () => void;
-    variant?: 'default' | 'outline' | 'secondary';
-  } | null;
   colors: AppColors;
-  expandLabel: string | null;
-  onExpandToggle: () => void;
+  isExpanded: boolean;
+  onPress: () => void;
   s: ActivityItemStyles;
 }) {
-  if (!action && !expandLabel) return null;
-  const isPrimary = action?.variant === 'default';
-  const fg = isPrimary ? colors.actionForeground : colors.action;
-
   return (
-    <View style={s.actionsRow} testID="activity-actions-row">
-      {action ? (
-        <TouchableOpacity
-          style={[s.actionBtn, isPrimary ? s.actionBtnPrimary : s.actionBtnTonal]}
-          onPress={action.onPress}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel={action.label}
-        >
-          <Text style={[s.actionBtnText, { color: fg }]} numberOfLines={1}>
-            {action.label}
-          </Text>
-          <ArrowRight size={15} color={fg} />
-        </TouchableOpacity>
-      ) : null}
-
-      {expandLabel ? (
-        <TouchableOpacity
-          style={[s.actionBtn, s.actionBtnGhost]}
-          onPress={onExpandToggle}
-          hitSlop={4}
-          activeOpacity={0.7}
-          accessibilityRole="button"
-        >
-          <Text style={[s.actionBtnText, { color: colors.action }]}>{expandLabel}</Text>
-        </TouchableOpacity>
-      ) : null}
-    </View>
+    <TouchableOpacity
+      style={s.expandLink}
+      onPress={onPress}
+      hitSlop={8}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      testID="activity-expand-link"
+    >
+      <Text style={[s.expandLinkText, { color: colors.action }]}>
+        {isExpanded ? 'Show less' : 'Read more'}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -878,11 +936,15 @@ export function ActivityItem({
   viewerTimezone,
   currentProfileId,
 }: ActivityItemProps) {
-  const iconKey = getIconKey(item);
+  // Captured once: a check that was still pending when the row mounted keeps its
+  // widget after the user answers (so the "How was it?" rating step can follow),
+  // while rows that load already answered collapse to their status tag.
+  const [completionPendingOnMount] = useState(() => !isCompletionCheckResolved(item));
+
   const tone =
     item.content.leading?.kind === 'icon' ? item.content.leading.tone : undefined;
   const { bg: iconBg, fg: iconFg } = isDark ? toneColorsDark(tone) : toneColors(tone);
-  const IconComponent = ACTIVITY_ICON_MAP[iconKey] ?? Bell;
+  const IconComponent = getActivityIcon(item);
   const avatar = getLeadingAvatar(item);
   const isRead = item.state?.isRead ?? false;
   const isExpanded = expandedIds.has(item.ids.id);
@@ -893,31 +955,39 @@ export function ActivityItem({
     item.content.summary?.trim() || item.content.preview?.text?.trim() || '';
   const previewText =
     rawPreview && !isPreviewRedundant(headlineText, rawPreview) ? rawPreview : null;
-  const expandedContent = item.content.expandedContent?.trim() || undefined;
-  const hasExpandedContent = Boolean(expandedContent);
-  const actionButton = item.content.actionButton;
+  const rawExpanded = item.content.expandedContent?.trim() || undefined;
+  const isExpandable = hasMoreToRead(headlineText, previewText, rawExpanded);
+  const expandedContent = isExpandable ? rawExpanded : undefined;
+  // Every feed action button navigates (open class / message / reply), so the
+  // row itself is the tap target — no separate "Open …" pill.
+  const navigationLabel = item.content.actionButton?.label ?? null;
+  const isCompletionCheck =
+    item.kind === 'leaf' &&
+    (item.verb === 'session.completion_check.sent' ||
+      item.verb === 'session.completion_check.batch.sent');
   const canShowFeedbackRequest =
     item.kind === 'leaf' &&
     item.verb === 'session.feedback_request.sent' &&
     canRenderMobileActivityFeedbackRequest(item);
-  const canShowCompletionCheck =
-    item.kind === 'leaf' &&
-    (item.verb === 'session.completion_check.sent' ||
-      item.verb === 'session.completion_check.batch.sent');
+  const canShowCompletionCheck = isCompletionCheck && completionPendingOnMount;
   const hidesDefaultContent =
-    !isSubActivity && (canShowFeedbackRequest || canShowCompletionCheck);
+    !isSubActivity && (canShowFeedbackRequest || isCompletionCheck);
   const shouldShowPreview = !hidesDefaultContent;
-  const shouldShowActionButton = Boolean(actionButton) && !hidesDefaultContent;
+  const canNavigate = Boolean(navigationLabel) && !hidesDefaultContent;
   const tag = getActivityTag(item);
+
+  const toggleExpanded = () => {
+    if (!isRead) onMarkRead(item.ids.id);
+    onToggle(item.ids.id);
+  };
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);
-    if (hasExpandedContent) onToggle(item.ids.id);
-  };
-
-  const handleActionPress = () => {
-    if (!isRead) onMarkRead(item.ids.id);
-    onActionPress?.(item);
+    if (canNavigate) {
+      onActionPress?.(item);
+      return;
+    }
+    if (isExpandable) onToggle(item.ids.id);
   };
 
   const header = (
@@ -939,57 +1009,49 @@ export function ActivityItem({
     />
   );
 
-  const inset = shouldShowPreview ? (
-    <ActivityInset
-      expandedContent={expandedContent}
-      isExpanded={isExpanded}
-      numberOfLines={isSubActivity ? 3 : 4}
-      previewText={previewText}
-      s={s}
-    />
-  ) : null;
+  const showPreview =
+    shouldShowPreview && (Boolean(previewText) || (isExpandable && isExpanded));
+  const showExpandLink = shouldShowPreview && isExpandable;
+  const body =
+    showPreview || showExpandLink ? (
+      <View style={isSubActivity ? s.subBody : s.body}>
+        {showPreview ? (
+          <ActivityInset
+            expandedContent={expandedContent}
+            isExpanded={isExpanded}
+            numberOfLines={isSubActivity ? 3 : 4}
+            previewText={previewText}
+            s={s}
+          />
+        ) : null}
+        {showExpandLink ? (
+          <ActivityExpandLink
+            colors={colors}
+            isExpanded={isExpanded}
+            onPress={toggleExpanded}
+            s={s}
+          />
+        ) : null}
+      </View>
+    ) : null;
 
-  const expandLabel =
-    shouldShowPreview && hasExpandedContent
-      ? isExpanded
-        ? 'Show less'
-        : 'Read more'
-      : null;
-  const actions = (
-    <ActivityActions
-      action={
-        shouldShowActionButton && actionButton
-          ? {
-              label: actionButton.label,
-              onPress: handleActionPress,
-              variant: actionButton.variant,
-            }
-          : null
-      }
-      colors={colors}
-      expandLabel={expandLabel}
-      onExpandToggle={() => onToggle(item.ids.id)}
-      s={s}
-    />
-  );
-  const hasActions =
-    (shouldShowActionButton && Boolean(actionButton)) || Boolean(expandLabel);
+  const a11yHint = canNavigate
+    ? navigationLabel!
+    : isRead
+      ? undefined
+      : 'Marks this notification as read';
 
   // Sub-activity: compact leaf view
   if (isSubActivity) {
-    const hasBody = Boolean(previewText) || hasActions;
     return (
       <Pressable
         onPress={handlePress}
+        accessibilityRole="button"
+        accessibilityHint={a11yHint}
         style={({ pressed }) => [s.subItemInner, pressed && { opacity: 0.7 }]}
       >
         {header}
-        {hasBody ? (
-          <View style={s.subBody}>
-            {inset}
-            {hasActions ? actions : null}
-          </View>
-        ) : null}
+        {body}
       </Pressable>
     );
   }
@@ -1016,26 +1078,16 @@ export function ActivityItem({
     )
   ) : null;
 
-  const hasPreviewContent =
-    shouldShowPreview && (Boolean(previewText) || (hasExpandedContent && isExpanded));
-  const hasBody = hasPreviewContent || hasActions;
-
   return (
     <View style={s.itemOuter}>
       <Pressable
         onPress={handlePress}
-        accessibilityHint={isRead ? undefined : 'Marks this notification as read'}
-        style={({ pressed }) => [s.itemWrap, pressed && { opacity: 0.92 }]}
+        accessibilityRole="button"
+        accessibilityHint={a11yHint}
+        style={({ pressed }) => [s.itemWrap, pressed && s.itemWrapPressed]}
       >
         {header}
-
-        {hasBody ? (
-          <View style={s.body}>
-            {hasPreviewContent ? inset : null}
-            {hasActions ? actions : null}
-          </View>
-        ) : null}
-
+        {body}
         {interactiveWidget ? <View style={s.widget}>{interactiveWidget}</View> : null}
       </Pressable>
     </View>

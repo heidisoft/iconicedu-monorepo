@@ -334,9 +334,7 @@ export function ActivityCompletionCheck({
             ]}
           >
             <Flag size={15} color={colors.text} />
-            <Text style={[styles.noButtonText, { color: colors.text }]}>
-              Report issue
-            </Text>
+            <Text style={[styles.noButtonText, { color: colors.text }]}>Report</Text>
           </TouchableOpacity>
         </View>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -533,11 +531,13 @@ export function ActivityCompletionCheck({
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    // Recessed inset panel under the feed row's headline. ActivityItem's body
-    // owns the left indent, so the card itself carries no margin.
+    // White panel on the feed's page background. ActivityItem owns spacing,
+    // so the card itself carries no margin.
     card: {
       borderRadius: 14,
-      backgroundColor: colors.bg,
+      backgroundColor: colors.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
       padding: 14,
       gap: 12,
     },
@@ -563,7 +563,7 @@ function makeStyles(colors: AppColors) {
       fontSize: 14,
       lineHeight: 20,
     },
-    // Side by side, equal width. Short labels ("Confirm" / "Report issue") keep
+    // Side by side, equal width. Short labels ("Confirm" / "Report") keep
     // both on one line on standard phones; wrap is only a fallback for very
     // narrow screens or large accessibility text sizes.
     buttonRow: {
@@ -595,7 +595,7 @@ function makeStyles(colors: AppColors) {
     noButton: {
       flexGrow: 1,
       flexBasis: 0,
-      minWidth: 128,
+      minWidth: 112,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',

@@ -99,6 +99,9 @@ export function ActivityCompletionCheckBatch({
         const isConfirmed = confirmedIds.has(sessionResponseKey);
         const isDisputed = disputedIds.has(sessionResponseKey);
         const isResolved = isConfirmed || isDisputed;
+        // Answered sessions collapse to a one-word status. A row the user just
+        // answered stays open (so the rating step can follow) until they close it.
+        const isCollapsedResolved = isResolved && !isExpanded;
 
         // Build a synthetic activity item for the single-session component
         const syntheticActivity: ActivityFeedLeafItemVM = {
@@ -121,12 +124,13 @@ export function ActivityCompletionCheckBatch({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`${session.title} — ${isResolved ? 'resolved' : 'needs confirmation'}`}
+              disabled={isCollapsedResolved}
               onPress={() => setExpandedIndex(isExpanded ? null : index)}
               style={({ pressed }) => [
                 styles.sessionRow,
                 {
                   borderColor: colors.border,
-                  backgroundColor: pressed ? colors.card : 'transparent',
+                  backgroundColor: pressed ? colors.inkSubtle : 'transparent',
                 },
               ]}
             >
@@ -153,7 +157,16 @@ export function ActivityCompletionCheckBatch({
                   {session.title}
                 </Text>
               </View>
-              {isExpanded ? (
+              {isCollapsedResolved ? (
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: isDisputed ? colors.warning : colors.success },
+                  ]}
+                >
+                  {isDisputed ? 'Reported' : 'Completed'}
+                </Text>
+              ) : isExpanded ? (
                 <ChevronUp size={14} color={colors.textMuted} />
               ) : (
                 <ChevronDown size={14} color={colors.textMuted} />
@@ -202,10 +215,12 @@ export function ActivityCompletionCheckBatch({
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
-    // Recessed inset panel — ActivityItem's body owns the left indent.
+    // White panel on the feed's page background.
     container: {
       borderRadius: 14,
-      backgroundColor: colors.bg,
+      backgroundColor: colors.card,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: colors.border,
       overflow: 'hidden',
     },
     sessionPanel: {
@@ -256,6 +271,10 @@ function makeStyles(colors: AppColors) {
       width: 8,
       height: 8,
       borderRadius: 4,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '700',
     },
     sessionTitle: {
       flex: 1,

@@ -5,11 +5,11 @@ import { PulseBox } from './pulse-box';
 
 type Props = { count?: number };
 
-// Mirrors ActivityItem's card: 40px leading visual, headline with a status tag
+// Mirrors ActivityItem's flat row (hairline separators between rows): 40px leading visual, headline with a status tag
 // pinned top-right, a meta line, then an inset panel aligned under the headline.
 const LEADING_SIZE = 40;
 const CONTENT_GAP = 12;
-const CARD_PADDING = 16;
+const ROW_PADDING_X = 20;
 const TAG_WIDTH = 64;
 
 const ROWS = [
@@ -34,7 +34,7 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const rows = ROWS.slice(0, Math.max(0, Math.min(count, ROWS.length)));
-  const cardInnerWidth = Math.max(168, width - 32 - CARD_PADDING * 2);
+  const cardInnerWidth = Math.max(168, width - ROW_PADDING_X * 2);
   const bodyWidth = Math.max(126, cardInnerWidth - LEADING_SIZE - CONTENT_GAP);
   const headlineWidth = Math.max(96, bodyWidth - TAG_WIDTH - 8);
   const clamp = (value: number) => Math.min(value, headlineWidth);
@@ -47,56 +47,57 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
       </View>
 
       {rows.map((row, index) => (
-        <View
-          key={index}
-          style={[s.card, { backgroundColor: colors.card }]}
-          testID="activity-skeleton-row"
-        >
-          <View style={s.itemRow}>
-            <View
-              style={[s.leading, { backgroundColor: colors.bg }]}
-              testID="activity-skeleton-icon"
-            />
+        <View key={index} testID="activity-skeleton-row">
+          {index > 0 ? (
+            <View style={[s.separator, { backgroundColor: colors.border }]} />
+          ) : null}
+          <View style={s.row}>
+            <View style={s.itemRow}>
+              <View
+                style={[s.leading, { backgroundColor: colors.inkSubtle }]}
+                testID="activity-skeleton-icon"
+              />
 
-            <View style={s.content}>
-              <View style={s.topRow}>
-                <View style={s.headlineBlock}>
-                  {row.titleLines.map((lineWidth, lineIndex) => (
-                    <PulseBox
-                      key={lineIndex}
-                      width={clamp(lineWidth)}
-                      height={15}
-                      radius={4}
-                    />
-                  ))}
+              <View style={s.content}>
+                <View style={s.topRow}>
+                  <View style={s.headlineBlock}>
+                    {row.titleLines.map((lineWidth, lineIndex) => (
+                      <PulseBox
+                        key={lineIndex}
+                        width={clamp(lineWidth)}
+                        height={15}
+                        radius={4}
+                      />
+                    ))}
+                  </View>
+                  <PulseBox width={TAG_WIDTH} height={20} radius={6} />
                 </View>
-                <PulseBox width={TAG_WIDTH} height={20} radius={6} />
-              </View>
 
-              <PulseBox width={row.metaWidth} height={12} radius={4} />
+                <PulseBox width={row.metaWidth} height={12} radius={4} />
+              </View>
             </View>
-          </View>
 
-          <View
-            style={[
-              s.inset,
-              row.detail === 'completion' && s.insetCompletion,
-              { backgroundColor: colors.bg },
-            ]}
-            testID="activity-skeleton-preview-card"
-          >
-            <PulseBox width={clampInset(304)} height={13} radius={4} />
-            <PulseBox
-              width={clampInset(row.detail === 'completion' ? 248 : 128)}
-              height={13}
-              radius={4}
-            />
-            {row.detail === 'completion' ? (
-              <View style={s.pillRow}>
-                <PulseBox width={132} height={36} radius={18} />
-                <PulseBox width={140} height={36} radius={18} />
-              </View>
-            ) : null}
+            <View
+              style={[
+                s.inset,
+                row.detail === 'completion' && s.insetCompletion,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
+              testID="activity-skeleton-preview-card"
+            >
+              <PulseBox width={clampInset(304)} height={13} radius={4} />
+              <PulseBox
+                width={clampInset(row.detail === 'completion' ? 248 : 128)}
+                height={13}
+                radius={4}
+              />
+              {row.detail === 'completion' ? (
+                <View style={s.pillRow}>
+                  <PulseBox width={132} height={36} radius={18} />
+                  <PulseBox width={140} height={36} radius={18} />
+                </View>
+              ) : null}
+            </View>
           </View>
         </View>
       ))}
@@ -107,12 +108,8 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
 const s = StyleSheet.create({
   wrap: { paddingTop: 0, paddingBottom: 24 },
   sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
-  card: {
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 18,
-    padding: CARD_PADDING,
-  },
+  row: { paddingHorizontal: ROW_PADDING_X, paddingVertical: 16 },
+  separator: { height: StyleSheet.hairlineWidth, marginHorizontal: ROW_PADDING_X },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: CONTENT_GAP },
   leading: {
     width: LEADING_SIZE,
@@ -127,6 +124,7 @@ const s = StyleSheet.create({
     marginLeft: LEADING_SIZE + CONTENT_GAP,
     minHeight: 56,
     borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: 12,
     paddingVertical: 12,
     justifyContent: 'center',

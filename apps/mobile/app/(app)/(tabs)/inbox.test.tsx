@@ -78,6 +78,7 @@ jest.mock('lucide-react-native', () => {
     CreditCard: Icon,
     GraduationCap: Icon,
     MessageSquare: Icon,
+    NotepadText: Icon,
     Star: Icon,
   };
 });
@@ -175,7 +176,7 @@ describe('InboxScreen', () => {
     expect(mockMarkRead).toHaveBeenCalledWith(['class-unread']);
   });
 
-  it('opens the class space from a class notification action', () => {
+  it('opens the class space when a class notification row is tapped', () => {
     mockFeed = {
       ...makeFeed(),
       sections: [
@@ -197,13 +198,15 @@ describe('InboxScreen', () => {
 
     render(<InboxScreen />);
 
-    fireEvent.press(screen.getByText('Open class'));
+    // Navigation actions are the row itself — no separate "Open class" pill.
+    expect(screen.queryByText('Open class')).toBeNull();
+    fireEvent.press(screen.getByText('Algebra I'));
 
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/spaces/space-channel-123');
     expect(mockMarkRead).toHaveBeenCalledWith(['class-action']);
   });
 
-  it('opens the DM screen from a direct-message reply action', () => {
+  it('opens the DM screen when a direct-message row is tapped', () => {
     mockFeed = {
       ...makeFeed(),
       sections: [
@@ -228,7 +231,7 @@ describe('InboxScreen', () => {
 
     render(<InboxScreen />);
 
-    fireEvent.press(screen.getByText('Reply'));
+    fireEvent.press(screen.getByText('Alice'));
 
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/dm/dm-channel-123');
     expect(mockMarkRead).toHaveBeenCalledWith(['dm-action']);
@@ -271,7 +274,7 @@ describe('InboxScreen', () => {
 
     render(<InboxScreen />);
 
-    fireEvent.press(screen.getByText('Reply'));
+    fireEvent.press(screen.getByText('Alice'));
 
     expect(mockRouterPush).toHaveBeenCalledWith('/(app)/dm/dm-channel-123');
   });
