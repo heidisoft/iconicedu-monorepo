@@ -43,7 +43,16 @@ function PromotionCarousel({
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
   const height = Math.ceil(175 * Math.max(1, fontScale));
-  const { visible, dismiss, saving } = useHomeTileDismissal(scope, 'family-promotions');
+  const referralDismissal = useHomeTileDismissal(scope, 'family-promotion-refer');
+  const childDismissal = useHomeTileDismissal(scope, 'family-promotion-child');
+  const classDismissal = useHomeTileDismissal(scope, 'family-promotion-class');
+  const dismissals: Record<string, typeof childDismissal> = {
+    refer: referralDismissal,
+    child: childDismissal,
+    class: classDismissal,
+  };
+  const loaded = Object.values(dismissals).every((item) => item.loaded);
+  const saving = Object.values(dismissals).some((item) => item.saving);
   const [active, setActive] = useState(0);
   const pager = useRef<ScrollView>(null);
   const [laidOut, setLaidOut] = useState(false);
@@ -90,10 +99,12 @@ function PromotionCarousel({
           },
         ]
       : []),
-  ];
-  const current = Math.min(active, promotions.length - 1);
-  const selected = promotions[current]!;
+  ].filter((promotion) => dismissals[promotion.id]?.visible);
+  const visible = loaded && promotions.length > 0;
+  const current = Math.max(0, Math.min(active, promotions.length - 1));
+  const selected = promotions[current];
   function move(index: number) {
+    if (saving) return;
     const next = Math.max(0, Math.min(promotions.length - 1, index));
     setActive(next);
     pager.current?.scrollTo({ y: next * height, animated: true });
@@ -124,7 +135,7 @@ function PromotionCarousel({
       };
     },
   );
-  if (!visible) return null;
+  if (!visible || !selected) return null;
   return (
     <View
       testID="parent-promotion-tile"
@@ -141,6 +152,10 @@ function PromotionCarousel({
         ref={pager}
         testID="parent-promotion-carousel"
         pagingEnabled
+        scrollEnabled={!saving}
+        onContentSizeChange={() =>
+          pager.current?.scrollTo({ y: current * height, animated: false })
+        }
         nestedScrollEnabled
         directionalLockEnabled
         showsVerticalScrollIndicator={false}
@@ -285,14 +300,18 @@ function PromotionCarousel({
       </ScrollView>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Dismiss family suggestions"
+        accessibilityLabel={`Dismiss ${selected.title}`}
+        accessibilityHint="Hide only this suggestion"
         accessibilityState={{ disabled: saving }}
         disabled={saving}
         onPress={() => {
           stopIntro();
-          void dismiss().catch(() =>
-            Alert.alert('Unable to dismiss', 'Please try again.'),
-          );
+          const nextIndex = current < promotions.length - 1 ? current : 0;
+          void dismissals[selected.id]!.dismiss()
+            .then(() => {
+              setActive(nextIndex);
+            })
+            .catch(() => Alert.alert('Unable to dismiss', 'Please try again.'));
         }}
         style={{
           position: 'absolute',
@@ -331,6 +350,8 @@ function PromotionCarousel({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Next family suggestion"
+            accessibilityState={{ disabled: saving }}
+            disabled={saving}
             onPress={() => {
               stopIntro();
               move((current + 1) % promotions.length);

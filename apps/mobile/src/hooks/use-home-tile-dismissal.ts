@@ -33,5 +33,10 @@ export function useHomeTileDismissal(scope: string, tileId: string) {
       if (currentKey.current === key) setSaving(false);
     }
   }, [key, saving]);
-  return { visible: state.key === key && !state.dismissed, dismiss, saving };
+  return {
+    loaded: state.key === key,
+    visible: state.key === key && !state.dismissed,
+    dismiss,
+    saving,
+  };
 }

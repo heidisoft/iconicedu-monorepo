@@ -138,10 +138,14 @@ can sign up on the web with automatic attribution, or enter a referring parentâ€
 name during onboarding. The $20 discount is confirmed and fulfilled manually in
 Stripe. See [Parent Referrals](parent-referrals.md) for rollout and review details.
 
-The close button dismisses the entire suggestions tile. Dismissals are device-local presentation
-preferences in AsyncStorage, scoped by organization, guardian account, carousel ID
-and version. They survive app restarts without changing profile or family data.
-A failed save keeps the tile visible and offers a retry.
+The close button dismisses only the active suggestion and reveals the next
+remaining suggestion, wrapping to the first when the last is removed. The stack
+hides only after all eligible suggestions are dismissed. Dismissals are device-local
+AsyncStorage preferences scoped by organization, guardian account and stable
+suggestion ID. They survive app restarts without changing profile or family data.
+Legacy whole-stack dismissal records are superseded by these per-suggestion keys,
+so they do not hide unrelated suggestions. A failed save keeps the active
+suggestion visible and offers a retry.
 
 The same parent Overview suggestion stack also offers **Request a class** when a
 child profile is available. It uses a flat mint surface with a dark variant, and
@@ -150,7 +154,7 @@ request validation, the authenticated onboarding class-request endpoint and the
 resulting request conversation are shared with the original homepage CTA. Parents
 can request another class even when they already have active subjects. The slide
 is independent of the referral flag; parent-role and child-view restrictions still
-apply to the entire stack. Existing carousel dismissals remain respected.
+apply to the entire stack. Per-suggestion dismissals remain respected.
 
 Add child and Request a class homepage suggestions first open introductory native
 sheets matching the referral explainer: colored hero, required information, next

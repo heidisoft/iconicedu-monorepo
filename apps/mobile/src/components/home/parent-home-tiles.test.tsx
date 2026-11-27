@@ -46,7 +46,7 @@ it('shows one Overview-sized tile and changes its action when advancing the caro
     lightColors.peach,
   ];
   expect(overviewColors).not.toContain(referralColor);
-  expect(screen.getAllByLabelText('Dismiss family suggestions')).toHaveLength(1);
+  expect(screen.getAllByLabelText(/^Dismiss /)).toHaveLength(1);
   expect(screen.queryByLabelText('Add a child')).toBeNull();
   fireEvent.press(screen.getByLabelText('How it works'));
   expect(refer).toHaveBeenCalledTimes(1);
@@ -87,9 +87,10 @@ it('pages vertically and supports screen-reader adjustment actions', async () =>
     1,
   );
 });
-it('dismisses the entire carousel without opening either action and remembers the choice', async () => {
+it('dismisses only the active suggestion and remembers each choice across reloads', async () => {
   const add = jest.fn(),
-    refer = jest.fn();
+    refer = jest.fn(),
+    request = jest.fn();
   const ui = (
     <ParentHomeTiles
       referralsEnabled
@@ -97,23 +98,59 @@ it('dismisses the entire carousel without opening either action and remembers th
       accountId="parent"
       onAddChild={add}
       onRefer={refer}
+      onRequestClass={request}
     />
   );
   const view = render(ui);
   await screen.findByTestId('parent-promotion-tile');
-  await act(async () => {
-    fireEvent.press(screen.getByLabelText('Dismiss family suggestions'));
-  });
-  expect(screen.queryByTestId('parent-promotion-tile')).toBeNull();
-  expect(mockSet).toHaveBeenCalledWith('home-tile-v1:org:parent:family-promotions', '1');
-  expect(add).not.toHaveBeenCalled();
-  expect(refer).not.toHaveBeenCalled();
+  await act(async () => fireEvent.press(screen.getByLabelText('Dismiss Refer a friend')));
+  expect(screen.queryByLabelText('How it works')).toBeNull();
+  expect(screen.getByLabelText('Add a child')).toBeTruthy();
+  expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.max).toBe(
+    2,
+  );
+  expect(mockSet).toHaveBeenCalledWith(
+    'home-tile-v1:org:parent:family-promotion-refer',
+    '1',
+  );
   view.unmount();
   render(ui);
-  await act(async () => {
-    await Promise.resolve();
-  });
+  await screen.findByLabelText('Add a child');
+  expect(screen.queryByLabelText('How it works')).toBeNull();
+  await act(async () => fireEvent.press(screen.getByLabelText('Dismiss Add a child')));
+  expect(screen.getByLabelText('Request a class')).toBeTruthy();
+  expect(screen.queryByLabelText('Next family suggestion')).toBeNull();
+  await act(async () =>
+    fireEvent.press(screen.getByLabelText('Dismiss Request a class')),
+  );
   expect(screen.queryByTestId('parent-promotion-tile')).toBeNull();
+  expect(add).not.toHaveBeenCalled();
+  expect(refer).not.toHaveBeenCalled();
+  expect(request).not.toHaveBeenCalled();
+});
+it('wraps to the first remaining suggestion when the final slide is dismissed', async () => {
+  render(
+    <ParentHomeTiles
+      referralsEnabled
+      orgId="org"
+      accountId="parent"
+      onAddChild={jest.fn()}
+      onRefer={jest.fn()}
+      onRequestClass={jest.fn()}
+    />,
+  );
+  await screen.findByTestId('parent-promotion-tile');
+  fireEvent.press(screen.getByLabelText('Next family suggestion'));
+  fireEvent.press(screen.getByLabelText('Next family suggestion'));
+  await act(async () =>
+    fireEvent.press(screen.getByLabelText('Dismiss Request a class')),
+  );
+  expect(screen.getByLabelText('How it works')).toBeTruthy();
+  expect(
+    screen.getByLabelText('Family suggestions').props.accessibilityValue,
+  ).toMatchObject({ now: 1, max: 2 });
+  fireEvent.press(screen.getByLabelText('Next family suggestion'));
+  expect(screen.getByLabelText('Add a child')).toBeTruthy();
 });
 it('keeps the card available with a retry message when persistence fails', async () => {
   mockSet.mockRejectedValueOnce(new Error('disk full'));
@@ -126,7 +163,7 @@ it('keeps the card available with a retry message when persistence fails', async
       onAddChild={jest.fn()}
     />,
   );
-  fireEvent.press(await screen.findByLabelText('Dismiss family suggestions'));
+  fireEvent.press(await screen.findByLabelText(/^Dismiss /));
   await waitFor(() =>
     expect(alert).toHaveBeenCalledWith('Unable to dismiss', 'Please try again.'),
   );
