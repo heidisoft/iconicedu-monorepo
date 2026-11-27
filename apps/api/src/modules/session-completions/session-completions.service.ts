@@ -158,6 +158,98 @@ export class SessionCompletionsService {
   }
 
   /**
+   * Full completion history for the mobile "Sessions completed" screen. Unlike
+   * listForProfile (the carousel/inbox window: pending rows plus resolved rows
+   * from the last 3 days), this reads the whole table for one status group,
+   * bounded to an optional session-end window so a month view lines up exactly
+   * with getCompletionSummaryForProfile's counts:
+   *   - `completed`: confirmed / auto_confirmed rows;
+   *   - `pending`: rows still awaiting the viewer's confirmation.
+   * Ordered newest session first with an (session_end_at, id) keyset cursor.
+   */
+  async listHistoryForProfile(
+    authUserId: string,
+    params: {
+      orgId: string;
+      profileId: string;
+      status: 'completed' | 'pending';
+      completedSince?: string | null;
+      completedUntil?: string | null;
+      cursor?: string | null;
+      limit?: number;
+    },
+  ): Promise<ConnectionVM<SessionCompletionVM>> {
+    if (!params?.orgId || !isUuid(params.orgId)) {
+      throw new BadRequestException('Invalid orgId');
+    }
+    if (!params.profileId || !isUuid(params.profileId)) {
+      throw new BadRequestException('Invalid profileId');
+    }
+    if (params.status !== 'completed' && params.status !== 'pending') {
+      throw new BadRequestException('Invalid status');
+    }
+    for (const bound of [params.completedSince, params.completedUntil]) {
+      if (bound && !Number.isFinite(Date.parse(bound))) {
+        throw new BadRequestException('Invalid date range');
+      }
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const account = await this.resolveAccount(supabase, authUserId, params.orgId);
+    await this.resolvePermittedProfile(supabase, account, params.orgId, params.profileId);
+
+    const requestedLimit = Math.floor(params.limit ?? DEFAULT_PAGE_SIZE);
+    const limit = Math.min(Math.max(requestedLimit, 1), MAX_PAGE_SIZE);
+
+    let query = supabase
+      .from('class_session_completions')
+      .select('*')
+      .eq('org_id', params.orgId)
+      .eq('profile_id', params.profileId)
+      .is('deleted_at', null);
+    query =
+      params.status === 'completed'
+        ? query.in('status', ['confirmed', 'auto_confirmed'])
+        : query.eq('status', 'pending');
+    if (params.completedSince) {
+      query = query.gte('session_end_at', params.completedSince);
+    }
+    if (params.completedUntil) {
+      query = query.lt('session_end_at', params.completedUntil);
+    }
+    if (params.cursor) {
+      const { orderKey, id } = this.decodeCursor(params.cursor);
+      // Values are quoted: ISO timestamps contain PostgREST-reserved '.' and ':'.
+      query = query.or(
+        `session_end_at.lt."${orderKey}",and(session_end_at.eq."${orderKey}",id.lt.${id})`,
+      );
+    }
+
+    // Fetch one extra row to know whether a next page exists, without a separate count query.
+    const response = await query
+      .order('session_end_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit + 1)
+      .returns<ClassSessionCompletionRow[]>();
+
+    if (response.error) {
+      throw new InternalServerErrorException(response.error.message);
+    }
+
+    const rows = response.data ?? [];
+    const page = rows.slice(0, limit);
+    const hasMore = rows.length > limit;
+    const last = page[page.length - 1];
+
+    return {
+      items: page.map((row) => toVM(row)),
+      nextCursor:
+        hasMore && last ? this.encodeCursor(last.session_end_at, last.id) : null,
+      total: null,
+    };
+  }
+
+  /**
    * Aggregate completion totals for the home dashboard's "Sessions completed"
    * tile. Deliberately NOT derived from listForProfile's page — that query is
    * capped at MAX_PAGE_SIZE and only surfaces resolved rows from the last 3 days

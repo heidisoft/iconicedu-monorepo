@@ -1,4 +1,5 @@
 import type {
+  AdminSessionCompletionVM,
   ConfirmSessionCompletionInput,
   ConnectionVM,
   DisputeSessionCompletionInput,
@@ -16,6 +17,31 @@ export function listSessionCompletions(input: {
   limit?: number;
 }) {
   return apiGet<ConnectionVM<SessionCompletionVM>>('/session-completions', input);
+}
+
+// Full history for the "Sessions completed" screen — not the carousel window
+// listSessionCompletions returns. `status` picks a tab: confirmed/auto_confirmed
+// rows, or rows still awaiting the viewer's confirmation.
+export function listSessionCompletionHistory(input: {
+  orgId: string;
+  profileId: string;
+  status: 'completed' | 'pending';
+  completedSince?: string;
+  completedUntil?: string;
+  cursor?: string | null;
+  limit?: number;
+}) {
+  return apiGet<ConnectionVM<SessionCompletionVM>>('/session-completions/history', input);
+}
+
+// Org-wide occurrence list for staff/admins (same endpoint as web's admin
+// attendance page). The API clamps it to a rolling three-month window.
+export function listAdminSessionCompletions(input: {
+  orgId: string;
+  completedSince?: string;
+  completedUntil?: string;
+}) {
+  return apiGet<AdminSessionCompletionVM[]>('/session-completions/admin', input);
 }
 
 export function getOrgSessionCompletionSummary(input: {

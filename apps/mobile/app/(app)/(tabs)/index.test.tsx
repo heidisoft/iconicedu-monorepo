@@ -2,8 +2,12 @@ import React from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
 let mockReferralEnabled = true;
+let mockCompletedSessionsListEnabled = false;
 jest.mock('@/hooks/use-mobile-feature-flag', () => ({
-  useMobileFeatureFlag: () => mockReferralEnabled,
+  useMobileFeatureFlag: (key: string) =>
+    key === 'enable-mobile-completed-sessions-list'
+      ? mockCompletedSessionsListEnabled
+      : mockReferralEnabled,
 }));
 let mockViewingAsChild = false;
 let mockHasChild = false;
@@ -318,6 +322,7 @@ describe('HomeScreen', () => {
     mockViewingAsChild = false;
     mockProfileKind = 'guardian';
     mockReferralEnabled = true;
+    mockCompletedSessionsListEnabled = false;
     mockSupportChannel = null;
   });
 
@@ -347,6 +352,23 @@ describe('HomeScreen', () => {
     ).toBeTruthy();
     expect(screen.getByText('completed-carousel:1')).toBeTruthy();
     expect(screen.queryByText('Completed Classes')).toBeNull();
+  });
+
+  it('keeps the Sessions completed tile inert while the list flag is off', () => {
+    const screen = render(<HomeScreen />);
+
+    fireEvent.press(screen.getByTestId('home-sessions-completed-tile'));
+
+    expect(mockRouterPush).not.toHaveBeenCalledWith('/(app)/sessions/completed');
+  });
+
+  it('opens the completed sessions list from the tile when the flag is on', () => {
+    mockCompletedSessionsListEnabled = true;
+    const screen = render(<HomeScreen />);
+
+    fireEvent.press(screen.getByTestId('home-sessions-completed-tile'));
+
+    expect(mockRouterPush).toHaveBeenCalledWith('/(app)/sessions/completed');
   });
 });
 

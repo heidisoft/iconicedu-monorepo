@@ -123,6 +123,30 @@ export class SessionCompletionsController {
     });
   }
 
+  @Get('history')
+  @UseGuards(AuthGuard)
+  listHistory(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('profileId') profileId: string,
+    @Query('status') status: 'completed' | 'pending',
+    @Query('completedSince') completedSince?: string,
+    @Query('completedUntil') completedUntil?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.sessionCompletionsService.listHistoryForProfile(req.user.id, {
+      orgId,
+      profileId,
+      status,
+      completedSince: completedSince ?? null,
+      completedUntil: completedUntil ?? null,
+      cursor: cursor ?? null,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
+  }
+
   @Post(':id/confirm')
   @UseGuards(AuthGuard)
   confirm(

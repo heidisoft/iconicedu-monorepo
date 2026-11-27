@@ -1334,6 +1334,179 @@ describe('SessionCompletionsService', () => {
     });
   });
 
+  describe('listHistoryForProfile', () => {
+    function historyRow(id: string, sessionEndAt: string, status = 'confirmed') {
+      return {
+        id,
+        org_id: ORG_ID,
+        schedule_id: SCHEDULE_ID,
+        occurrence_key: sessionEndAt,
+        profile_id: PROFILE_ID,
+        role: 'student',
+        status,
+        reschedule_requested: false,
+        session_title: 'Algebra',
+        student_name: 'Sam',
+        channel_id: CHANNEL_ID,
+        session_end_at: sessionEndAt,
+        expires_at: sessionEndAt,
+      };
+    }
+
+    function makeHistorySupabase(input: {
+      rows: Array<Record<string, unknown>>;
+      profileRow?: Record<string, unknown> | null;
+    }) {
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const profileChain = makeChain({
+        data:
+          input.profileRow === undefined
+            ? { id: PROFILE_ID, account_id: ACCOUNT_ID, org_id: ORG_ID, kind: 'child' }
+            : input.profileRow,
+      });
+      const familyLinkChain = makeChain({ data: null });
+      const historyChain = makeChain({ data: input.rows, error: null }) as Record<
+        string,
+        jest.Mock
+      >;
+      historyChain.or = jest.fn(() => historyChain);
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'profiles') return profileChain;
+        if (table === 'family_links') return familyLinkChain;
+        if (table === 'class_session_completions') return historyChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { from, historyChain };
+    }
+
+    const ROW_A = '00000000-0000-4000-8000-0000000000a1';
+    const ROW_B = '00000000-0000-4000-8000-0000000000b2';
+    const ROW_C = '00000000-0000-4000-8000-0000000000c3';
+
+    it('filters completed rows to the requested session_end_at window, newest first', async () => {
+      const { historyChain } = makeHistorySupabase({
+        rows: [historyRow(ROW_A, '2026-03-20T10:00:00.000Z')],
+      });
+      const service = new SessionCompletionsService();
+
+      const result = await service.listHistoryForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        status: 'completed',
+        completedSince: '2026-03-01T00:00:00.000Z',
+        completedUntil: '2026-04-01T00:00:00.000Z',
+      });
+
+      expect(historyChain.in).toHaveBeenCalledWith('status', [
+        'confirmed',
+        'auto_confirmed',
+      ]);
+      expect(historyChain.gte).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-03-01T00:00:00.000Z',
+      );
+      expect(historyChain.lt).toHaveBeenCalledWith(
+        'session_end_at',
+        '2026-04-01T00:00:00.000Z',
+      );
+      expect(historyChain.order).toHaveBeenNthCalledWith(1, 'session_end_at', {
+        ascending: false,
+      });
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0]).toMatchObject({
+        id: ROW_A,
+        sessionTitle: 'Algebra',
+        studentName: 'Sam',
+      });
+      expect(result.nextCursor).toBeNull();
+    });
+
+    it('filters pending rows by status', async () => {
+      const { historyChain } = makeHistorySupabase({ rows: [] });
+      const service = new SessionCompletionsService();
+
+      await service.listHistoryForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        status: 'pending',
+      });
+
+      expect(historyChain.eq).toHaveBeenCalledWith('status', 'pending');
+      expect(historyChain.in).not.toHaveBeenCalledWith('status', expect.anything());
+    });
+
+    it('returns a cursor when more rows exist and resumes from it', async () => {
+      const { historyChain } = makeHistorySupabase({
+        rows: [
+          historyRow(ROW_A, '2026-03-20T10:00:00.000Z'),
+          historyRow(ROW_B, '2026-03-19T10:00:00.000Z'),
+          historyRow(ROW_C, '2026-03-18T10:00:00.000Z'),
+        ],
+      });
+      const service = new SessionCompletionsService();
+
+      const first = await service.listHistoryForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        status: 'completed',
+        limit: 2,
+      });
+
+      expect(historyChain.limit).toHaveBeenCalledWith(3);
+      expect(first.items.map((item) => item.id)).toEqual([ROW_A, ROW_B]);
+      expect(first.nextCursor).toEqual(expect.any(String));
+
+      await service.listHistoryForProfile(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        profileId: PROFILE_ID,
+        status: 'completed',
+        cursor: first.nextCursor,
+        limit: 2,
+      });
+
+      expect(historyChain.or).toHaveBeenCalledWith(
+        `session_end_at.lt."2026-03-19T10:00:00.000Z",and(session_end_at.eq."2026-03-19T10:00:00.000Z",id.lt.${ROW_B})`,
+      );
+    });
+
+    it('rejects an unknown status before querying', async () => {
+      const { from } = makeHistorySupabase({ rows: [] });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.listHistoryForProfile(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          profileId: PROFILE_ID,
+          status: 'disputed' as never,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(from).not.toHaveBeenCalled();
+    });
+
+    it('rejects a profile the requesting account may not act for', async () => {
+      makeHistorySupabase({
+        rows: [],
+        profileRow: {
+          id: OTHER_PROFILE_ID,
+          account_id: OTHER_ACCOUNT_ID,
+          org_id: ORG_ID,
+          kind: 'child',
+        },
+      });
+      const service = new SessionCompletionsService();
+
+      await expect(
+        service.listHistoryForProfile(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          profileId: OTHER_PROFILE_ID,
+          status: 'completed',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
   describe('getOrgCompletionSummary', () => {
     function makeOrgSummarySupabase(input: {
       summaryRows?: Array<{ completed: number; pending: number }>;

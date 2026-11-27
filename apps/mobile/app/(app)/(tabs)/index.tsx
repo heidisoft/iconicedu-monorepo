@@ -461,6 +461,9 @@ export default function HomeScreen() {
   const enableParentReferrals = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableParentReferrals,
   );
+  const enableCompletedSessionsList = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableMobileCompletedSessionsList,
+  );
   const { user } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const focusedHome = useRef(isHomeFocused);
@@ -763,6 +766,9 @@ export default function HomeScreen() {
       animated: true,
     });
   }, [thisWeekSectionY, todaySectionY, todaySessions.length]);
+  const handleSessionsCompletedPress = useCallback(() => {
+    router.push('/(app)/sessions/completed');
+  }, [router]);
   const canShowFamilySwitcher =
     familySwitchOptions.length > 1 &&
     profileData?.kind &&
@@ -1044,12 +1050,22 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
 
-              <View
+              <TouchableOpacity
+                testID="home-sessions-completed-tile"
                 accessibilityLabel={`Session completion summary. ${sessionCompletionSummary.completed} sessions completed, ${sessionCompletionSummary.pending} awaiting confirmation.`}
+                accessibilityRole={enableCompletedSessionsList ? 'button' : undefined}
+                accessibilityHint={
+                  enableCompletedSessionsList
+                    ? 'Opens the completed sessions list'
+                    : undefined
+                }
                 style={[
                   s.metricCard,
                   { width: metricCardWidth, backgroundColor: colors.primarySubtle },
                 ]}
+                onPress={handleSessionsCompletedPress}
+                activeOpacity={0.85}
+                disabled={!enableCompletedSessionsList}
               >
                 <View style={s.metricHeader}>
                   <Text style={s.metricTitle}>Sessions completed</Text>
@@ -1068,7 +1084,7 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <View
                 style={[
