@@ -32,6 +32,8 @@ export type ChannelListItem = {
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
+  /** True when the last message was sent by the requesting profile. */
+  last_message_is_mine?: boolean;
   icon_key?: string | null;
   themeKey?: string | null;
   messageUiThemeKey?: 'classic' | 'feed' | null;

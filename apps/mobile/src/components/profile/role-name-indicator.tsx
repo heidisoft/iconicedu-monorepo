@@ -62,13 +62,20 @@ export function RoleNameIndicator({
               accessibilityLabel={STAFF_LABEL}
               hitSlop={8}
             >
-              <IdCardLanyard
-                testID="staff-name-indicator"
-                size={iconSize}
-                color={colors.textMuted}
-                strokeWidth={2}
-              />
-              <Text style={[s.badgeText, { color: colors.textMuted }]}>Staff</Text>
+              <View style={s.badgeContent}>
+                <IdCardLanyard
+                  testID="staff-name-indicator"
+                  size={iconSize}
+                  color={colors.textMuted}
+                  strokeWidth={2}
+                />
+                <Text
+                  style={[s.badgeText, { color: colors.textMuted }]}
+                  numberOfLines={1}
+                >
+                  Staff
+                </Text>
+              </View>
             </TooltipTrigger>
             <TooltipContent
               testID="staff-tooltip"
@@ -100,13 +107,15 @@ const s = StyleSheet.create({
     minWidth: 0,
   },
   iconWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 3,
+    flexShrink: 0,
     borderRadius: 999,
     paddingHorizontal: 6,
     paddingVertical: 2,
+  },
+  badgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   badgeText: {
     fontSize: 10,

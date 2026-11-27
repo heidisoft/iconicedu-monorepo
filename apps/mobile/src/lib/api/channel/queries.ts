@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from '@/lib/api/http-client';
+import { apiGet, apiPost, apiPatch } from '@/lib/api/http-client';
 import type { NotificationConversationMode } from '@iconicedu/shared-types';
 import { supabase } from '@/lib/supabase/client';
 import type { ChannelListItem } from '@/lib/api/types';
@@ -207,5 +207,14 @@ export async function fetchProfilesByAccountIds(orgId: string, accountIds: strin
   return apiGet<Array<Record<string, unknown>>>('/profiles/by-account-ids', {
     orgId,
     accountIds: accountIds.join(','),
+  });
+}
+
+export async function archiveChannel(input: {
+  channelId: string;
+  orgId: string;
+}): Promise<{ archived: boolean }> {
+  return apiPatch<{ archived: boolean }>(`/channels/${input.channelId}/archive`, {
+    orgId: input.orgId,
   });
 }

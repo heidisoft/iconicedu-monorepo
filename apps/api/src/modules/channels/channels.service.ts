@@ -1,13 +1,18 @@
 import { randomUUID } from 'crypto';
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
 } from '@nestjs/common';
+import { isUUID } from 'class-validator';
 import { PrismaService } from '@iconicedu/api/prisma/prisma.service';
+import { requireAdminAccount } from '@iconicedu/api/lib/auth/require-admin-account';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
+import { LearningSpaceLifecycleService } from '@iconicedu/api/modules/spaces/learning-space-lifecycle.service';
 
 type DmParticipant = {
   id: string;
@@ -38,6 +43,8 @@ type ChannelListItem = {
   last_message_text: string | null;
   last_message_at: string | null;
   last_message_sender: string | null;
+  /** True when the last message was sent by the requesting profile. */
+  last_message_is_mine?: boolean;
   icon_key?: string | null;
   themeKey?: string | null;
   messageUiThemeKey?: 'classic' | 'feed' | null;
@@ -62,7 +69,12 @@ function dmStatusesFor(channelId: string | undefined): string[] {
   return channelId ? ['active', 'archived'] : ['active'];
 }
 
-type LastMessageInfo = { text: string | null; at: string | null; sender: string | null };
+type LastMessageInfo = {
+  text: string | null;
+  at: string | null;
+  sender: string | null;
+  senderProfileId: string | null;
+};
 
 type ChannelMemberProfileItem = {
   id: string;
@@ -336,6 +348,7 @@ export class ChannelsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly threadsService: ThreadsService,
+    private readonly learningSpaceLifecycle: LearningSpaceLifecycleService,
   ) {}
 
   private async fetchLastMessages(
@@ -348,7 +361,7 @@ export class ChannelsService {
     const { data: msgRows, error } = await supabase
       .from('messages')
       .select(
-        'id, channel_id, type, created_at, sender:profiles!sender_profile_id(display_name, first_name, last_name)',
+        'id, channel_id, type, created_at, sender_profile_id, sender:profiles!sender_profile_id(display_name, first_name, last_name)',
       )
       .in('channel_id', channelIds)
       .is('deleted_at', null)
@@ -403,6 +416,7 @@ export class ChannelsService {
             [sender.first_name, sender.last_name].filter(Boolean).join(' ') ||
             null
           : null,
+        senderProfileId: (row.sender_profile_id as string | null) ?? null,
       });
     }
 
@@ -535,6 +549,10 @@ export class ChannelsService {
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
+        last_message_is_mine:
+          last?.senderProfileId != null
+            ? last.senderProfileId === input.profileId
+            : undefined,
         participants: participantMap.get(channel.id) ?? [],
         messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'classic',
         is_archived: channel.status === 'archived',
@@ -1245,6 +1263,7 @@ export class ChannelsService {
         last_message_text: last?.text ?? null,
         last_message_at: last?.at ?? null,
         last_message_sender: last?.sender ?? null,
+        last_message_is_mine: undefined,
         icon_key: channel.icon_key ?? null,
         themeKey: channel.ui_theme_key ?? null,
         messageUiThemeKey: resolveMessageUiThemeKey(channel.ui_defaults) ?? 'feed',
@@ -1693,5 +1712,67 @@ export class ChannelsService {
     );
     if (error) throw new InternalServerErrorException(error.message);
     return { unreadCount: typeof data === 'number' ? data : 0 };
+  }
+
+  /**
+   * Archive a channel (staff/admin only). Sets the channel status to 'archived',
+   * making it read-only history. The channel disappears from the active DM list.
+   */
+  /**
+   * Staff archive from the conversation list. A class channel runs the full
+   * class archive cascade (docs/operations/class-archive-lifecycle.md); a DM
+   * becomes read-only history. Org-wide channels such as support are refused.
+   */
+  async archiveChannel(
+    authUserId: string,
+    input: { orgId: string; channelId: string },
+  ): Promise<{ archived: boolean }> {
+    if (!isUUID(input.orgId) || !isUUID(input.channelId)) {
+      throw new BadRequestException('A valid orgId and channel id are required');
+    }
+    await requireAdminAccount(authUserId, input.orgId);
+    const serviceSupabase = createSupabaseServiceClient();
+
+    const { data: channel, error: channelError } = await serviceSupabase
+      .from('channels')
+      .select('id, kind, status')
+      .eq('id', input.channelId)
+      .eq('org_id', input.orgId)
+      .is('deleted_at', null)
+      .maybeSingle<{ id: string; kind: string; status: string }>();
+    if (channelError) throw new InternalServerErrorException(channelError.message);
+    if (!channel) throw new NotFoundException('Conversation not found');
+
+    const { data: spaceLink, error: spaceLinkError } = await serviceSupabase
+      .from('learning_space_channels')
+      .select('learning_space_id')
+      .eq('org_id', input.orgId)
+      .eq('channel_id', input.channelId)
+      .eq('is_primary', true)
+      .is('deleted_at', null)
+      .maybeSingle<{ learning_space_id: string | null }>();
+    if (spaceLinkError) throw new InternalServerErrorException(spaceLinkError.message);
+
+    if (spaceLink?.learning_space_id) {
+      await this.learningSpaceLifecycle.run('archive', authUserId, {
+        orgId: input.orgId,
+        learningSpaceId: spaceLink.learning_space_id,
+      });
+      return { archived: true };
+    }
+
+    if (channel.kind !== 'dm') {
+      throw new BadRequestException('Only classes and direct messages can be archived');
+    }
+    if (channel.status === 'archived') return { archived: true };
+
+    const now = new Date().toISOString();
+    const { error } = await serviceSupabase
+      .from('channels')
+      .update({ status: 'archived', archived_at: now, updated_at: now })
+      .eq('id', input.channelId)
+      .eq('org_id', input.orgId);
+    if (error) throw new InternalServerErrorException(error.message);
+    return { archived: true };
   }
 }

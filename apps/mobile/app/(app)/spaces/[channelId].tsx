@@ -795,6 +795,12 @@ export default function SpaceDetailScreen() {
             profileId={profileId}
             enableScheduledSend={p2.enableScheduledSend}
             onScheduleSend={p2.scheduleSend}
+            enableDrafts
+            draftScope={
+              orgId && profileId && accountId && channelId
+                ? { accountId, profileId, orgId, channelId }
+                : undefined
+            }
             editingMessage={editingMessage}
             onSaveEdit={handleSaveEdit}
             onCancelEdit={handleCancelEdit}

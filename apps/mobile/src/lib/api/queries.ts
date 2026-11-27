@@ -14,6 +14,7 @@ export {
   fetchUserAccount,
 } from './account/queries';
 export {
+  archiveChannel,
   fetchChannels,
   fetchChannelMembers,
   fetchChannelMetaByChannelId,

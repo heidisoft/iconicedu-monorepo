@@ -60,8 +60,12 @@ describe('use-unread-sync', () => {
     realtimeCallbacks.clear();
 
     mockOn.mockImplementation(
-      (_type: string, filter: { event: string }, callback: RealtimeCallback) => {
-        realtimeCallbacks.set(filter.event, callback);
+      (
+        _type: string,
+        filter: { event: string; table: string },
+        callback: RealtimeCallback,
+      ) => {
+        realtimeCallbacks.set(`${filter.table}:${filter.event}`, callback);
         return { on: mockOn, subscribe: mockSubscribe };
       },
     );
@@ -92,7 +96,7 @@ describe('use-unread-sync', () => {
     );
 
     await act(async () => {
-      realtimeCallbacks.get('INSERT')?.({
+      realtimeCallbacks.get('channel_read_state:INSERT')?.({
         new: { thread_id: 'thread-1', channel_id: 'channel-1' },
       });
     });
@@ -100,6 +104,34 @@ describe('use-unread-sync', () => {
     expect(mockInvalidateQueries).toHaveBeenCalledWith({
       queryKey: ['messages', 'channel-1', 'profile-1'],
       exact: true,
+    });
+  });
+
+  it('refreshes channel lists when the current profile sends a message', async () => {
+    renderHook(() =>
+      useUnreadSync({
+        orgId: 'org-1',
+        profileId: 'profile-1',
+        accountId: 'account-1',
+      }),
+    );
+
+    expect(mockOn).toHaveBeenCalledWith(
+      'postgres_changes',
+      expect.objectContaining({
+        event: 'INSERT',
+        table: 'messages',
+        filter: 'sender_profile_id=eq.profile-1',
+      }),
+      expect.any(Function),
+    );
+
+    await act(async () => {
+      realtimeCallbacks.get('messages:INSERT')?.({ new: { channel_id: 'channel-1' } });
+    });
+
+    expect(mockInvalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['directMessages', 'org-1', 'profile-1'],
     });
   });
 
@@ -113,7 +145,7 @@ describe('use-unread-sync', () => {
     );
 
     await act(async () => {
-      realtimeCallbacks.get('UPDATE')?.({
+      realtimeCallbacks.get('channel_read_state:UPDATE')?.({
         new: { thread_id: 'thread-1', channel_id: 'channel-1' },
       });
     });
@@ -139,7 +171,7 @@ describe('use-unread-sync', () => {
     );
 
     await act(async () => {
-      realtimeCallbacks.get('INSERT')?.({
+      realtimeCallbacks.get('channel_read_state:INSERT')?.({
         new: { thread_id: 'thread-1' },
       });
     });
@@ -165,13 +197,13 @@ describe('use-unread-sync', () => {
     mockFetchUnreadBadgeCount.mockClear();
 
     await act(async () => {
-      realtimeCallbacks.get('INSERT')?.({
+      realtimeCallbacks.get('channel_read_state:INSERT')?.({
         new: { thread_id: null, channel_id: 'channel-1' },
       });
-      realtimeCallbacks.get('UPDATE')?.({
+      realtimeCallbacks.get('channel_read_state:UPDATE')?.({
         new: { thread_id: null, channel_id: 'channel-1' },
       });
-      realtimeCallbacks.get('UPDATE')?.({
+      realtimeCallbacks.get('channel_read_state:UPDATE')?.({
         new: { thread_id: null, channel_id: 'channel-1' },
       });
     });

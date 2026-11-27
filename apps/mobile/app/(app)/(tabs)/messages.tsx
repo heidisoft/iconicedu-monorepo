@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,15 @@ import {
   RefreshControl,
   Alert,
 } from 'react-native';
+import ReanimatedSwipeable, {
+  type SwipeableMethods,
+} from 'react-native-gesture-handler/ReanimatedSwipeable';
+import Animated, {
+  useAnimatedStyle,
+  interpolate,
+  Extrapolation,
+  type SharedValue,
+} from 'react-native-reanimated';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -42,6 +51,7 @@ import {
 import type { AppColors } from '@/lib/theme';
 import { createHeaderSurface } from '@/lib/header-surface';
 import {
+  archiveChannel,
   fetchChannels,
   markChannelsReadByIds,
   type ChannelListItem,
@@ -53,13 +63,16 @@ import { RoleAvatarBadge } from '@/components/profile/role-avatar-badge';
 import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { useIsFocused } from '@react-navigation/native';
-import { useMessageDraftChannelIds } from '@/hooks/use-message-draft';
+import { useMessageDraftPreviews } from '@/hooks/use-message-draft';
+import { useHiddenChannels } from '@/hooks/use-hidden-channels';
+import { EyeOff, Eye, ChevronDown, ChevronRight, Archive } from 'lucide-react-native';
 
 type Tab = 'all' | 'dms' | 'channels';
 type ClassroomStudentTab = 'all' | string;
 
 type SectionHeaderItem = { _type: 'section-header'; title: string; id: string };
-type ListRow = ChannelListItem | SectionHeaderItem;
+type HiddenSectionToggle = { _type: 'hidden-section-toggle'; count: number; id: string };
+type ListRow = ChannelListItem | SectionHeaderItem | HiddenSectionToggle;
 
 const CLASS_REQUEST_CHANNEL_PURPOSE = 'chass-requests';
 
@@ -336,7 +349,6 @@ function makeStyles(C: AppColors) {
     subTabTextActive: { color: C.teal },
 
     listContent: {
-      paddingHorizontal: 16,
       paddingTop: 14,
       paddingBottom: 16,
     },
@@ -346,19 +358,20 @@ function makeStyles(C: AppColors) {
     },
     itemWrap: {
       position: 'relative',
-      backgroundColor: 'transparent',
-      paddingHorizontal: 0,
-      paddingVertical: 18,
+      backgroundColor: C.bg,
+      paddingHorizontal: 16,
+      paddingVertical: 4,
       overflow: 'hidden',
     },
     itemWrapUnread: {},
     itemRow: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 12 },
     separator: {
-      height: 16,
+      height: 8,
       justifyContent: 'center',
     },
     separatorLine: {
-      marginLeft: 62,
+      marginLeft: 78,
+      marginRight: 16,
       height: StyleSheet.hairlineWidth,
     },
 
@@ -537,27 +550,63 @@ function makeStyles(C: AppColors) {
     },
     supervisedBadgeTxt: { fontSize: 11, fontWeight: '700', color: C.teal },
 
-    // ── Draft indicator badge (issue #264 capability #3) ────────────────────────
-    draftBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: C.card,
-      borderRadius: 6,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
-    },
-    draftBadgeTxt: { fontSize: 11, fontWeight: '700', color: C.textMuted },
-
     // ── Section header ─────────────────────────────────────────────────────────
-    sectionHeaderWrap: { paddingHorizontal: 0, paddingTop: 18, paddingBottom: 7 },
+    sectionHeaderWrap: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 7 },
     sectionHeaderTxt: {
       fontSize: 12,
       fontWeight: '700',
       color: C.textFaint,
       letterSpacing: 0.5,
       textTransform: 'uppercase',
+    },
+
+    // ── Swipe actions ──────────────────────────────────────────────────────────
+    swipeActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      gap: 8,
+    },
+    swipeBtn: {
+      alignItems: 'center',
+      gap: 4,
+      width: 56,
+    },
+    swipeBtnCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    swipeBtnHide: { backgroundColor: '#5090bb' },
+    swipeBtnUnhide: { backgroundColor: '#5090bb' },
+    swipeBtnArchive: { backgroundColor: '#cc5b52' },
+    swipeBtnLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: C.textMuted,
+    },
+
+    // ── Hidden channels section ────────────────────────────────────────────────
+    hiddenHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      gap: 8,
+    },
+    hiddenHeaderTxt: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+      color: C.textMuted,
+    },
+    hiddenHeaderCount: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: C.textFaint,
     },
   });
 }
@@ -722,25 +771,109 @@ function SectionHeader({
   );
 }
 
+// ─── Swipe action buttons ─────────────────────────────────────────────────────
+
+function SwipeActions({
+  progress,
+  isHidden,
+  onHide,
+  onUnhide,
+  onArchive,
+  s,
+}: {
+  progress: SharedValue<number>;
+  isHidden: boolean;
+  onHide?: () => void;
+  onUnhide?: () => void;
+  onArchive?: () => void;
+  s: ReturnType<typeof makeStyles>;
+}) {
+  const btn1Style = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.4, 1], [0, 0.6, 1], Extrapolation.CLAMP),
+    transform: [
+      { scale: interpolate(progress.value, [0, 1], [0.4, 1], Extrapolation.CLAMP) },
+      { translateX: interpolate(progress.value, [0, 1], [24, 0], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  const btn2Style = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      progress.value,
+      [0.25, 0.65, 1],
+      [0, 0.6, 1],
+      Extrapolation.CLAMP,
+    ),
+    transform: [
+      { scale: interpolate(progress.value, [0.25, 1], [0.4, 1], Extrapolation.CLAMP) },
+      { translateX: interpolate(progress.value, [0, 1], [24, 0], Extrapolation.CLAMP) },
+    ],
+  }));
+
+  // 12px padding each side + 56px per button + 8px gap.
+  const panelWidth = onArchive ? 144 : 80;
+
+  return (
+    <View style={[s.swipeActionsRow, { width: panelWidth }]}>
+      <Animated.View style={[s.swipeBtn, btn1Style]}>
+        <TouchableOpacity
+          style={[s.swipeBtnCircle, isHidden ? s.swipeBtnUnhide : s.swipeBtnHide]}
+          onPress={isHidden ? onUnhide : onHide}
+          activeOpacity={0.75}
+        >
+          {isHidden ? (
+            <Eye size={20} color="#ffffff" />
+          ) : (
+            <EyeOff size={20} color="#ffffff" />
+          )}
+        </TouchableOpacity>
+        <Text style={s.swipeBtnLabel}>{isHidden ? 'Show' : 'Hide'}</Text>
+      </Animated.View>
+
+      {!!onArchive && (
+        <Animated.View style={[s.swipeBtn, btn2Style]}>
+          <TouchableOpacity
+            style={[s.swipeBtnCircle, s.swipeBtnArchive]}
+            onPress={onArchive}
+            activeOpacity={0.75}
+          >
+            <Archive size={20} color="#ffffff" />
+          </TouchableOpacity>
+          <Text style={s.swipeBtnLabel}>Archive</Text>
+        </Animated.View>
+      )}
+    </View>
+  );
+}
+
 // ─── Row component ────────────────────────────────────────────────────────────
 
 function ChannelRow({
   item,
   onPress,
+  onHide,
+  onUnhide,
+  onArchive,
+  isHidden = false,
   presenceByProfileId,
   currentProfileName,
   currentProfileKind,
-  hasDraft = false,
+  draftText,
+  onSwipeWillOpen,
   s,
   colors,
 }: {
   item: ChannelListItem;
   onPress: () => void;
+  onSwipeWillOpen?: (swipeable: SwipeableMethods | null) => void;
+  onHide?: () => void;
+  onUnhide?: () => void;
+  onArchive?: () => void;
+  isHidden?: boolean;
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
   currentProfileName?: string | null;
   currentProfileKind?: string | null;
-  /** Non-expired main-composer draft exists for this channel (issue #264 capability #3). */
-  hasDraft?: boolean;
+  /** Unsent main-composer draft for this channel; replaces the last-message preview. */
+  draftText?: string | null;
   s: ReturnType<typeof makeStyles>;
   colors: AppColors;
 }) {
@@ -791,6 +924,7 @@ function ChannelRow({
 
   const text = item.last_message_text;
   const sender = item.last_message_sender;
+  const isMine = item.last_message_is_mine === true;
   const time = formatListTime(item.last_message_at ?? item.updated_at);
   const unread = (item.unread_count ?? 0) + (item.thread_unread_count ?? 0);
   // An explicit "mark unread" keeps the row in its unread treatment even when
@@ -818,138 +952,179 @@ function ChannelRow({
     currentProfileName,
     currentProfileKind,
   });
-  const messagePreviewText = text ? (!isDm && sender ? `${sender}: ${text}` : text) : '';
+  const messagePreviewText = text
+    ? isMine
+      ? `You: ${text}`
+      : !isDm && sender
+        ? `${sender}: ${text}`
+        : text
+    : '';
   const previewText =
     item.is_supervised && item.supervised_child_name
       ? `Viewing ${item.supervised_child_name}'s conversation`
       : messagePreviewText || (isClassroom ? '' : (item.description ?? ''));
   const previewLines = isClassroom ? 1 : 2;
+  const draftPreview = draftText?.replace(/\s+/g, ' ').trim() || null;
+
+  const rightActions = useCallback(
+    (progress: SharedValue<number>) => (
+      <SwipeActions
+        progress={progress}
+        isHidden={isHidden}
+        onHide={onHide}
+        onUnhide={onUnhide}
+        onArchive={onArchive}
+        s={s}
+      />
+    ),
+    [isHidden, onHide, onUnhide, onArchive, s],
+  );
+  const swipeRef = useRef<SwipeableMethods>(null);
 
   return (
     <View style={s.itemOuter}>
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [
-          s.itemWrap,
-          hasUnread && s.itemWrapUnread,
-          pressed && { backgroundColor: colors.inputBg },
-        ]}
+      <ReanimatedSwipeable
+        ref={swipeRef}
+        renderRightActions={rightActions}
+        rightThreshold={40}
+        overshootRight={false}
+        friction={2}
+        onSwipeableWillOpen={() => onSwipeWillOpen?.(swipeRef.current)}
       >
-        <View style={s.itemRow}>
-          {/* Avatar */}
-          {isDm ? (
-            <DmAvatar
-              participants={avatarParticipants}
-              fallbackId={item.id}
-              presenceStatus={presenceStatus}
-              s={s}
-            />
-          ) : (
-            <ChannelTopicIconBadge
-              iconKey={item.icon_key}
-              size={50}
-              iconSize={22}
-              borderRadius={25}
-              backgroundColor={classAvatarColors.bg}
-              color={classAvatarColors.fg}
-              style={s.channelAvatar}
-            />
-          )}
+        <Pressable onPress={onPress}>
+          {({ pressed }) => (
+            <View
+              style={[
+                s.itemWrap,
+                hasUnread && s.itemWrapUnread,
+                pressed && { backgroundColor: colors.inputBg },
+              ]}
+            >
+              <View style={s.itemRow}>
+                {/* Avatar */}
+                {isDm ? (
+                  <DmAvatar
+                    participants={avatarParticipants}
+                    fallbackId={item.id}
+                    presenceStatus={presenceStatus}
+                    s={s}
+                  />
+                ) : (
+                  <ChannelTopicIconBadge
+                    iconKey={item.icon_key}
+                    size={50}
+                    iconSize={22}
+                    borderRadius={25}
+                    backgroundColor={classAvatarColors.bg}
+                    color={classAvatarColors.fg}
+                    style={s.channelAvatar}
+                  />
+                )}
 
-          {/* Content */}
-          <View style={s.content}>
-            <View style={s.topRow}>
-              {isDm ? (
-                <RoleNameIndicator
-                  name={name}
-                  role={displayRole}
-                  containerStyle={s.rowNameWrap}
-                  textStyle={[s.rowName, hasUnread && s.rowNameUnread]}
-                  numberOfLines={1}
-                  iconSize={13}
-                />
-              ) : (
-                <View style={s.rowNameWrap}>
-                  <Text
-                    style={[s.rowName, hasUnread && s.rowNameUnread]}
-                    numberOfLines={1}
-                  >
-                    {channelStudentTitle.channelTitle}
-                  </Text>
-                </View>
-              )}
-              {item.is_supervised && (
-                <View style={s.supervisedBadge}>
-                  <Text style={s.supervisedBadgeTxt}>Supervised</Text>
-                </View>
-              )}
-              {hasDraft && (
-                <View style={s.draftBadge} accessibilityLabel="Draft saved">
-                  <Text style={s.draftBadgeTxt}>Draft</Text>
-                </View>
-              )}
-            </View>
-            {!isDm && hasClassroomMeta ? (
-              <View style={s.rowMetaWrap}>
-                {classroomParticipantGroups.map((group) => {
-                  const GroupIcon = CLASSROOM_PARTICIPANT_ICON_MAP[group.kind];
-
-                  return (
-                    <View key={group.kind} style={s.rowMetaGroup}>
-                      <GroupIcon size={12} color={colors.textMuted} strokeWidth={2} />
-                      <View style={s.rowMetaGroupNames}>
-                        {group.participants.map((participant, index) => (
-                          <React.Fragment key={`${participant.kind}-${participant.name}`}>
-                            {index > 0 ? <Text style={s.rowMeta}>{', '}</Text> : null}
-                            <Text
-                              style={[
-                                s.rowMeta,
-                                s.rowMetaName,
-                                participant.kind === 'child'
-                                  ? {
-                                      color: themeTextColor(
-                                        participant.themeKey,
-                                        colors.textMuted,
-                                      ),
-                                    }
-                                  : null,
-                              ]}
-                              numberOfLines={1}
-                            >
-                              {participant.name}
-                            </Text>
-                          </React.Fragment>
-                        ))}
+                {/* Content */}
+                <View style={s.content}>
+                  <View style={s.topRow}>
+                    {isDm ? (
+                      <RoleNameIndicator
+                        name={name}
+                        role={displayRole}
+                        containerStyle={s.rowNameWrap}
+                        textStyle={[s.rowName, hasUnread && s.rowNameUnread]}
+                        numberOfLines={1}
+                        iconSize={13}
+                      />
+                    ) : (
+                      <View style={s.rowNameWrap}>
+                        <Text
+                          style={[s.rowName, hasUnread && s.rowNameUnread]}
+                          numberOfLines={1}
+                        >
+                          {channelStudentTitle.channelTitle}
+                        </Text>
                       </View>
+                    )}
+                    {item.is_supervised && (
+                      <View style={s.supervisedBadge}>
+                        <Text style={s.supervisedBadgeTxt}>Supervised</Text>
+                      </View>
+                    )}
+                  </View>
+                  {!isDm && hasClassroomMeta ? (
+                    <View style={s.rowMetaWrap}>
+                      {classroomParticipantGroups.map((group) => {
+                        const GroupIcon = CLASSROOM_PARTICIPANT_ICON_MAP[group.kind];
+
+                        return (
+                          <View key={group.kind} style={s.rowMetaGroup}>
+                            <GroupIcon
+                              size={12}
+                              color={colors.textMuted}
+                              strokeWidth={2}
+                            />
+                            <View style={s.rowMetaGroupNames}>
+                              {group.participants.map((participant, index) => (
+                                <React.Fragment
+                                  key={`${participant.kind}-${participant.name}`}
+                                >
+                                  {index > 0 ? (
+                                    <Text style={s.rowMeta}>{', '}</Text>
+                                  ) : null}
+                                  <Text
+                                    style={[
+                                      s.rowMeta,
+                                      s.rowMetaName,
+                                      participant.kind === 'child'
+                                        ? {
+                                            color: themeTextColor(
+                                              participant.themeKey,
+                                              colors.textMuted,
+                                            ),
+                                          }
+                                        : null,
+                                    ]}
+                                    numberOfLines={1}
+                                  >
+                                    {participant.name}
+                                  </Text>
+                                </React.Fragment>
+                              ))}
+                            </View>
+                          </View>
+                        );
+                      })}
                     </View>
-                  );
-                })}
-              </View>
-            ) : null}
-            {previewText ? (
-              <Text style={s.rowPreview} numberOfLines={previewLines}>
-                {previewText}
-              </Text>
-            ) : null}
-          </View>
-          <View style={s.rowTail}>
-            <Text style={s.rowTime} numberOfLines={1}>
-              {time}
-            </Text>
-            {hasUnread ? (
-              unread > 0 ? (
-                <View style={s.badge}>
-                  <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
+                  ) : null}
+                  {draftPreview ? (
+                    <Text style={s.rowPreview} numberOfLines={previewLines}>
+                      {`Draft: ${draftPreview}`}
+                    </Text>
+                  ) : previewText ? (
+                    <Text style={s.rowPreview} numberOfLines={previewLines}>
+                      {previewText}
+                    </Text>
+                  ) : null}
                 </View>
-              ) : (
-                <View testID="channel-row-manual-unread-dot" style={s.badgeDot} />
-              )
-            ) : (
-              <View />
-            )}
-          </View>
-        </View>
-      </Pressable>
+                <View style={s.rowTail}>
+                  <Text style={s.rowTime} numberOfLines={1}>
+                    {time}
+                  </Text>
+                  {hasUnread ? (
+                    unread > 0 ? (
+                      <View style={s.badge}>
+                        <Text style={s.badgeTxt}>{unread > 99 ? '99+' : unread}</Text>
+                      </View>
+                    ) : (
+                      <View testID="channel-row-manual-unread-dot" style={s.badgeDot} />
+                    )
+                  ) : (
+                    <View />
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+        </Pressable>
+      </ReanimatedSwipeable>
     </View>
   );
 }
@@ -984,15 +1159,30 @@ export default function MessagesScreen() {
     ((account as Record<string, unknown> | undefined)?.id as string) ?? '';
   const myProfileId =
     ((profile as Record<string, unknown> | undefined)?.id as string | undefined) ?? '';
-  const { channelIds: draftChannelIds, refresh: refreshDraftChannelIds } =
-    useMessageDraftChannelIds({ accountId, profileId: myProfileId, orgId }, true);
+  const { drafts: draftsByChannelId, refresh: refreshDrafts } = useMessageDraftPreviews(
+    { accountId, profileId: myProfileId, orgId },
+    true,
+  );
+  const { hiddenChannelIds, hideChannel, unhideChannel } = useHiddenChannels(myProfileId);
+  const [hiddenSectionExpanded, setHiddenSectionExpanded] = useState(false);
+  const openSwipeRef = useRef<SwipeableMethods | null>(null);
+  const handleSwipeWillOpen = useCallback((swipeable: SwipeableMethods | null) => {
+    if (openSwipeRef.current && openSwipeRef.current !== swipeable) {
+      openSwipeRef.current.close();
+    }
+    openSwipeRef.current = swipeable;
+  }, []);
+  const closeOpenSwipe = useCallback(() => {
+    openSwipeRef.current?.close();
+    openSwipeRef.current = null;
+  }, []);
   // Re-read AsyncStorage whenever this tab regains focus — a draft saved on
   // the channel/DM screen should show up here as soon as the user backs out.
   React.useEffect(() => {
     if (isFocused) {
-      void refreshDraftChannelIds();
+      void refreshDrafts();
     }
-  }, [isFocused, refreshDraftChannelIds]);
+  }, [isFocused, refreshDrafts]);
   const currentProfileName =
     (
       (profile as Record<string, unknown> | undefined)?.display_name as string | undefined
@@ -1046,7 +1236,7 @@ export default function MessagesScreen() {
       refetchChannels(),
       refetchListedChannels(),
       refetchSupervised(),
-      refreshDraftChannelIds(),
+      refreshDrafts(),
     ]);
     setRefreshing(false);
   }, [
@@ -1054,7 +1244,7 @@ export default function MessagesScreen() {
     refetchChannels,
     refetchListedChannels,
     refetchSupervised,
-    refreshDraftChannelIds,
+    refreshDrafts,
   ]);
 
   const allDms = useMemo(() => dms ?? [], [dms]);
@@ -1158,12 +1348,40 @@ export default function MessagesScreen() {
     [activeStudentTab, classroomChannels],
   );
 
-  const data: ListRow[] =
+  const rawData: ListRow[] =
     activeTab === 'all'
       ? allItems
       : activeTab === 'dms'
         ? dmsData
         : filteredClassroomChannels;
+
+  const { visibleData, hiddenItems } = useMemo(() => {
+    const visible: ListRow[] = [];
+    const hidden: ChannelListItem[] = [];
+    for (const row of rawData) {
+      if ('_type' in row) {
+        visible.push(row);
+      } else if (hiddenChannelIds.has(row.id)) {
+        hidden.push(row);
+      } else {
+        visible.push(row);
+      }
+    }
+    return { visibleData: visible, hiddenItems: hidden };
+  }, [rawData, hiddenChannelIds]);
+
+  const data: ListRow[] = useMemo(() => {
+    if (hiddenItems.length === 0) return visibleData;
+    const toggle: HiddenSectionToggle = {
+      _type: 'hidden-section-toggle',
+      count: hiddenItems.length,
+      id: '__hidden-toggle__',
+    };
+    if (hiddenSectionExpanded) {
+      return [toggle, ...hiddenItems, ...visibleData];
+    }
+    return [toggle, ...visibleData];
+  }, [visibleData, hiddenItems, hiddenSectionExpanded]);
 
   const unreadAll = useMemo(
     () =>
@@ -1284,14 +1502,34 @@ export default function MessagesScreen() {
     },
   }[activeTab];
 
-  const isEmpty = data.length === 0 || (data.length === 1 && '_type' in data[0]!);
+  const isEmpty =
+    visibleData.length === 0 || (visibleData.length === 1 && '_type' in visibleData[0]!);
+  const isStaffOrAdmin = profileKind === 'staff';
 
   const renderItem = useCallback(
     ({ item }: { item: ListRow }) => {
       if ('_type' in item && item._type === 'section-header') {
         return <SectionHeader title={item.title} s={s} />;
       }
+      if ('_type' in item && item._type === 'hidden-section-toggle') {
+        return (
+          <TouchableOpacity
+            style={s.hiddenHeader}
+            onPress={() => setHiddenSectionExpanded((v) => !v)}
+            activeOpacity={0.7}
+          >
+            {hiddenSectionExpanded ? (
+              <ChevronDown size={16} color={colors.textMuted} />
+            ) : (
+              <ChevronRight size={16} color={colors.textMuted} />
+            )}
+            <Text style={s.hiddenHeaderTxt}>Hidden</Text>
+            <Text style={s.hiddenHeaderCount}>{item.count}</Text>
+          </TouchableOpacity>
+        );
+      }
       const channel = item as ChannelListItem;
+      const isHidden = hiddenChannelIds.has(channel.id);
       const isDm = channel.kind === 'dm';
       const participants = channel.participants ?? [];
       // For supervised DMs, topic = the partner's name (child is excluded from participants).
@@ -1329,12 +1567,55 @@ export default function MessagesScreen() {
       return (
         <ChannelRow
           item={channel}
+          isHidden={isHidden}
           presenceByProfileId={presenceByProfileId}
           currentProfileName={currentProfileName}
           currentProfileKind={profileKind}
-          hasDraft={draftChannelIds.has(channel.id)}
+          draftText={draftsByChannelId.get(channel.id)}
           s={s}
           colors={colors}
+          onSwipeWillOpen={handleSwipeWillOpen}
+          onHide={() => {
+            closeOpenSwipe();
+            hideChannel(channel.id);
+          }}
+          onUnhide={() => {
+            closeOpenSwipe();
+            unhideChannel(channel.id);
+          }}
+          onArchive={
+            isStaffOrAdmin && (isDm || channel.is_learning_space)
+              ? () => {
+                  closeOpenSwipe();
+                  Alert.alert(
+                    isDm ? 'Archive conversation' : 'Archive class',
+                    isDm
+                      ? 'Archive this conversation? It will move to read-only history.'
+                      : 'Archive this class? Its channel becomes read-only, members are removed, and upcoming reminders are canceled. You can restore it from admin.',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Archive',
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await archiveChannel({ channelId: channel.id, orgId });
+                            await Promise.all([
+                              refetchDms(),
+                              refetchChannels(),
+                              refetchListedChannels(),
+                              refetchSupervised(),
+                            ]);
+                          } catch {
+                            Alert.alert('Error', 'Failed to archive conversation.');
+                          }
+                        },
+                      },
+                    ],
+                  );
+                }
+              : undefined
+          }
           onPress={() => {
             router.push({
               pathname,
@@ -1378,7 +1659,19 @@ export default function MessagesScreen() {
       presenceByProfileId,
       currentProfileName,
       profileKind,
-      draftChannelIds,
+      draftsByChannelId,
+      hideChannel,
+      unhideChannel,
+      hiddenChannelIds,
+      hiddenSectionExpanded,
+      isStaffOrAdmin,
+      handleSwipeWillOpen,
+      closeOpenSwipe,
+      orgId,
+      refetchDms,
+      refetchChannels,
+      refetchListedChannels,
+      refetchSupervised,
     ],
   );
 
@@ -1487,6 +1780,7 @@ export default function MessagesScreen() {
           data={data}
           keyExtractor={(item) => ('_type' in item ? item.id : item.id)}
           contentContainerStyle={s.listContent}
+          onScrollBeginDrag={closeOpenSwipe}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
