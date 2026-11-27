@@ -193,9 +193,11 @@ child profile. This tile is independent of suggestion dismissal preferences.
 
 After a suggestion dismissal is saved, the active suggestion gently shrinks and
 fades out before revealing the next remaining suggestion in the first slot.
-Overview reveals and briefly outlines the permanent action tile so parents know
-where to find it later. Screen-reader users get an announcement instead of an
-automatic scroll; Reduce Motion skips the exit animation and uses an immediate
-scroll with a static outline. A storage failure leaves the suggestion visible and
+The carousel container and Overview scroll position stay fixed; only the active
+slide animates and is removed. The native pager is recreated when its remaining
+slide IDs change so deleting the last page cannot leave an empty scroll offset. The permanent action tile receives a brief outline
+without scrolling away from the remaining suggestions. Screen-reader users get
+an announcement of where the action remains available. Reduce Motion skips the
+exit animation and uses a static outline. A storage failure leaves the suggestion visible and
 does not trigger the transition. Native sheets finish dismissing before their
 selected action opens another introduction.

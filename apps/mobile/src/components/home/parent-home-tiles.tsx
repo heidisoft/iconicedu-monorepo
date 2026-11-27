@@ -170,7 +170,7 @@ function PromotionCarousel({
   );
   if (!visible || !selected) return null;
   return (
-    <Animated.View
+    <View
       testID="parent-promotion-tile"
       onTouchStart={stopIntro}
       style={{
@@ -179,18 +179,10 @@ function PromotionCarousel({
         borderRadius: 20,
         backgroundColor: selected.background,
         overflow: 'hidden',
-        opacity: dismissOpacity,
-        transform: [
-          {
-            scale: dismissOpacity.interpolate({
-              inputRange: [0, 1],
-              outputRange: [0.94, 1],
-            }),
-          },
-        ],
       }}
     >
       <ScrollView
+        key={promotions.map((promotion) => promotion.id).join(':')}
         ref={pager}
         testID="parent-promotion-carousel"
         pagingEnabled
@@ -240,7 +232,7 @@ function PromotionCarousel({
           style={{ transform: [{ translateY: peekOffset }] }}
         >
           {promotions.map((promotion, index) => (
-            <View
+            <Animated.View
               key={promotion.id}
               accessibilityElementsHidden={current !== index}
               importantForAccessibility={
@@ -251,6 +243,18 @@ function PromotionCarousel({
                 padding: 16,
                 gap: 6,
                 backgroundColor: promotion.background,
+                opacity: index === current ? dismissOpacity : 1,
+                transform: [
+                  {
+                    scale:
+                      index === current
+                        ? dismissOpacity.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.94, 1],
+                          })
+                        : 1,
+                  },
+                ],
               }}
             >
               <View
@@ -336,7 +340,7 @@ function PromotionCarousel({
                 </Text>
                 <ArrowRight size={12} color={promotion.background} />
               </Pressable>
-            </View>
+            </Animated.View>
           ))}
         </Animated.View>
       </ScrollView>
@@ -414,7 +418,7 @@ function PromotionCarousel({
           </Pressable>
         </>
       )}
-    </Animated.View>
+    </View>
   );
 }
 

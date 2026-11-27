@@ -135,8 +135,8 @@ it('dismisses only the active suggestion and remembers each choice across reload
   expect(refer).not.toHaveBeenCalled();
   expect(request).not.toHaveBeenCalled();
 });
-it('wraps to the first remaining suggestion when the final slide is dismissed', async () => {
-  render(
+it('removes the last of three slides while keeping the other two visible and usable after reload', async () => {
+  const ui = (
     <ParentHomeTiles
       referralsEnabled
       orgId="org"
@@ -144,20 +144,31 @@ it('wraps to the first remaining suggestion when the final slide is dismissed', 
       onAddChild={jest.fn()}
       onRefer={jest.fn()}
       onRequestClass={jest.fn()}
-    />,
+    />
   );
+  const view = render(ui);
   await screen.findByTestId('parent-promotion-tile');
   fireEvent.press(screen.getByLabelText('Next family suggestion'));
   fireEvent.press(screen.getByLabelText('Next family suggestion'));
   await act(async () =>
     fireEvent.press(screen.getByLabelText('Dismiss Request a class')),
   );
+  expect(screen.getByTestId('parent-promotion-tile')).toBeTruthy();
   expect(screen.getByLabelText('How it works')).toBeTruthy();
   expect(
     screen.getByLabelText('Family suggestions').props.accessibilityValue,
   ).toMatchObject({ now: 1, max: 2 });
   fireEvent.press(screen.getByLabelText('Next family suggestion'));
   expect(screen.getByLabelText('Add a child')).toBeTruthy();
+  view.unmount();
+  render(ui);
+  await screen.findByLabelText('How it works');
+  expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.max).toBe(
+    2,
+  );
+  fireEvent.press(screen.getByLabelText('Next family suggestion'));
+  expect(screen.getByLabelText('Add a child')).toBeTruthy();
+  expect(screen.queryByLabelText('Request a class')).toBeNull();
 });
 it('keeps the card available with a retry message when persistence fails', async () => {
   mockSet.mockRejectedValueOnce(new Error('disk full'));

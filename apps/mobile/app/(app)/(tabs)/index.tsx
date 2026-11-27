@@ -11,7 +11,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
-  AccessibilityInfo,
   Text,
   Image,
   ScrollView,
@@ -464,22 +463,12 @@ export default function HomeScreen() {
   );
   const { user } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
-  const overviewRef = useRef<ScrollView>(null);
   const focusedHome = useRef(isHomeFocused);
   focusedHome.current = isHomeFocused;
   const [familyActionsHighlight, setFamilyActionsHighlight] = useState(0);
   const revealFamilyActions = useCallback(() => {
     if (!focusedHome.current) return;
     setFamilyActionsHighlight((value) => value + 1);
-    void Promise.all([
-      AccessibilityInfo.isReduceMotionEnabled(),
-      AccessibilityInfo.isScreenReaderEnabled(),
-    ])
-      .then(([reduced, reader]) => {
-        if (focusedHome.current && !reader)
-          overviewRef.current?.scrollToEnd({ animated: !reduced });
-      })
-      .catch(() => {});
   }, []);
   React.useEffect(() => {
     focusedHome.current = isHomeFocused;
@@ -1005,7 +994,6 @@ export default function HomeScreen() {
             </ScrollView>
           ) : (
             <ScrollView
-              ref={overviewRef}
               testID="home-overview-row"
               horizontal
               showsHorizontalScrollIndicator={false}

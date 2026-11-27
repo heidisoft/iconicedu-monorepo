@@ -492,7 +492,11 @@ it('clears the introduction when switching to a child view', () => {
   expect(mockRouterPush).not.toHaveBeenCalled();
 });
 
-it('keeps the permanent family tile last in Overview and highlights it after dismissal', async () => {
+it('keeps the carousel in place after dismissal and highlights the permanent last tile without scrolling', async () => {
+  const endScroll = jest.spyOn(
+    require('react-native').ScrollView.prototype,
+    'scrollToEnd',
+  );
   const view = render(<HomeScreen />);
   const row = view.getByTestId('home-overview-row');
   const tiles = row
@@ -502,6 +506,8 @@ it('keeps the permanent family tile last in Overview and highlights it after dis
   expect(mockFamilyActions.mock.calls.at(-1)![0].highlight).toBe(0);
   await act(async () => mockParentTiles.mock.calls.at(-1)![0].onSuggestionDismissed!());
   expect(mockFamilyActions.mock.calls.at(-1)![0].highlight).toBe(1);
+  expect(endScroll).not.toHaveBeenCalled();
+  endScroll.mockRestore();
 });
 it('opens the same introductions from the permanent family actions tile', () => {
   mockHasChild = true;
