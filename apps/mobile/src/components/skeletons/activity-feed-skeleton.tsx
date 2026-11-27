@@ -109,7 +109,7 @@ const s = StyleSheet.create({
   wrap: { paddingTop: 0, paddingBottom: 24 },
   sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
   row: { paddingHorizontal: ROW_PADDING_X, paddingVertical: 16 },
-  separator: { height: 1, opacity: 0.3, marginHorizontal: ROW_PADDING_X },
+  separator: { height: 1, opacity: 0.2, marginHorizontal: ROW_PADDING_X },
   itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: CONTENT_GAP },
   leading: {
     width: LEADING_SIZE,

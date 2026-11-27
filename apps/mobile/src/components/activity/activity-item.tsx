@@ -529,7 +529,7 @@ export function makeActivityItemStyles(C: AppColors) {
     separator: {
       height: 1,
       backgroundColor: C.textMuted,
-      opacity: 0.3,
+      opacity: 0.2,
       marginHorizontal: 20,
     },
 
