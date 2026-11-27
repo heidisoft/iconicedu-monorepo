@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 
 const mockUseLocalSearchParams = jest.fn(() => ({
-  email: 'iconicedudev+student@gmail.com',
+  email: 'parent@example.test',
 }));
 const mockVerifyOtp = jest.fn();
 const mockSignInWithOtp = jest.fn();
@@ -83,6 +83,14 @@ describe('OtpScreen', () => {
     mockVerifyOtp.mockResolvedValue({ error: null });
     mockSignInWithOtp.mockResolvedValue({ error: null });
     mockFetchOnboardingStatus.mockResolvedValue({ isComplete: true });
+  });
+
+  it('returns to welcome when deep-link history has no email', () => {
+    mockUseLocalSearchParams.mockReturnValueOnce({ email: '' });
+    render(<OtpScreen />);
+    expect(mockReplace).toHaveBeenCalledWith('/(auth)/login');
+    expect(mockVerifyOtp).not.toHaveBeenCalled();
+    expect(mockSignInWithOtp).not.toHaveBeenCalled();
   });
 
   it('renders the verification code field', () => {

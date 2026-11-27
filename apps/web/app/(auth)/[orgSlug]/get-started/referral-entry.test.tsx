@@ -44,7 +44,9 @@ vi.mock('@iconicedu/web/app/(auth)/[orgSlug]/get-started/org-get-started-client'
 const code = 'a'.repeat(48);
 beforeEach(() => {
   mocks.flag.mockResolvedValue(true);
-  mocks.cookie.mockReturnValue({ value: code });
+  mocks.cookie.mockImplementation((key: string) =>
+    key === 'iconic-parent-referral' ? { value: code } : undefined,
+  );
 });
 it('keeps referred mobile visitors on web signup and carries their attribution into authentication', async () => {
   render(
@@ -65,5 +67,17 @@ it('preserves the existing signup behavior when referrals are off', async () => 
     }),
   );
   expect(screen.getByText('Install app prompt')).toBeTruthy();
+  expect(screen.getByTestId('signup')).not.toHaveAttribute('data-referral');
+});
+
+it('allows an ordinary parent signup without any invitation while referrals are enabled', async () => {
+  mocks.cookie.mockReturnValue(undefined);
+  render(
+    await Page({
+      params: Promise.resolve({ orgSlug: 'test-academy' }),
+      searchParams: Promise.resolve({}),
+    }),
+  );
+  expect(screen.getByTestId('signup')).toBeTruthy();
   expect(screen.getByTestId('signup')).not.toHaveAttribute('data-referral');
 });

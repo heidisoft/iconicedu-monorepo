@@ -2,7 +2,10 @@ import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { beforeEach, expect, it, vi } from 'vitest';
 import Page from './page';
-const mocks = vi.hoisted(() => ({ flag: vi.fn(), get: vi.fn() }));
+const mocks = vi.hoisted(() => ({ flag: vi.fn(), get: vi.fn(), entry: vi.fn() }));
+vi.mock('@iconicedu/web/lib/referrals/referral-entry-state', () => ({
+  getReferralEntryState: mocks.entry,
+}));
 vi.mock('@iconicedu/web/flags', () => ({ enableParentReferrals: mocks.flag }));
 vi.mock('@iconicedu/web/lib/api/http-client', () => ({
   createPublicApiClient: () => ({ get: mocks.get }),
@@ -16,6 +19,7 @@ const code = 'a'.repeat(48);
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.flag.mockResolvedValue(true);
+  mocks.entry.mockResolvedValue('guest');
   mocks.get.mockResolvedValue({
     referrerName: 'Test Parent',
     orgSlug: 'test-academy',
@@ -41,7 +45,7 @@ it('explains the new parent benefits and keeps the referrer reward secondary', a
     `iconicedu://r/${code}`,
   );
   expect(
-    screen.getByRole('link', { name: 'Download for iPhone' }).getAttribute('href'),
+    screen.getByRole('link', { name: 'Download on the App Store' }).getAttribute('href'),
   ).not.toContain('/us/');
   const form = screen
     .getByRole('button', { name: /Continue on the web/ })
@@ -60,5 +64,16 @@ it('shows no invitation for an invalid link', async () => {
   await expect(
     Page({ params: Promise.resolve({ code: '../../admin' }) }),
   ).rejects.toThrow('NEXT_NOT_FOUND');
+  expect(mocks.get).not.toHaveBeenCalled();
+});
+
+it('shows no invitation acceptance or app handoff for a signed-in account', async () => {
+  mocks.entry.mockResolvedValue('signed_in');
+  render(await Page({ params: Promise.resolve({ code }) }));
+  expect(
+    screen.getByRole('heading', { name: 'Invitations are for new parents' }),
+  ).toBeTruthy();
+  expect(screen.queryByRole('button', { name: 'Continue on the web' })).toBeNull();
+  expect(screen.queryByRole('link', { name: 'Open app and continue' })).toBeNull();
   expect(mocks.get).not.toHaveBeenCalled();
 });

@@ -1,3 +1,5 @@
+import Link from 'next/link';
+import { getReferralEntryState } from '@iconicedu/web/lib/referrals/referral-entry-state';
 import { ReferralAppOptions } from './app-options';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
@@ -21,6 +23,28 @@ export default async function ReferralPage({
   if (!(await enableParentReferrals())) notFound();
   const { code } = await params;
   if (!isParentReferralCode(code)) notFound();
+  const entryState = await getReferralEntryState();
+  if (entryState !== 'guest')
+    return (
+      <main className="mx-auto flex min-h-svh max-w-xl flex-col justify-center gap-6 px-6 py-12">
+        <h1 className="text-3xl font-bold">
+          {entryState === 'signed_in'
+            ? 'Invitations are for new parents'
+            : 'Unable to check your account'}
+        </h1>
+        <p className="text-muted-foreground">
+          {entryState === 'signed_in'
+            ? 'You’re already signed in. A referral cannot be applied to your existing account, including your own invitation.'
+            : 'Please try again before accepting this invitation.'}
+        </p>
+        <Link
+          href="/"
+          className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-primary px-5 py-3 font-semibold text-primary-foreground"
+        >
+          Back to ICONIC Academy
+        </Link>
+      </main>
+    );
   let invitation: ParentReferralLanding;
   try {
     invitation = await createPublicApiClient().get<ParentReferralLanding>(

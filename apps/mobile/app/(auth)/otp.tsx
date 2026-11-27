@@ -86,6 +86,11 @@ export default function OtpScreen() {
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   React.useEffect(() => {
+    // Deep-link history must never leave someone on verification without an email.
+    if (typeof email !== 'string' || !email.trim()) router.replace('/(auth)/login');
+  }, [email, router]);
+
+  React.useEffect(() => {
     analytics.screen('OTP Verification', { screen_name: 'otp' });
   }, [analytics]);
 

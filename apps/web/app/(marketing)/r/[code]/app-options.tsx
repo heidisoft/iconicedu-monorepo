@@ -1,13 +1,50 @@
 'use client';
-import React, { useState } from 'react';
 import {
-  ICONIC_IOS_STORE_URL,
-  ICONIC_ANDROID_STORE_URL,
-  ICONIC_APP_SCHEME,
-} from '@iconicedu/utils';
+  cancelReferralFlow,
+  markReferralFlow,
+  readReferralFlow,
+} from '@iconicedu/web/lib/referrals/referral-exit';
+import React, { useEffect, useRef, useState } from 'react';
+import { ICONIC_APP_SCHEME } from '@iconicedu/utils';
+import { MarketingStoreBadges } from '@iconicedu/ui-web/components/marketing/marketing-store-badges';
 
 export function ReferralAppOptions({ code }: { code: string }) {
   const [copyStatus, setCopyStatus] = useState('');
+  const mounted = useRef(false);
+  const preserve = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    preserve.current = false;
+    markReferralFlow(code, 'invitation');
+    const submit = (event: SubmitEvent) => {
+      const form = event.target;
+      if (
+        form instanceof HTMLFormElement &&
+        new URL(form.action).pathname === `/r/${code}/continue`
+      ) {
+        preserve.current = true;
+        markReferralFlow(code, 'signup');
+      }
+    };
+    const leave = () => {
+      const flow = readReferralFlow();
+      if (
+        !preserve.current &&
+        (!flow || (flow.code === code && flow.phase === 'invitation'))
+      )
+        cancelReferralFlow(code);
+    };
+    document.addEventListener('submit', submit, true);
+    window.addEventListener('pagehide', leave);
+    return () => {
+      mounted.current = false;
+      queueMicrotask(() => {
+        if (!mounted.current) leave();
+      });
+      document.removeEventListener('submit', submit, true);
+      window.removeEventListener('pagehide', leave);
+    };
+  }, [code]);
   return (
     <section aria-labelledby="continue-in-app" className="space-y-4">
       <h2 id="continue-in-app" className="text-xl font-semibold">
@@ -23,20 +60,7 @@ export function ReferralAppOptions({ code }: { code: string }) {
         New to the app? Download it below, then return to this invitation and tap “Open
         app and continue”. Your invitation will be ready to accept before signup.
       </p>
-      <div className="flex flex-wrap gap-3">
-        <a
-          href={ICONIC_IOS_STORE_URL}
-          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl border px-4 py-3 font-semibold"
-        >
-          Download for iPhone
-        </a>
-        <a
-          href={ICONIC_ANDROID_STORE_URL}
-          className="inline-flex min-h-12 flex-1 items-center justify-center rounded-2xl border px-4 py-3 font-semibold"
-        >
-          Download for Android
-        </a>
-      </div>
+      <MarketingStoreBadges layout="inline" size="compact" />
       <details className="rounded-2xl border p-4 text-sm">
         <summary className="cursor-pointer font-semibold">
           Need to enter your invitation manually?

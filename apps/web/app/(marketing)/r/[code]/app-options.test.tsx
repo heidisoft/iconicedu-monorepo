@@ -10,11 +10,11 @@ it('opens the invitation in the app without losing its opaque code and uses coun
     'href',
     `iconicedu://r/${code}`,
   );
-  expect(screen.getByRole('link', { name: 'Download for iPhone' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Download on the App Store' })).toHaveAttribute(
     'href',
     'https://apps.apple.com/app/iconic-academy/id6762158186',
   );
-  expect(screen.getByRole('link', { name: 'Download for Android' })).toHaveAttribute(
+  expect(screen.getByRole('link', { name: 'Get it on Google Play' })).toHaveAttribute(
     'href',
     'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',
   );

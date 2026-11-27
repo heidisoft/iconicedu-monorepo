@@ -18,6 +18,7 @@ function setup(completed = false) {
       user: { id: actorId, email: 'parent@example.invalid' },
       serviceSupabase: {},
     }),
+    getAccountByAuthUserId: jest.fn().mockResolvedValue(null),
     resolveOrgIdForUser: jest.fn().mockResolvedValue(orgId),
     getOrCreateAccount: jest.fn().mockResolvedValue({
       id: 'parent-account',
@@ -114,4 +115,21 @@ it('completes an unassigned parent account normally after the invitation is remo
     {},
     expect.objectContaining({ primaryRole: 'guardian' }),
   );
+});
+
+it('does not create an account or credit when the authenticated user already has a role in another organization', async () => {
+  const { service, referrals, mocks } = setup();
+  mocks.getAccountByAuthUserId.mockResolvedValueOnce({
+    id: 'existing-account',
+    org_id: 'other-org',
+    primary_role: 'guardian',
+    onboarding_completed_at: '2026-01-01T00:00:00Z',
+  } as never);
+  expect(
+    (await service.completeRole('token', { role: 'parent', referralCode: code }))
+      .referralStatus,
+  ).toBe('not_eligible');
+  expect(mocks.getOrCreateAccount).not.toHaveBeenCalled();
+  expect(referrals.record).not.toHaveBeenCalled();
+  expect(mocks.updateAccountRoleState).not.toHaveBeenCalled();
 });

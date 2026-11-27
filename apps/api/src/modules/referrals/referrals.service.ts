@@ -129,6 +129,10 @@ export class ReferralsService {
       code_value: code,
       name_value: name,
     });
+    if (error?.code === '42501')
+      throw new BadRequestException(
+        'Referral invitations are for new parent accounts only.',
+      );
     if (error?.code === '22023')
       throw new BadRequestException(
         'This referral link cannot be used. Clear the referral or use the parent’s name.',

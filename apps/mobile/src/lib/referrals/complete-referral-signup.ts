@@ -20,6 +20,9 @@ export async function completePendingReferralSignup(userId: string) {
     }
     throw error;
   }
+  const current = await readPendingParentReferral(userId);
+  if (!current || current.code !== pending.code || current.savedAt !== pending.savedAt)
+    return 'cancelled' as const;
   const result = await completeParentRole({ referralCode: pending.code });
   await clearPendingParentReferral({ code: pending.code, ownerId: userId });
   return result?.referralStatus ?? 'pending_review';

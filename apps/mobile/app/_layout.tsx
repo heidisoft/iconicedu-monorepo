@@ -1,3 +1,4 @@
+import { ReferralFlowBoundary } from '@/components/home/referral-flow-boundary';
 import '../global.css';
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
@@ -69,6 +70,7 @@ function RootContent() {
         rendered behind it (the tab bar's tabBarBackground), not from this component.
       */}
       <SystemBars style={isDark ? 'light' : 'dark'} />
+      <ReferralFlowBoundary />
       <ScreenTracker />
       <AppLifecycleTracker />
       <PresenceTracker />

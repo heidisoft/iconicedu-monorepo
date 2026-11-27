@@ -13,6 +13,7 @@ import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/we
 import { enableParentReferrals } from '@iconicedu/web/flags';
 import {
   PARENT_REFERRAL_COOKIE,
+  PARENT_REFERRAL_CANCELLED_COOKIE,
   isParentReferralCode,
 } from '@iconicedu/web/lib/referrals/referral-cookie';
 import { isMobileOrTablet } from '@iconicedu/web/lib/mobile/detect-mobile';
@@ -64,7 +65,12 @@ export default async function OrgGetStartedPage({
     );
   }
 
-  const referralCode = (await cookies()).get(PARENT_REFERRAL_COOKIE)?.value;
+  const cookieStore = await cookies();
+  const rawReferralCode = cookieStore.get(PARENT_REFERRAL_COOKIE)?.value;
+  const referralCode =
+    cookieStore.get(PARENT_REFERRAL_CANCELLED_COOKIE)?.value === rawReferralCode
+      ? undefined
+      : rawReferralCode;
   const referredSignup =
     (await enableParentReferrals()) && isParentReferralCode(referralCode);
   const isMobile = !referredSignup && isMobileOrTablet(await headers());

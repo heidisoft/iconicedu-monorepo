@@ -532,24 +532,31 @@ export class OnboardingService {
     );
     if (!orgId) throw new BadRequestException('No organization found for onboarding');
 
-    const account = await this.getOrCreateAccount(serviceSupabase, {
-      orgId,
-      authUserId: user.id,
-      authEmail: user.email ?? null,
-    });
-
     const hasReferral = Boolean(referral.code || referral.name);
-    if (hasReferral && account.onboarding_completed_at) {
+    const establishedAccount = hasReferral
+      ? await this.getAccountByAuthUserId(serviceSupabase, user.id, true)
+      : null;
+    const account =
+      establishedAccount ??
+      (await this.getOrCreateAccount(serviceSupabase, {
+        orgId,
+        authUserId: user.id,
+        authEmail: user.email ?? null,
+      }));
+
+    if (hasReferral && (account.onboarding_completed_at || account.primary_role)) {
       const roles = await this.getUserRoles(serviceSupabase, account.id, account.org_id);
       return {
         success: true,
-        referralStatus: (await this.referralsService.hasMatchingSignupReferral(
-          account.id,
-          account.org_id,
-          body,
-        ))
-          ? ('already_recorded' as const)
-          : ('not_eligible' as const),
+        referralStatus:
+          account.org_id === orgId &&
+          (await this.referralsService.hasMatchingSignupReferral(
+            account.id,
+            account.org_id,
+            body,
+          ))
+            ? ('already_recorded' as const)
+            : ('not_eligible' as const),
         onboarding: await this.resolveOnboardingDestinations(
           serviceSupabase,
           buildAuthOnboardingState(account, roles),
@@ -1463,12 +1470,19 @@ export class OnboardingService {
     if (error) throw new InternalServerErrorException(error.message);
   }
 
-  private async getAccountByAuthUserId(supabase: SupabaseClient, authUserId: string) {
-    const { data, error } = await supabase
+  private async getAccountByAuthUserId(
+    supabase: SupabaseClient,
+    authUserId: string,
+    establishedOnly = false,
+  ) {
+    let query = supabase
       .from('accounts')
       .select('*')
       .eq('auth_user_id', authUserId)
-      .is('deleted_at', null)
+      .is('deleted_at', null);
+    if (establishedOnly)
+      query = query.or('primary_role.not.is.null,onboarding_completed_at.not.is.null');
+    const { data, error } = await query
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle<AccountRow>();
