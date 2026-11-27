@@ -64,7 +64,14 @@ Only fields in that section are validated and written; cancelling discards the
 local draft. Profile and child-profile text inputs use shared sizing, padding, theme
 colors, and focus borders, following the onboarding style. Creation and edit sheets use the
 same card insets so the fields retain matching proportions. Name placeholders are
-short labels with normal text weight and spacing. Name fields support keyboard Next/Done;
+short labels with normal text weight and spacing. In saved-profile section editors, text fields display their current values as tappable rows.
+Names, address text, bio and spoken languages open focused native sheets. Close or
+native Back discards the field edit; Done updates only the section draft. Country,
+region, birth year, grade, timezone and language/region retain their existing selection
+sheets. Accent colors also open in a separate sheet, with the current avatar color
+selected. The section Save still requires confirmation before persistence. This
+applies to main and child profiles; Add child keeps inline inputs for first-time entry.
+Name field editors support keyboard Done;
 email fields keep email keyboards and disable autocorrection. Address, birth-year,
 grade, and regional selectors are disabled during confirmation and saving, including
 for accessibility actions. Regional editors use searchable timezone and language/region pickers, and allow

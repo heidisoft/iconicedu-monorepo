@@ -1,15 +1,13 @@
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Alert,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   Switch,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
@@ -17,6 +15,8 @@ import { File } from 'expo-file-system';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   PROFILE_COUNTRIES,
+  getCountryAddressFields,
+  getCountryRegions,
   optionsForCountry,
   normalizeCountryCode,
   type ProfileSettingsInput,
@@ -29,13 +29,14 @@ import { supabase } from '@/lib/supabase/client';
 import { chooseProfilePhoto } from '@/lib/profile-photo-picker';
 import { saveProfileSettings } from '@/lib/api/profile-settings';
 import { LocationCountryField } from '@/components/auth/location-country-field';
-import { LocationAddressFields } from '@/components/auth/location-address-fields';
+import { LocationRegionField } from '@/components/auth/location-region-field';
 import { GradeLevelSelect } from '@/components/auth/grade-level-select';
 import { BirthYearSelect } from '@/components/auth/birth-year-select';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { RegionalFields } from './regional-fields';
 import { ThemeModePicker } from './theme-mode-options';
-import { ProfileTextInput, profileFieldStyles } from './profile-text-input';
+import { profileFieldStyles } from './profile-text-input';
+import { ProfileFieldEditor, ProfileTextField } from './profile-field-editor';
 export const sectionTitles: Record<ProfileSettingsSection, string> = {
   identity: 'Identity',
   photo: 'Photo',
@@ -77,7 +78,6 @@ export function ProfileSectionForm({
   const family = useFamilyView();
   const value = (key: string, fallback = '') =>
     typeof profile[key] === 'string' ? (profile[key] as string) : fallback;
-  const identityInputs = useRef<Record<string, TextInput | null>>({});
   const [firstName, setFirst] = useState(value('first_name'));
   const [lastName, setLast] = useState(value('last_name'));
   const [displayName, setDisplay] = useState(value('display_name'));
@@ -104,31 +104,8 @@ export function ProfileSectionForm({
   );
   const show = (key: ProfileSettingsSection) => section === key;
   const text = { color: colors.text };
-  const fieldStyles = {
-    label: { ...profileFieldStyles(colors).label, marginBottom: 6 },
-    labelOptional: { color: colors.textMuted, fontSize: 13 },
-    inputWrap: {
-      backgroundColor: colors.inputBg,
-      borderColor: colors.border,
-      borderWidth: 1,
-      borderRadius: 12,
-      minHeight: 56,
-      paddingHorizontal: 16,
-      marginBottom: 16,
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-    },
-    inputWrapFocused: { borderColor: colors.teal },
-    input: {
-      color: colors.text,
-      flex: 1,
-      fontSize: 16,
-      lineHeight: 22,
-      paddingVertical: 16,
-      includeFontPadding: false,
-    },
-    placeholderColor: colors.textFaint,
-  };
+  const addressFields =
+    getCountryAddressFields(countryCode) ?? getCountryAddressFields('ZZ')!;
   const error = (e: unknown) =>
     Alert.alert('Unable to save', e instanceof Error ? e.message : 'Please try again.');
 
@@ -385,33 +362,21 @@ export function ProfileSectionForm({
               ] as const
             )
               .filter(([label]) => !onDraftSave || label !== 'Display name')
-              .map(([label, val, setter], index, fields) => (
-                <View key={label} style={{ gap: 8 }}>
-                  <Text style={profileFieldStyles(colors).label}>{label}</Text>
-                  <ProfileTextInput
-                    accessibilityLabel={label}
-                    value={val}
-                    editable={!disabled}
-                    maxLength={100}
-                    onChangeText={setter}
-                    ref={(input) => {
-                      identityInputs.current[label] = input;
-                    }}
-                    placeholder={label}
-                    autoCapitalize="words"
-                    autoCorrect={false}
-                    autoComplete={
-                      index === 0 ? 'given-name' : index === 1 ? 'family-name' : 'off'
-                    }
-                    returnKeyType={index < fields.length - 1 ? 'next' : 'done'}
-                    blurOnSubmit={index === fields.length - 1}
-                    onSubmitEditing={() => {
-                      const next = fields[index + 1];
-                      if (next) identityInputs.current[next[0]]?.focus();
-                      else Keyboard.dismiss();
-                    }}
-                  />
-                </View>
+              .map(([label, val, setter], index) => (
+                <ProfileTextField
+                  key={label}
+                  label={label}
+                  value={val}
+                  onChange={setter}
+                  disabled={disabled}
+                  maxLength={100}
+                  placeholder={label}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  autoComplete={
+                    index === 0 ? 'given-name' : index === 1 ? 'family-name' : 'off'
+                  }
+                />
               ))}
           {show('appearance') && (
             <>
@@ -421,72 +386,90 @@ export function ProfileSectionForm({
                 onChange={setDraftMode}
                 disabled={disabled}
               />
-              <Text style={text}>Accent color</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-                {THEMES.map((theme) => {
-                  const accent = profileAvatarColors({
-                    themeKey: theme,
-                    seed: String(profile.id),
-                  });
-                  const selected = themeKey === theme;
-                  return (
-                    <Pressable
-                      key={theme}
-                      accessibilityRole="radio"
-                      accessibilityLabel={theme}
-                      accessibilityState={{ selected, disabled }}
-                      disabled={disabled}
-                      onPress={() => setTheme(theme)}
-                      style={{
-                        width: 76,
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingVertical: 4,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 72,
-                          height: 72,
-                          borderRadius: 36,
-                          borderWidth: 2,
-                          borderColor: selected ? colors.teal : 'transparent',
-                          padding: 4,
-                        }}
-                      >
-                        <View
-                          testID={`accent-avatar-${theme}`}
+              <ProfileFieldEditor
+                label="Accent color"
+                value={themeKey.charAt(0).toUpperCase() + themeKey.slice(1)}
+                disabled={disabled}
+              >
+                {(close) => (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                    {THEMES.map((theme) => {
+                      const accent = profileAvatarColors({
+                        themeKey: theme,
+                        seed: String(profile.id),
+                      });
+                      const selected = themeKey === theme;
+                      return (
+                        <Pressable
+                          key={theme}
+                          accessibilityRole="radio"
+                          accessibilityLabel={theme}
+                          accessibilityState={{ selected, disabled }}
+                          disabled={disabled}
+                          onPress={() => {
+                            setTheme(theme);
+                            close();
+                          }}
                           style={{
-                            flex: 1,
-                            borderRadius: 30,
-                            backgroundColor: accent.bg,
+                            width: 76,
                             alignItems: 'center',
-                            justifyContent: 'center',
+                            gap: 6,
+                            paddingVertical: 4,
                           }}
                         >
-                          <Text
-                            style={{ color: accent.fg, fontSize: 26, fontWeight: '800' }}
+                          <View
+                            style={{
+                              width: 72,
+                              height: 72,
+                              borderRadius: 36,
+                              borderWidth: 2,
+                              borderColor: selected ? colors.teal : 'transparent',
+                              padding: 4,
+                            }}
                           >
-                            {(displayName || firstName || 'Profile')[0]?.toUpperCase()}
+                            <View
+                              testID={`accent-avatar-${theme}`}
+                              style={{
+                                flex: 1,
+                                borderRadius: 30,
+                                backgroundColor: accent.bg,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  color: accent.fg,
+                                  fontSize: 26,
+                                  fontWeight: '800',
+                                }}
+                              >
+                                {(displayName ||
+                                  firstName ||
+                                  'Profile')[0]?.toUpperCase()}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text
+                            style={{
+                              color: colors.text,
+                              fontSize: 14,
+                              textTransform: 'capitalize',
+                            }}
+                          >
+                            {theme}
                           </Text>
-                        </View>
-                      </View>
-                      <Text
-                        style={{
-                          color: colors.text,
-                          fontSize: 14,
-                          textTransform: 'capitalize',
-                        }}
-                      >
-                        {theme}
-                      </Text>
-                      {selected && (
-                        <Text style={{ color: colors.teal, fontSize: 12 }}>Selected</Text>
-                      )}
-                    </Pressable>
-                  );
-                })}
-              </View>
+                          {selected && (
+                            <Text style={{ color: colors.teal, fontSize: 12 }}>
+                              Selected
+                            </Text>
+                          )}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </ProfileFieldEditor>
             </>
           )}
           {(show('location') || show('child')) && (
@@ -509,17 +492,56 @@ export function ProfileSectionForm({
                 />
               )}
               {show('location') && countryCode ? (
-                <LocationAddressFields
-                  countryCode={countryCode}
-                  city={city}
-                  region={region}
-                  postalCode={postalCode}
-                  setCity={setCity}
-                  setRegion={setRegion}
-                  setPostalCode={setPostal}
-                  s={fieldStyles}
-                  disabled={disabled}
-                />
+                <View style={{ gap: 18 }}>
+                  {addressFields.city.visible && (
+                    <ProfileTextField
+                      label={addressFields.city.label}
+                      value={city}
+                      onChange={setCity}
+                      disabled={disabled}
+                      autoCapitalize="words"
+                      autoCorrect={false}
+                      maxLength={100}
+                    />
+                  )}
+                  {addressFields.region.visible &&
+                    (getCountryRegions(countryCode).length > 0 ? (
+                      <View style={{ gap: 8 }}>
+                        <Text style={profileFieldStyles(colors).label}>
+                          {addressFields.region.label}
+                        </Text>
+                        <LocationRegionField
+                          countryCode={countryCode}
+                          label={addressFields.region.label}
+                          value={region}
+                          onChange={setRegion}
+                          disabled={disabled}
+                        />
+                      </View>
+                    ) : (
+                      <ProfileTextField
+                        label={addressFields.region.label}
+                        value={region}
+                        onChange={setRegion}
+                        disabled={disabled}
+                        autoCapitalize="words"
+                        autoCorrect={false}
+                        maxLength={100}
+                      />
+                    ))}
+                  {addressFields.postal.visible && (
+                    <ProfileTextField
+                      label={addressFields.postal.label}
+                      value={postalCode}
+                      onChange={setPostal}
+                      disabled={disabled}
+                      textContentType="postalCode"
+                      autoCapitalize="characters"
+                      autoCorrect={false}
+                      maxLength={32}
+                    />
+                  )}
+                </View>
               ) : null}
               {show('child') && (
                 <>
@@ -593,18 +615,15 @@ export function ProfileSectionForm({
             </>
           )}
           {section === 'about' && (
-            <>
-              <Text style={profileFieldStyles(colors).label}>Bio</Text>
-              <ProfileTextInput
-                accessibilityLabel="Bio"
-                value={bio}
-                onChangeText={setBio}
-                editable={!disabled}
-                multiline
-                maxLength={2000}
-              />
-              <Text style={{ color: colors.textMuted }}>{bio.length} / 2,000</Text>
-            </>
+            <ProfileTextField
+              label="Bio"
+              value={bio}
+              onChange={setBio}
+              disabled={disabled}
+              multiline
+              maxLength={2000}
+              hint="Up to 2,000 characters."
+            />
           )}
         </View>
       </ScrollView>

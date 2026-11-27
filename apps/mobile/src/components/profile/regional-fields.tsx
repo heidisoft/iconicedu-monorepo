@@ -5,7 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchableSelectionSheet } from '@iconicedu/ui-native/components/searchable-selection-sheet';
 import { timezoneIds, timezoneOption } from '@/components/auth/timezone-options';
 import { useTheme } from '@/providers/theme-provider';
-import { ProfileTextInput, profileFieldStyles } from './profile-text-input';
+import { profileFieldStyles } from './profile-text-input';
+import { ProfileTextField } from './profile-field-editor';
 
 export function RegionalFields({
   timezone,
@@ -110,23 +111,17 @@ export function RegionalFields({
           </View>
         );
       })}
-      <View style={{ gap: 8 }}>
-        <Text style={profileFieldStyles(colors).label}>Languages Spoken</Text>
-        <ProfileTextInput
-          accessibilityLabel="Languages spoken"
-          value={languages}
-          editable={!disabled}
-          onChangeText={setLanguages}
-          placeholder="English, Sinhala"
-          placeholderTextColor={colors.textFaint}
-          autoCapitalize="words"
-          autoCorrect={false}
-          returnKeyType="done"
-        />
-        <Text style={{ color: colors.textMuted, fontSize: 13 }}>
-          Separate languages with commas.
-        </Text>
-      </View>
+      <ProfileTextField
+        label="Languages spoken"
+        value={languages}
+        onChange={setLanguages}
+        disabled={disabled}
+        placeholder="English, Sinhala"
+        autoCapitalize="words"
+        autoCorrect={false}
+        maxLength={500}
+        hint="Separate languages with commas."
+      />
       <Text style={{ color: colors.textMuted, fontSize: 13 }}>
         These preferences apply to your profile. They do not change the app’s display
         language.

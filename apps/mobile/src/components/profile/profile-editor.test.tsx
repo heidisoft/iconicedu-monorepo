@@ -3,6 +3,7 @@ import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { ProfileEditor, ProfileSectionEditButton } from './profile-editor';
+import { ProfileSectionForm } from './profile-section-form';
 
 const mockSave = jest.fn();
 const mockChoosePhoto = jest.fn();
@@ -93,18 +94,24 @@ beforeEach(() => {
 it('requires confirmation and preserves edits when review is cancelled', () => {
   render(<ProfileEditor id="p1" />);
   fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit First name'));
   fireEvent.changeText(screen.getByLabelText('First name'), 'Janet');
+  fireEvent.press(screen.getByLabelText('Done editing First name'));
   fireEvent.press(screen.getByLabelText('Save section changes'));
   expect(mockSave).not.toHaveBeenCalled();
   const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)![2]!;
   act(() => buttons.find((button) => button.text === 'Cancel')!.onPress!());
   expect(mockSave).not.toHaveBeenCalled();
-  expect(screen.getByLabelText('First name').props.value).toBe('Janet');
+  expect(screen.getByLabelText('Edit First name').props.accessibilityValue.text).toBe(
+    'Janet',
+  );
 });
 it('saves the reviewed values only after explicit confirmation', async () => {
   render(<ProfileEditor id="p1" />);
   fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit First name'));
   fireEvent.changeText(screen.getByLabelText('First name'), 'Janet');
+  fireEvent.press(screen.getByLabelText('Done editing First name'));
   fireEvent.press(screen.getByLabelText('Save section changes'));
   const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)![2]!;
   await act(async () => {
@@ -165,12 +172,16 @@ it('keeps the original data rows read-only until a section is opened', () => {
 it('edits only the selected section and discards changes on cancel', () => {
   render(<ProfileEditor id="p1" />);
   fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit First name'));
   fireEvent.changeText(screen.getByLabelText('First name'), 'Discarded');
+  fireEvent.press(screen.getByLabelText('Done editing First name'));
   expect(screen.queryByLabelText('Hide account role')).toBeNull();
   expect(screen.queryByLabelText('Choose profile photo')).toBeNull();
   fireEvent.press(screen.getByText('Cancel'));
   fireEvent.press(screen.getByLabelText('Edit Identity'));
-  expect(screen.getByLabelText('First name').props.value).toBe('Jane');
+  expect(screen.getByLabelText('Edit First name').props.accessibilityValue.text).toBe(
+    'Jane',
+  );
   expect(mockSave).not.toHaveBeenCalled();
 });
 it('saves visibility without sending identity or regional fields', async () => {
@@ -197,7 +208,9 @@ it('opens regional editing with pickers and spoken languages only', () => {
   fireEvent.press(screen.getByLabelText('Edit Regional'));
   expect(screen.getByLabelText('Choose Time Zone')).toBeTruthy();
   expect(screen.getByLabelText('Choose Language / Region')).toBeTruthy();
-  expect(screen.getByLabelText('Languages spoken').props.value).toBe('');
+  expect(
+    screen.getByLabelText('Edit Languages spoken').props.accessibilityValue.text,
+  ).toBe('Not set');
   expect(screen.queryByLabelText('First name')).toBeNull();
   expect(screen.queryByLabelText('Hide account role')).toBeNull();
 });
@@ -252,6 +265,7 @@ it('confirms appearance before saving accent and applying the local theme', asyn
   fireEvent.press(screen.getByLabelText('Edit Appearance'));
   fireEvent.press(screen.getByLabelText('Theme: System. Change theme'));
   fireEvent.press(screen.getByLabelText('Dark'));
+  fireEvent.press(screen.getByLabelText('Edit Accent color'));
   fireEvent.press(screen.getByLabelText('blue'));
   fireEvent.press(screen.getByLabelText('Save section changes'));
   expect(mockSave).not.toHaveBeenCalled();
@@ -300,11 +314,17 @@ it.each([false, true])(
 it('previews accent colors as profile avatars and keeps dismissed theme choices unchanged', () => {
   render(<ProfileSectionEditButton id="p1" section="appearance" />);
   fireEvent.press(screen.getByLabelText('Edit Appearance'));
+  fireEvent.press(screen.getByLabelText('Edit Accent color'));
   expect(screen.getByTestId('accent-avatar-blue').props.style.backgroundColor).toBe(
     profileAvatarColors({ themeKey: 'blue', seed: 'p1' }).bg,
   );
   fireEvent.press(screen.getByLabelText('blue'));
+  expect(screen.getByLabelText('Edit Accent color').props.accessibilityValue.text).toBe(
+    'Blue',
+  );
+  fireEvent.press(screen.getByLabelText('Edit Accent color'));
   expect(screen.getByLabelText('blue').props.accessibilityState.selected).toBe(true);
+  fireEvent.press(screen.getByLabelText('Close Accent color editor'));
   expect(mockSave).not.toHaveBeenCalled();
   fireEvent.press(screen.getByLabelText('Theme: System. Change theme'));
   expect(screen.getByLabelText('System').props.accessibilityState.selected).toBe(true);
@@ -322,4 +342,76 @@ it('uses the shared profile sections for the separate child Profile screen', () 
   expect(screen.queryByText('Location')).toBeNull();
   expect(screen.queryByText('Preferences')).toBeNull();
   expect(screen.queryByText('Remove child')).toBeNull();
+});
+
+it.each([false, true])(
+  'keeps per-field edits local and discards them when the section closes (child=%s)',
+  (child) => {
+    render(<ProfileEditor id="p1" child={child} profileOnly />);
+    fireEvent.press(screen.getByLabelText('Edit Identity'));
+    fireEvent.press(screen.getByLabelText('Edit First name'));
+    fireEvent.changeText(screen.getByLabelText('First name'), 'Janet');
+    fireEvent.press(screen.getByLabelText('Done editing First name'));
+    fireEvent.press(screen.getByLabelText('Edit Last name'));
+    fireEvent.changeText(screen.getByLabelText('Last name'), 'Discarded');
+    fireEvent.press(screen.getByLabelText('Close Last name editor'));
+    expect(screen.getByLabelText('Edit First name').props.accessibilityValue.text).toBe(
+      'Janet',
+    );
+    expect(screen.getByLabelText('Edit Last name').props.accessibilityValue.text).toBe(
+      'Smith',
+    );
+    expect(mockSave).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByText('Cancel'));
+    fireEvent.press(screen.getByLabelText('Edit Identity'));
+    expect(screen.getByLabelText('Edit First name').props.accessibilityValue.text).toBe(
+      'Jane',
+    );
+  },
+);
+
+it('checks required names after field editing before offering database confirmation', () => {
+  render(<ProfileEditor id="p1" />);
+  fireEvent.press(screen.getByLabelText('Edit Identity'));
+  fireEvent.press(screen.getByLabelText('Edit Last name'));
+  fireEvent.changeText(screen.getByLabelText('Last name'), ' ');
+  fireEvent.press(screen.getByLabelText('Done editing Last name'));
+  fireEvent.press(screen.getByLabelText('Save section changes'));
+  expect(Alert.alert).toHaveBeenLastCalledWith('Check names', expect.any(String));
+  expect(mockSave).not.toHaveBeenCalled();
+});
+
+it('edits address text in a focused sheet and saves only the confirmed location draft', async () => {
+  render(
+    <ProfileSectionForm
+      section="location"
+      profile={{
+        id: 'p1',
+        country_code: 'US',
+        city: 'Boston',
+        region: 'MA',
+        postal_code: '02108',
+      }}
+    />,
+  );
+  fireEvent.press(screen.getByLabelText('Edit City'));
+  fireEvent.changeText(screen.getByLabelText('City'), 'Cambridge');
+  fireEvent.press(screen.getByLabelText('Done editing City'));
+  expect(mockSave).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByLabelText('Save section changes'));
+  const buttons = jest.mocked(Alert.alert).mock.calls.at(-1)![2]!;
+  await act(async () => {
+    buttons.find((button) => button.text === 'Save')!.onPress!();
+  });
+  expect(mockSave).toHaveBeenCalledWith('p1', {
+    section: 'location',
+    values: {
+      location: {
+        countryCode: 'US',
+        city: 'Cambridge',
+        region: 'MA',
+        postalCode: '02108',
+      },
+    },
+  });
 });

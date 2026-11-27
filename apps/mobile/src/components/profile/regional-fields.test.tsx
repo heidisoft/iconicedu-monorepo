@@ -5,6 +5,8 @@ jest.mock('@/providers/theme-provider', () => ({
   useTheme: () => ({ colors: require('@/lib/theme').lightColors }),
 }));
 jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaProvider: require('react-native').View,
+  SafeAreaView: require('react-native').View,
   useSafeAreaInsets: () => ({ bottom: 0 }),
 }));
 jest.mock('@/components/auth/timezone-options', () => ({
@@ -63,10 +65,15 @@ it('allows editing spoken languages and disables inputs during a save', () => {
     disabled: false,
   };
   const view = render(<RegionalFields {...props} />);
+  fireEvent.press(screen.getByLabelText('Edit Languages spoken'));
   fireEvent.changeText(screen.getByLabelText('Languages spoken'), 'English, Sinhala');
+  expect(setLanguages).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByLabelText('Done editing Languages spoken'));
   expect(setLanguages).toHaveBeenCalledWith('English, Sinhala');
   view.rerender(<RegionalFields {...props} disabled />);
-  expect(screen.getByLabelText('Languages spoken').props.editable).toBe(false);
+  expect(
+    screen.getByLabelText('Edit Languages spoken').props.accessibilityState.disabled,
+  ).toBe(true);
   expect(
     screen.getByLabelText('Choose Time Zone').props.accessibilityState.disabled,
   ).toBe(true);
