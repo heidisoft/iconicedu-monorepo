@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { Check, CheckCircle2, XCircle } from 'lucide-react-native';
+import { Check, CheckCircle2, Flag } from 'lucide-react-native';
 import type { ActivityFeedLeafItemVM } from '@iconicedu/shared-types';
 import type { AppColors } from '@/lib/theme';
 import {
@@ -100,6 +100,26 @@ type Props = {
    */
   embedded?: boolean;
 };
+
+function normalizeTitle(value: string) {
+  return value.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * The feed row's headline usually already says "Confirm the lesson for … with …".
+ * Repeating that verbatim as the card's title reads as noise, so only show the
+ * prompt title when it adds something the headline does not.
+ */
+export function shouldShowCompletionPromptTitle(
+  promptTitle: string,
+  headline: string | undefined,
+): boolean {
+  const title = normalizeTitle(promptTitle);
+  if (!title) return false;
+  if (!headline) return true;
+  const normalizedHeadline = normalizeTitle(headline);
+  return !normalizedHeadline.includes(title) && !title.includes(normalizedHeadline);
+}
 
 function getInitialStep(status: CompletionStatus | null): Step {
   if (status === 'confirmed' || status === 'auto_confirmed') return 'confirmed';
@@ -269,8 +289,12 @@ export function ActivityCompletionCheck({
         {/* When embedded (the homepage tile), the tile itself already shows a
             "Completed" badge next to the session title — repeating "Session
             Completed" here would just say the same thing twice. */}
-        {embedded ? null : (
-          <Text style={[styles.question, { color: colors.textMuted }]}>
+        {embedded ||
+        !shouldShowCompletionPromptTitle(
+          metadata.promptTitle,
+          activity.content?.headline?.primary,
+        ) ? null : (
+          <Text style={[styles.question, { color: colors.text }]}>
             {metadata.promptTitle}
           </Text>
         )}
@@ -286,12 +310,12 @@ export function ActivityCompletionCheck({
             activeOpacity={0.8}
             style={[
               styles.yesButton,
-              { backgroundColor: colors.teal, opacity: isLoading ? 0.7 : 1 },
+              { backgroundColor: colors.action, opacity: isLoading ? 0.7 : 1 },
             ]}
           >
-            <CheckCircle2 size={16} color={colors.tealFg} />
+            <Check size={16} color={colors.actionForeground} strokeWidth={2.5} />
             <Text style={styles.yesButtonText}>
-              {isLoading ? 'Saving...' : 'Confirm Lesson'}
+              {isLoading ? 'Saving...' : 'Confirm lesson'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -304,14 +328,14 @@ export function ActivityCompletionCheck({
               styles.noButton,
               {
                 borderColor: colors.border,
-                backgroundColor: colors.inputBg,
+                backgroundColor: colors.card,
                 opacity: isLoading ? 0.7 : 1,
               },
             ]}
           >
-            <XCircle size={16} color={colors.textMuted} />
-            <Text style={[styles.noButtonText, { color: colors.textMuted }]}>
-              Report a Problem
+            <Flag size={15} color={colors.text} />
+            <Text style={[styles.noButtonText, { color: colors.text }]}>
+              Report a problem
             </Text>
           </TouchableOpacity>
         </View>
@@ -361,7 +385,7 @@ export function ActivityCompletionCheck({
 
   if (step === 'disputed') {
     return (
-      <View style={[...cardStyle, !embedded && { backgroundColor: colors.inputBg }]}>
+      <View style={cardStyle}>
         <View style={styles.disputedRow}>
           <Text style={[styles.submittedText, { color: colors.textMuted }]}>
             {"Got it — we've notified the educator and admin team."}
@@ -387,7 +411,7 @@ export function ActivityCompletionCheck({
 
   if (step === 'already_responded') {
     return (
-      <View style={[...cardStyle, !embedded && { backgroundColor: colors.inputBg }]}>
+      <View style={cardStyle}>
         <Text style={[styles.submittedText, { color: colors.textMuted }]}>
           {"You've already responded — thanks for letting us know!"}
         </Text>
@@ -509,14 +533,12 @@ export function ActivityCompletionCheck({
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
+    // Recessed inset panel under the feed row's headline. ActivityItem's body
+    // owns the left indent, so the card itself carries no margin.
     card: {
-      marginTop: 10,
-      marginLeft: 42,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
-      padding: 16,
+      borderRadius: 14,
+      backgroundColor: colors.bg,
+      padding: 14,
       gap: 12,
     },
     cardEmbedded: {
@@ -533,55 +555,50 @@ function makeStyles(colors: AppColors) {
       padding: 0,
     },
     question: {
-      fontSize: 10,
-      lineHeight: 14,
+      fontSize: 15,
+      lineHeight: 20,
       fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 1.4,
     },
     promptBody: {
-      fontSize: 13,
-      lineHeight: 19,
+      fontSize: 14,
+      lineHeight: 20,
     },
     buttonRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       alignItems: 'center',
-      gap: 12,
+      gap: 8,
     },
     yesButton: {
-      flex: 1,
-      maxWidth: 200,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      minHeight: 38,
-      borderRadius: 8,
+      minHeight: 40,
+      borderRadius: 999,
       paddingVertical: 8,
-      paddingHorizontal: 10,
+      paddingHorizontal: 16,
     },
     yesButtonText: {
-      color: colors.tealFg,
-      fontSize: 13,
+      color: colors.actionForeground,
+      fontSize: 14,
       lineHeight: 18,
       fontWeight: '600',
       textAlign: 'center',
     },
     noButton: {
-      flex: 1,
-      maxWidth: 200,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
-      minHeight: 38,
-      borderRadius: 8,
+      minHeight: 40,
+      borderRadius: 999,
       borderWidth: 1,
       paddingVertical: 8,
-      paddingHorizontal: 10,
+      paddingHorizontal: 16,
     },
     noButtonText: {
-      fontSize: 13,
+      fontSize: 14,
       lineHeight: 18,
       fontWeight: '600',
       textAlign: 'center',
@@ -659,14 +676,15 @@ function makeStyles(colors: AppColors) {
       fontWeight: '600',
     },
     submitButton: {
-      borderRadius: 10,
+      borderRadius: 999,
+      minHeight: 40,
       paddingVertical: 10,
       alignItems: 'center',
       justifyContent: 'center',
     },
     submitButtonText: {
-      color: '#ffffff',
-      fontSize: 13,
+      color: colors.actionForeground,
+      fontSize: 14,
       fontWeight: '700',
     },
     submittedText: {

@@ -81,8 +81,8 @@ export function ActivityCompletionCheckBatch({
           {sessions.length} classes ended
         </Text>
         {resolvedCount > 0 ? (
-          <View style={[styles.progressPill, { backgroundColor: `${colors.teal}22` }]}>
-            <Text style={[styles.progressText, { color: colors.teal }]}>
+          <View style={[styles.progressPill, { backgroundColor: colors.actionSubtle }]}>
+            <Text style={[styles.progressText, { color: colors.action }]}>
               {resolvedCount} of {sessions.length} confirmed
             </Text>
           </View>
@@ -126,7 +126,7 @@ export function ActivityCompletionCheckBatch({
                 styles.sessionRow,
                 {
                   borderColor: colors.border,
-                  backgroundColor: pressed ? colors.inputBg : colors.card,
+                  backgroundColor: pressed ? colors.card : 'transparent',
                 },
               ]}
             >
@@ -136,7 +136,7 @@ export function ActivityCompletionCheckBatch({
                     styles.statusDot,
                     {
                       backgroundColor: isConfirmed
-                        ? colors.teal
+                        ? colors.action
                         : isDisputed
                           ? colors.warning
                           : colors.border,
@@ -161,30 +161,37 @@ export function ActivityCompletionCheckBatch({
             </Pressable>
 
             {isExpanded ? (
-              <ActivityCompletionCheck
-                activity={syntheticActivity}
-                colors={colors}
-                currentProfileId={currentProfileId}
-                onCompletionSubmit={(status) => {
-                  if (status === 'confirmed') {
-                    setConfirmedIds((current) =>
-                      new Set(current).add(sessionResponseKey),
-                    );
-                    setDisputedIds((current) => {
-                      const next = new Set(current);
-                      next.delete(sessionResponseKey);
-                      return next;
-                    });
-                  } else {
-                    setDisputedIds((current) => new Set(current).add(sessionResponseKey));
-                    setConfirmedIds((current) => {
-                      const next = new Set(current);
-                      next.delete(sessionResponseKey);
-                      return next;
-                    });
-                  }
-                }}
-              />
+              <View style={styles.sessionPanel}>
+                <ActivityCompletionCheck
+                  activity={syntheticActivity}
+                  colors={colors}
+                  currentProfileId={currentProfileId}
+                  // The row above already names the session, so drop the
+                  // check's own title and chrome rather than nest a card here.
+                  embedded
+                  onCompletionSubmit={(status) => {
+                    if (status === 'confirmed') {
+                      setConfirmedIds((current) =>
+                        new Set(current).add(sessionResponseKey),
+                      );
+                      setDisputedIds((current) => {
+                        const next = new Set(current);
+                        next.delete(sessionResponseKey);
+                        return next;
+                      });
+                    } else {
+                      setDisputedIds((current) =>
+                        new Set(current).add(sessionResponseKey),
+                      );
+                      setConfirmedIds((current) => {
+                        const next = new Set(current);
+                        next.delete(sessionResponseKey);
+                        return next;
+                      });
+                    }
+                  }}
+                />
+              </View>
             ) : null}
           </View>
         );
@@ -195,14 +202,16 @@ export function ActivityCompletionCheckBatch({
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
+    // Recessed inset panel — ActivityItem's body owns the left indent.
     container: {
-      marginTop: 10,
-      marginLeft: 42,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
+      borderRadius: 14,
+      backgroundColor: colors.bg,
       overflow: 'hidden',
+    },
+    sessionPanel: {
+      paddingHorizontal: 14,
+      paddingBottom: 14,
+      paddingTop: 4,
     },
     header: {
       flexDirection: 'row',
@@ -213,7 +222,7 @@ function makeStyles(colors: AppColors) {
       gap: 8,
     },
     headerTitle: {
-      fontSize: 13,
+      fontSize: 14,
       fontWeight: '700',
     },
     subTitle: {

@@ -71,6 +71,7 @@ jest.mock('lucide-react-native', () => {
   const { Text } = require('react-native');
   const Icon = ({ size }: { size?: number }) => <Text>{`icon-${size ?? 0}`}</Text>;
   return {
+    ArrowRight: Icon,
     Bell: Icon,
     CheckCheck: Icon,
     CheckCircle: Icon,

@@ -5,21 +5,28 @@ import { PulseBox } from './pulse-box';
 
 type Props = { count?: number };
 
+// Mirrors ActivityItem's card: 40px leading visual, headline with the compact
+// time pinned top-right, then an inset panel aligned under the headline.
+const LEADING_SIZE = 40;
+const CONTENT_GAP = 12;
+const CARD_PADDING = 16;
+const TIME_WIDTH = 28;
+
 const ROWS = [
   {
     titleLines: [360, 172],
-    metaWidth: 126,
+    metaWidth: 64,
     detail: 'completion',
   },
   {
     titleLines: [360, 360, 176],
-    metaWidth: 126,
-    detail: 'class-card',
+    metaWidth: 56,
+    detail: 'preview',
   },
   {
-    titleLines: [360, 360, 176],
-    metaWidth: 128,
-    detail: 'class-card',
+    titleLines: [360, 220],
+    metaWidth: 64,
+    detail: 'preview',
   },
 ] as const;
 
@@ -27,11 +34,11 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
   const { colors } = useTheme();
   const { width } = useWindowDimensions();
   const rows = ROWS.slice(0, Math.max(0, Math.min(count, ROWS.length)));
-  const itemInnerWidth = Math.max(168, width - 32);
-  const contentWidth = Math.max(126, itemInnerWidth - 38);
-  const insetContentWidth = Math.max(126, itemInnerWidth - 42);
-  const clamp = (value: number) => Math.min(value, contentWidth);
-  const clampInset = (value: number) => Math.min(value, insetContentWidth - 28);
+  const cardInnerWidth = Math.max(168, width - 32 - CARD_PADDING * 2);
+  const bodyWidth = Math.max(126, cardInnerWidth - LEADING_SIZE - CONTENT_GAP);
+  const headlineWidth = Math.max(96, bodyWidth - TIME_WIDTH - 8);
+  const clamp = (value: number) => Math.min(value, headlineWidth);
+  const clampInset = (value: number) => Math.min(value, bodyWidth - 24);
 
   return (
     <View accessibilityLabel="Loading" style={s.wrap} testID="activity-feed-skeleton">
@@ -40,69 +47,57 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
       </View>
 
       {rows.map((row, index) => (
-        <View key={index} style={s.itemOuter} testID="activity-skeleton-row">
+        <View
+          key={index}
+          style={[s.card, { backgroundColor: colors.card }]}
+          testID="activity-skeleton-row"
+        >
           <View style={s.itemRow}>
-            <View style={s.statusRail}>
-              <View
-                style={[s.iconCircle, { backgroundColor: colors.inputBg }]}
-                testID="activity-skeleton-icon"
-              >
-                <PulseBox width={11} height={11} radius={6} />
-              </View>
-              <View style={s.readCheck} testID="activity-skeleton-read-indicator">
-                <PulseBox width={14} height={2} radius={2} />
-                <PulseBox width={9} height={2} radius={2} />
-              </View>
-            </View>
+            <View
+              style={[s.leading, { backgroundColor: colors.bg }]}
+              testID="activity-skeleton-icon"
+            />
 
             <View style={s.content}>
-              <View style={s.headlineBlock}>
-                {row.titleLines.map((lineWidth, lineIndex) => (
-                  <PulseBox
-                    key={lineIndex}
-                    width={clamp(lineWidth)}
-                    height={17}
-                    radius={4}
-                  />
-                ))}
+              <View style={s.topRow}>
+                <View style={s.headlineBlock}>
+                  {row.titleLines.map((lineWidth, lineIndex) => (
+                    <PulseBox
+                      key={lineIndex}
+                      width={clamp(lineWidth)}
+                      height={15}
+                      radius={4}
+                    />
+                  ))}
+                </View>
+                <PulseBox width={TIME_WIDTH} height={12} radius={4} />
               </View>
 
-              <PulseBox width={clamp(row.metaWidth)} height={14} radius={4} />
+              <PulseBox width={row.metaWidth} height={12} radius={4} />
             </View>
           </View>
 
-          {row.detail === 'completion' ? (
-            <View
-              style={[
-                s.completionCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-              testID="activity-skeleton-preview-card"
-            >
-              <PulseBox width={clampInset(202)} height={10} radius={3} />
-              <View style={s.completionBody}>
-                <PulseBox width={clampInset(304)} height={13} radius={4} />
-                <PulseBox width={clampInset(248)} height={13} radius={4} />
+          <View
+            style={[
+              s.inset,
+              row.detail === 'completion' && s.insetCompletion,
+              { backgroundColor: colors.bg },
+            ]}
+            testID="activity-skeleton-preview-card"
+          >
+            <PulseBox width={clampInset(304)} height={13} radius={4} />
+            <PulseBox
+              width={clampInset(row.detail === 'completion' ? 248 : 128)}
+              height={13}
+              radius={4}
+            />
+            {row.detail === 'completion' ? (
+              <View style={s.pillRow}>
+                <PulseBox width={132} height={36} radius={18} />
+                <PulseBox width={140} height={36} radius={18} />
               </View>
-            </View>
-          ) : (
-            <View
-              style={[
-                s.previewCard,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                },
-              ]}
-              testID="activity-skeleton-preview-card"
-            >
-              <PulseBox width={clampInset(304)} height={15} radius={4} />
-              <PulseBox width={clampInset(128)} height={15} radius={4} />
-            </View>
-          )}
+            ) : null}
+          </View>
         </View>
       ))}
     </View>
@@ -112,60 +107,34 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
 const s = StyleSheet.create({
   wrap: { paddingTop: 0, paddingBottom: 24 },
   sectionHeader: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 8 },
-  itemOuter: {
+  card: {
     marginHorizontal: 16,
-    marginBottom: 22,
-    paddingBottom: 0,
-    minHeight: 80,
+    marginBottom: 8,
+    borderRadius: 18,
+    padding: CARD_PADDING,
   },
-  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  statusRail: {
-    width: 28,
-    flexShrink: 0,
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 2,
+  itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: CONTENT_GAP },
+  leading: {
+    width: LEADING_SIZE,
+    height: LEADING_SIZE,
+    borderRadius: LEADING_SIZE / 2,
   },
-  iconCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  readCheck: {
-    width: 18,
-    height: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 2,
-    transform: [{ rotate: '-30deg' }],
-  },
-  content: { flex: 1 },
-  headlineBlock: {
-    gap: 5,
-    marginBottom: 5,
-  },
-  completionCard: {
-    marginTop: 10,
-    marginLeft: 42,
-    minHeight: 96,
+  content: { flex: 1, gap: 8 },
+  topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  headlineBlock: { flex: 1, gap: 6 },
+  inset: {
+    marginTop: 12,
+    marginLeft: LEADING_SIZE + CONTENT_GAP,
+    minHeight: 56,
     borderRadius: 12,
-    borderWidth: 1,
-    padding: 16,
-    gap: 12,
-  },
-  completionBody: {
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    justifyContent: 'center',
     gap: 6,
   },
-  previewCard: {
-    marginTop: 10,
-    marginLeft: 42,
-    minHeight: 64,
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    justifyContent: 'center',
-    gap: 5,
+  insetCompletion: {
+    minHeight: 112,
+    gap: 8,
   },
+  pillRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
 });

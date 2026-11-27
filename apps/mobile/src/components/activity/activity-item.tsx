@@ -1,13 +1,13 @@
 import React from 'react';
-import { View, Text, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Image, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
 import {
   AlertCircle,
+  ArrowRight,
   AtSign,
   Bell,
   BookImage,
   CalendarCheck,
   CalendarX,
-  CheckCheck,
   CheckCircle2,
   CreditCard,
   FileBadge,
@@ -22,7 +22,12 @@ import {
   Star,
 } from 'lucide-react-native';
 import type { AppColors } from '@/lib/theme';
-import type { ActivityFeedItemVM, InboxIconKeyVM } from '@iconicedu/shared-types';
+import type {
+  ActivityFeedItemVM,
+  ActivityVerbVM,
+  InboxIconKeyVM,
+} from '@iconicedu/shared-types';
+import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import {
   ActivityFeedbackRequest,
   canRenderMobileActivityFeedbackRequest,
@@ -144,133 +149,236 @@ export function relativeTime(iso: string): string {
   return `${days} day${days !== 1 ? 's' : ''} ago`;
 }
 
+/**
+ * Short timestamp for the top-right corner of a notification: "now", "5m",
+ * "3h", "2d", then a calendar date ("Mar 4") once it is more than a week old.
+ * The long form (`relativeTime`) stays available as the accessibility label.
+ */
+export function compactTime(iso: string, now: number = Date.now()): string {
+  const timestamp = new Date(iso).getTime();
+  if (Number.isNaN(timestamp)) return '';
+  const diff = Math.max(0, now - timestamp);
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 2) return 'now';
+  if (mins < 60) return `${mins}m`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d`;
+  return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(
+    new Date(timestamp),
+  );
+}
+
+function normalizeForCompare(value: string) {
+  return value
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .replace(/[.!?…\s]+$/u, '')
+    .trim();
+}
+
+/**
+ * True when the preview only restates what the headline already says (e.g. a
+ * reminder whose headline is "ELA with Ms Denise Class session starts Wed…" and
+ * whose summary is "Class session starts Wed…"). Showing it twice makes the feed
+ * feel noisy without telling the reader anything new.
+ */
+export function isPreviewRedundant(headline: string, preview: string): boolean {
+  const normalizedPreview = normalizeForCompare(preview);
+  if (!normalizedPreview) return true;
+  return normalizeForCompare(headline).includes(normalizedPreview);
+}
+
+// Verbs driven by a person's action — these lead with that person's avatar so
+// the reader sees *who* before *what*. System-generated verbs (reminders,
+// schedule changes, completion checks) keep the tone icon chip.
+const PERSON_DRIVEN_VERBS = new Set<ActivityVerbVM>([
+  'message.posted',
+  'message.mentioned',
+  'message.thread_reply.posted',
+  'file.uploaded',
+  'image.uploaded',
+  'audio.uploaded',
+  'reaction.added',
+]);
+
+export type ActivityLeadingAvatar = {
+  name: string;
+  url: string | null;
+  seed: string;
+  themeKey: string | null;
+};
+
+function resolveAvatarUrl(avatar?: { source?: string; url?: string | null } | null) {
+  if (!avatar || avatar.source === 'seed') return null;
+  const url = avatar.url?.trim();
+  return url ? url : null;
+}
+
+export function getLeadingAvatar(item: ActivityFeedItemVM): ActivityLeadingAvatar | null {
+  const leading = item.content.leading;
+  if (leading?.kind === 'avatars') {
+    const first = leading.avatars[0];
+    if (!first) return null;
+    return {
+      name: first.name,
+      url: resolveAvatarUrl(first.avatar),
+      seed: first.avatar.seed ?? first.profileId ?? first.name,
+      themeKey: first.themeKey ?? null,
+    };
+  }
+
+  if (!PERSON_DRIVEN_VERBS.has(item.verb)) return null;
+  const actor = item.refs.actor;
+  if (!actor) return null;
+  const avatar = actor.profile.avatar;
+  return {
+    name: actor.profile.displayName,
+    url: resolveAvatarUrl(avatar),
+    seed: avatar?.seed ?? actor.ids.id,
+    themeKey: actor.ui?.themeKey ?? null,
+  };
+}
+
+function getInitials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (words.length >= 2) return (words[0]![0]! + words[1]![0]!).toUpperCase();
+  return words[0]?.[0]?.toUpperCase() ?? '?';
+}
+
 // ---------------------------------------------------------------------------
 // Styles
 // ---------------------------------------------------------------------------
+
+const LEADING_SIZE = 40;
+const SUB_LEADING_SIZE = 28;
+const CONTENT_GAP = 12;
+/** Left edge of the body (previews, actions, interactive widgets). */
+export const ACTIVITY_BODY_INDENT = LEADING_SIZE + CONTENT_GAP;
+const SUB_BODY_INDENT = SUB_LEADING_SIZE + 10;
 
 export function makeActivityItemStyles(C: AppColors) {
   return StyleSheet.create({
     // Outer wrapper owns horizontal margin (inbox SectionList / home ScrollView)
     itemOuter: { marginHorizontal: 16 },
 
-    // Item card
+    // Item card — borderless, soft shadow (matches SessionCard)
     itemWrap: {
-      borderRadius: 14,
+      borderRadius: 18,
       backgroundColor: C.card,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: C.border,
       paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 14,
-      overflow: 'hidden',
-      minHeight: 80,
+      paddingVertical: 16,
+      shadowColor: '#1f2a26',
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      shadowOffset: { width: 0, height: 3 },
+      elevation: 1,
     },
-    itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+    itemRow: { flexDirection: 'row', alignItems: 'flex-start', gap: CONTENT_GAP },
 
-    // Avatar
-    avatarWrap: { width: 28, flexShrink: 0, marginTop: 2, alignItems: 'center', gap: 6 },
-    avatar: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+    // Leading visual — actor avatar or tone icon chip
+    leading: { width: LEADING_SIZE, height: LEADING_SIZE },
+    subLeading: { width: SUB_LEADING_SIZE, height: SUB_LEADING_SIZE },
+    iconChip: {
+      width: LEADING_SIZE,
+      height: LEADING_SIZE,
+      borderRadius: LEADING_SIZE / 2,
       alignItems: 'center',
       justifyContent: 'center',
     },
-
-    // Unread dot
-    unreadDot: { width: 9, height: 9, borderRadius: 5, flexShrink: 0 },
-    readIcon: { width: 14, height: 14, alignItems: 'center', justifyContent: 'center' },
-
-    // Content
-    content: { flex: 1 },
-    headlineRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+    subIconChip: {
+      width: SUB_LEADING_SIZE,
+      height: SUB_LEADING_SIZE,
+      borderRadius: SUB_LEADING_SIZE / 2,
       alignItems: 'center',
-      gap: 5,
-      marginBottom: 5,
+      justifyContent: 'center',
     },
-    headlineText: { fontSize: 16, lineHeight: 22 },
-    bold: { fontWeight: '700' },
-
-    // Emphasis badge
-    badge: {
-      flexDirection: 'row',
+    avatar: {
+      width: LEADING_SIZE,
+      height: LEADING_SIZE,
+      borderRadius: LEADING_SIZE / 2,
       alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 8,
-    },
-    badgeText: { fontSize: 14, fontWeight: '600' },
-
-    // Meta row
-    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-    metaText: { fontSize: 14 },
-    metaDot: { width: 3, height: 3, borderRadius: 2 },
-
-    // Preview card (summary / expanded content)
-    previewCard: {
-      marginTop: 10,
-      marginLeft: 42,
-      borderRadius: 12,
-      borderWidth: 1,
-      padding: 14,
-    },
-    previewText: { fontSize: 15, lineHeight: 20 },
-
-    // Read more
-    readMoreBtn: { marginTop: 8, marginLeft: 42 },
-    readMoreText: { fontSize: 14, fontWeight: '600' },
-
-    // Action button
-    actionBtn: {
-      alignSelf: 'flex-start',
-      marginTop: 10,
-      marginLeft: 42,
-      borderRadius: 20,
-      borderWidth: 1,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-    },
-    actionBtnText: { fontSize: 14, fontWeight: '600' },
-
-    // Sub-items container
-    subItemsWrap: { marginTop: 10, marginLeft: 42, borderLeftWidth: 2, paddingLeft: 12 },
-
-    // Sub-activity: full leaf view
-    subItemInner: { paddingVertical: 10 },
-    subAvatarWrap: {
-      width: 24,
-      flexShrink: 0,
-      marginTop: 2,
-      alignItems: 'center',
-      gap: 5,
+      justifyContent: 'center',
+      overflow: 'hidden',
     },
     subAvatar: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      width: SUB_LEADING_SIZE,
+      height: SUB_LEADING_SIZE,
+      borderRadius: SUB_LEADING_SIZE / 2,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    avatarInitials: { fontSize: 14, fontWeight: '700' },
+    subAvatarInitials: { fontSize: 11, fontWeight: '700' },
+    // Small type badge pinned to the avatar's bottom-right
+    typeBadge: {
+      position: 'absolute',
+      right: -3,
+      bottom: -3,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: C.card,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    subPreviewCard: {
-      marginTop: 8,
-      marginLeft: 34,
-      borderRadius: 10,
-      borderWidth: 1,
-      padding: 12,
+
+    // Content
+    content: { flex: 1, minWidth: 0 },
+    topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    headlineText: { flex: 1, fontSize: 15, lineHeight: 21 },
+    subHeadlineText: { flex: 1, fontSize: 14, lineHeight: 19 },
+    strong: { fontWeight: '700' },
+    strongRead: { fontWeight: '600' },
+    trailing: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingTop: 2,
     },
-    subReadMoreBtn: { marginTop: 6, marginLeft: 34 },
-    subActionBtn: {
-      alignSelf: 'flex-start',
-      marginTop: 8,
-      marginLeft: 34,
-      borderRadius: 16,
-      borderWidth: 1,
+    timeText: { fontSize: 13, fontVariant: ['tabular-nums'] },
+    unreadDot: { width: 8, height: 8, borderRadius: 4 },
+
+    // Meta row (category)
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+    metaText: { fontSize: 13 },
+
+    // Body — everything under the headline aligns with the headline text
+    body: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: 12, gap: 10 },
+    subBody: { marginLeft: SUB_BODY_INDENT, marginTop: 8, gap: 8 },
+
+    // Inset panel (preview / expanded content) — recessed, no border
+    inset: {
+      borderRadius: 12,
+      backgroundColor: C.bg,
       paddingHorizontal: 12,
-      paddingVertical: 6,
+      paddingVertical: 10,
+      gap: 8,
     },
+    insetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.border },
+    insetText: { fontSize: 14, lineHeight: 20, color: C.text },
+    readMoreBtn: { alignSelf: 'flex-start' },
+    readMoreText: { fontSize: 13, fontWeight: '600' },
+
+    // Actions
+    actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    actionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      minHeight: 36,
+      paddingHorizontal: 14,
+      borderRadius: 999,
+    },
+    actionBtnPrimary: { backgroundColor: C.action },
+    actionBtnTonal: { backgroundColor: C.actionSubtle },
+    actionBtnText: { fontSize: 14, fontWeight: '600' },
+
+    // Sub-activity: compact leaf view
+    subItemInner: { paddingVertical: 10 },
   });
 }
 
@@ -384,9 +492,79 @@ export function formatActivityPrimaryHeadline(
 
 type ActivityIconComponent = React.ComponentType<{ size: number; color: string }>;
 
+function ActivityLeading({
+  avatar,
+  s,
+  IconComponent,
+  iconBg,
+  iconFg,
+  isSubActivity,
+}: {
+  avatar: ActivityLeadingAvatar | null;
+  s: ActivityItemStyles;
+  IconComponent: ActivityIconComponent;
+  iconBg: string;
+  iconFg: string;
+  isSubActivity: boolean;
+}) {
+  if (!avatar) {
+    return (
+      <View
+        style={[isSubActivity ? s.subIconChip : s.iconChip, { backgroundColor: iconBg }]}
+        testID="activity-leading-icon"
+      >
+        <IconComponent size={isSubActivity ? 14 : 18} color={iconFg} />
+      </View>
+    );
+  }
+
+  const avatarColors = profileAvatarColors({
+    seed: avatar.seed,
+    themeKey: avatar.themeKey,
+  });
+
+  return (
+    <View
+      style={isSubActivity ? s.subLeading : s.leading}
+      testID="activity-leading-avatar"
+    >
+      {avatar.url ? (
+        <Image
+          source={{ uri: avatar.url }}
+          style={isSubActivity ? s.subAvatar : s.avatar}
+          accessibilityLabel={avatar.name}
+        />
+      ) : (
+        <View
+          style={[
+            isSubActivity ? s.subAvatar : s.avatar,
+            { backgroundColor: avatarColors.bg },
+          ]}
+          accessibilityLabel={avatar.name}
+        >
+          <Text
+            style={[
+              isSubActivity ? s.subAvatarInitials : s.avatarInitials,
+              { color: avatarColors.fg },
+            ]}
+          >
+            {getInitials(avatar.name)}
+          </Text>
+        </View>
+      )}
+      {isSubActivity ? null : (
+        <View style={[s.typeBadge, { backgroundColor: iconBg }]}>
+          <IconComponent size={10} color={iconFg} />
+        </View>
+      )}
+    </View>
+  );
+}
+
 type ActivityHeaderRowProps = {
   colors: AppColors;
   s: ActivityItemStyles;
+  avatar: ActivityLeadingAvatar | null;
   IconComponent: ActivityIconComponent;
   iconBg: string;
   iconFg: string;
@@ -395,50 +573,14 @@ type ActivityHeaderRowProps = {
   primary: string;
   secondary?: string;
   emphasis?: string;
-  time: string;
+  occurredAt: string;
   tabLabel?: string;
 };
-
-function ActivityStatusRail({
-  colors,
-  s,
-  IconComponent,
-  iconBg,
-  iconFg,
-  isRead,
-  isSubActivity,
-}: Pick<
-  ActivityHeaderRowProps,
-  'colors' | 's' | 'IconComponent' | 'iconBg' | 'iconFg' | 'isRead' | 'isSubActivity'
->) {
-  return (
-    <View style={isSubActivity ? s.subAvatarWrap : s.avatarWrap}>
-      <View style={[isSubActivity ? s.subAvatar : s.avatar, { backgroundColor: iconBg }]}>
-        <IconComponent size={isSubActivity ? 10 : 11} color={iconFg} />
-      </View>
-      {isRead ? (
-        <View
-          style={s.readIcon}
-          accessibilityLabel="Read"
-          accessibilityRole="image"
-          testID="activity-read-indicator"
-        >
-          <CheckCheck size={isSubActivity ? 12 : 13} color={colors.textMuted} />
-        </View>
-      ) : (
-        <View
-          style={[s.unreadDot, { backgroundColor: colors.teal }]}
-          accessibilityLabel="Unread"
-          testID="activity-unread-indicator"
-        />
-      )}
-    </View>
-  );
-}
 
 function ActivityHeaderRow({
   colors,
   s,
+  avatar,
   IconComponent,
   iconBg,
   iconFg,
@@ -447,132 +589,147 @@ function ActivityHeaderRow({
   primary,
   secondary,
   emphasis,
-  time,
+  occurredAt,
   tabLabel,
 }: ActivityHeaderRowProps) {
-  const showEmphasis = !isSubActivity && Boolean(emphasis);
   const showTab = !isSubActivity && Boolean(tabLabel && tabLabel !== 'All');
+  const strongStyle = isRead ? s.strongRead : s.strong;
 
   return (
     <View style={s.itemRow}>
-      <ActivityStatusRail
-        colors={colors}
+      <ActivityLeading
+        avatar={avatar}
         s={s}
         IconComponent={IconComponent}
         iconBg={iconBg}
         iconFg={iconFg}
-        isRead={isRead}
         isSubActivity={isSubActivity}
       />
 
       <View style={s.content}>
-        <View style={s.headlineRow}>
-          <Text style={[s.headlineText, { color: colors.text }]}>
-            <Text style={s.bold}>{primary}</Text>
-            {!!secondary && ` ${secondary}`}
+        <View style={s.topRow}>
+          <Text
+            style={[
+              isSubActivity ? s.subHeadlineText : s.headlineText,
+              { color: colors.textMuted },
+            ]}
+          >
+            <Text style={[strongStyle, { color: colors.text }]}>{primary}</Text>
+            {secondary ? ` ${secondary}` : null}
+            {emphasis ? (
+              <>
+                {' '}
+                <Text style={[strongStyle, { color: colors.text }]}>{emphasis}</Text>
+              </>
+            ) : null}
           </Text>
-          {showEmphasis ? (
-            <View style={[s.badge, { backgroundColor: iconBg }]}>
-              <IconComponent size={9} color={iconFg} />
-              <Text style={[s.badgeText, { color: iconFg }]}>{emphasis}</Text>
-            </View>
-          ) : null}
+
+          <View style={s.trailing}>
+            <Text
+              style={[s.timeText, { color: isRead ? colors.textMuted : colors.text }]}
+              accessibilityLabel={relativeTime(occurredAt)}
+            >
+              {compactTime(occurredAt)}
+            </Text>
+            {isRead ? null : (
+              <View
+                style={[s.unreadDot, { backgroundColor: colors.action }]}
+                accessibilityLabel="Unread"
+                testID="activity-unread-indicator"
+              />
+            )}
+          </View>
         </View>
 
-        <View style={s.metaRow}>
-          <Text style={[s.metaText, { color: colors.textMuted }]}>{time}</Text>
-          {showTab ? (
-            <>
-              <View style={[s.metaDot, { backgroundColor: colors.textFaint }]} />
-              <Text style={[s.metaText, { color: colors.textMuted }]}>{tabLabel}</Text>
-            </>
-          ) : null}
-        </View>
+        {showTab ? (
+          <View style={s.metaRow}>
+            <Text style={[s.metaText, { color: colors.textMuted }]}>{tabLabel}</Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );
 }
 
-function ActivityPreviewCard({
-  children,
+function ActivityInset({
   colors,
-  isSubActivity,
-  numberOfLines,
-  s,
-}: {
-  children: React.ReactNode;
-  colors: AppColors;
-  isSubActivity: boolean;
-  numberOfLines?: number;
-  s: ActivityItemStyles;
-}) {
-  return (
-    <View
-      style={[
-        isSubActivity ? s.subPreviewCard : s.previewCard,
-        {
-          borderColor: colors.border,
-          backgroundColor: isSubActivity ? colors.inputBg : colors.card,
-        },
-      ]}
-    >
-      <Text style={[s.previewText, { color: colors.text }]} numberOfLines={numberOfLines}>
-        {children}
-      </Text>
-    </View>
-  );
-}
-
-function ActivityReadMoreButton({
-  colors,
+  expandedContent,
   isExpanded,
-  isSubActivity,
-  onPress,
+  numberOfLines,
+  onToggle,
+  previewText,
   s,
 }: {
   colors: AppColors;
+  expandedContent?: string;
   isExpanded: boolean;
-  isSubActivity: boolean;
-  onPress: () => void;
+  numberOfLines: number;
+  onToggle: () => void;
+  previewText: string | null;
   s: ActivityItemStyles;
 }) {
+  const hasExpanded = Boolean(expandedContent);
+  if (!previewText && !hasExpanded) return null;
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      hitSlop={8}
-      style={isSubActivity ? s.subReadMoreBtn : s.readMoreBtn}
-    >
-      <Text style={[s.readMoreText, { color: colors.teal }]}>
-        {isExpanded ? 'Show less' : 'Read more'}
-      </Text>
-    </TouchableOpacity>
+    <View style={s.inset}>
+      {previewText ? (
+        <Text style={s.insetText} numberOfLines={isExpanded ? undefined : numberOfLines}>
+          {previewText}
+        </Text>
+      ) : null}
+
+      {hasExpanded && isExpanded ? (
+        <>
+          {previewText ? <View style={s.insetDivider} /> : null}
+          <Text style={s.insetText}>{expandedContent}</Text>
+        </>
+      ) : null}
+
+      {hasExpanded ? (
+        <TouchableOpacity
+          onPress={onToggle}
+          hitSlop={8}
+          style={s.readMoreBtn}
+          accessibilityRole="button"
+        >
+          <Text style={[s.readMoreText, { color: colors.action }]}>
+            {isExpanded ? 'Show less' : 'Read more'}
+          </Text>
+        </TouchableOpacity>
+      ) : null}
+    </View>
   );
 }
 
 function ActivityActionButton({
   colors,
-  isSubActivity,
   label,
   onPress,
   s,
+  variant,
 }: {
   colors: AppColors;
-  isSubActivity: boolean;
   label: string;
   onPress: () => void;
   s: ActivityItemStyles;
+  variant?: 'default' | 'outline' | 'secondary';
 }) {
+  const isPrimary = variant === 'default';
+  const fg = isPrimary ? colors.actionForeground : colors.action;
   return (
-    <TouchableOpacity
-      style={[
-        isSubActivity ? s.subActionBtn : s.actionBtn,
-        { borderColor: colors.border },
-      ]}
-      onPress={onPress}
-      accessibilityRole="button"
-    >
-      <Text style={[s.actionBtnText, { color: colors.text }]}>{label}</Text>
-    </TouchableOpacity>
+    <View style={s.actionsRow}>
+      <TouchableOpacity
+        style={[s.actionBtn, isPrimary ? s.actionBtnPrimary : s.actionBtnTonal]}
+        onPress={onPress}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={label}
+      >
+        <Text style={[s.actionBtnText, { color: fg }]}>{label}</Text>
+        <ArrowRight size={15} color={fg} />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -594,15 +751,19 @@ export function ActivityItem({
     item.content.leading?.kind === 'icon' ? item.content.leading.tone : undefined;
   const { bg: iconBg, fg: iconFg } = isDark ? toneColorsDark(tone) : toneColors(tone);
   const IconComponent = ACTIVITY_ICON_MAP[iconKey] ?? Bell;
-  const time = relativeTime(item.timestamps.occurredAt);
+  const avatar = getLeadingAvatar(item);
   const isRead = item.state?.isRead ?? false;
   const isExpanded = expandedIds.has(item.ids.id);
-  const previewText =
+  const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
+  const { secondary, emphasis } = item.content.headline;
+  const headlineText = [primary, secondary, emphasis].filter(Boolean).join(' ');
+  const rawPreview =
     item.content.summary?.trim() || item.content.preview?.text?.trim() || '';
-  const hasPreviewText = previewText.length > 0;
-  const expandedContent = item.content.expandedContent?.trim();
+  const previewText =
+    rawPreview && !isPreviewRedundant(headlineText, rawPreview) ? rawPreview : null;
+  const expandedContent = item.content.expandedContent?.trim() || undefined;
   const hasExpandedContent = Boolean(expandedContent);
-  const hasActionBtn = !!item.content.actionButton && !isSubActivity;
+  const actionButton = item.content.actionButton;
   const canShowFeedbackRequest =
     item.kind === 'leaf' &&
     item.verb === 'session.feedback_request.sent' &&
@@ -611,11 +772,10 @@ export function ActivityItem({
     item.kind === 'leaf' &&
     (item.verb === 'session.completion_check.sent' ||
       item.verb === 'session.completion_check.batch.sent');
-  const hidesDefaultContent = canShowFeedbackRequest || canShowCompletionCheck;
-  const shouldShowPreviewText = hasPreviewText && !hidesDefaultContent;
-  const shouldShowActionButton = hasActionBtn && !hidesDefaultContent;
-  const primary = formatActivityPrimaryHeadline(item, viewerTimezone);
-  const { secondary, emphasis } = item.content.headline;
+  const hidesDefaultContent =
+    !isSubActivity && (canShowFeedbackRequest || canShowCompletionCheck);
+  const shouldShowPreview = !hidesDefaultContent;
+  const shouldShowActionButton = Boolean(actionButton) && !hidesDefaultContent;
   const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
 
   const handlePress = () => {
@@ -628,152 +788,108 @@ export function ActivityItem({
     onActionPress?.(item);
   };
 
-  // Sub-activity: full leaf view matching web
+  const header = (
+    <ActivityHeaderRow
+      colors={colors}
+      s={s}
+      avatar={avatar}
+      IconComponent={IconComponent}
+      iconBg={iconBg}
+      iconFg={iconFg}
+      isRead={isRead}
+      isSubActivity={isSubActivity}
+      primary={primary}
+      secondary={secondary}
+      emphasis={emphasis}
+      occurredAt={item.timestamps.occurredAt}
+      tabLabel={tabLabel}
+    />
+  );
+
+  const inset = shouldShowPreview ? (
+    <ActivityInset
+      colors={colors}
+      expandedContent={expandedContent}
+      isExpanded={isExpanded}
+      numberOfLines={isSubActivity ? 3 : 4}
+      onToggle={() => onToggle(item.ids.id)}
+      previewText={previewText}
+      s={s}
+    />
+  ) : null;
+
+  const action =
+    shouldShowActionButton && actionButton ? (
+      <ActivityActionButton
+        colors={colors}
+        label={actionButton.label}
+        onPress={handleActionPress}
+        s={s}
+        variant={actionButton.variant}
+      />
+    ) : null;
+
+  // Sub-activity: compact leaf view
   if (isSubActivity) {
+    const hasBody = Boolean(inset) || Boolean(action);
     return (
       <Pressable
         onPress={handlePress}
         style={({ pressed }) => [s.subItemInner, pressed && { opacity: 0.7 }]}
       >
-        <ActivityHeaderRow
-          colors={colors}
-          s={s}
-          IconComponent={IconComponent}
-          iconBg={iconBg}
-          iconFg={iconFg}
-          isRead={isRead}
-          isSubActivity
-          primary={primary}
-          secondary={secondary}
-          emphasis={emphasis}
-          time={time}
-          tabLabel={tabLabel}
-        />
-
-        {hasPreviewText && (
-          <ActivityPreviewCard colors={colors} isSubActivity numberOfLines={3} s={s}>
-            {previewText}
-          </ActivityPreviewCard>
-        )}
-
-        {hasExpandedContent && isExpanded && (
-          <ActivityPreviewCard colors={colors} isSubActivity s={s}>
-            {expandedContent}
-          </ActivityPreviewCard>
-        )}
-
-        {hasExpandedContent && (
-          <ActivityReadMoreButton
-            colors={colors}
-            isExpanded={isExpanded}
-            isSubActivity
-            onPress={() => onToggle(item.ids.id)}
-            s={s}
-          />
-        )}
-
-        {!!item.content.actionButton && (
-          <ActivityActionButton
-            colors={colors}
-            isSubActivity
-            label={item.content.actionButton.label}
-            onPress={handleActionPress}
-            s={s}
-          />
-        )}
+        {header}
+        {hasBody ? (
+          <View style={s.subBody}>
+            {inset}
+            {action}
+          </View>
+        ) : null}
       </Pressable>
     );
   }
+
+  const interactiveWidget = canShowFeedbackRequest ? (
+    <ActivityFeedbackRequest
+      activity={item}
+      colors={colors}
+      currentProfileId={currentProfileId}
+    />
+  ) : canShowCompletionCheck ? (
+    item.verb === 'session.completion_check.batch.sent' ? (
+      <ActivityCompletionCheckBatch
+        activity={item}
+        colors={colors}
+        currentProfileId={currentProfileId}
+      />
+    ) : (
+      <ActivityCompletionCheck
+        activity={item}
+        colors={colors}
+        currentProfileId={currentProfileId}
+      />
+    )
+  ) : null;
+
+  const hasPreviewContent =
+    shouldShowPreview && (Boolean(previewText) || hasExpandedContent);
+  const hasBody = hasPreviewContent || Boolean(action) || Boolean(interactiveWidget);
 
   return (
     <View style={s.itemOuter}>
       <Pressable
         onPress={handlePress}
-        style={({ pressed }) => [
-          s.itemWrap,
-          pressed && { backgroundColor: colors.inputBg },
-        ]}
+        accessibilityHint={isRead ? undefined : 'Marks this notification as read'}
+        style={({ pressed }) => [s.itemWrap, pressed && { opacity: 0.92 }]}
       >
-        {/* Row: avatar + content + unread dot */}
-        <ActivityHeaderRow
-          colors={colors}
-          s={s}
-          IconComponent={IconComponent}
-          iconBg={iconBg}
-          iconFg={iconFg}
-          isRead={isRead}
-          isSubActivity={false}
-          primary={primary}
-          secondary={secondary}
-          emphasis={emphasis}
-          time={time}
-          tabLabel={tabLabel}
-        />
+        {header}
 
-        {/* Preview card — summary text */}
-        {shouldShowPreviewText && (
-          <ActivityPreviewCard
-            colors={colors}
-            isSubActivity={false}
-            numberOfLines={4}
-            s={s}
-          >
-            {previewText}
-          </ActivityPreviewCard>
-        )}
-
-        {canShowFeedbackRequest && (
-          <ActivityFeedbackRequest
-            activity={item}
-            colors={colors}
-            currentProfileId={currentProfileId}
-          />
-        )}
-
-        {canShowCompletionCheck &&
-          item.kind === 'leaf' &&
-          (item.verb === 'session.completion_check.batch.sent' ? (
-            <ActivityCompletionCheckBatch
-              activity={item}
-              colors={colors}
-              currentProfileId={currentProfileId}
-            />
-          ) : (
-            <ActivityCompletionCheck
-              activity={item}
-              colors={colors}
-              currentProfileId={currentProfileId}
-            />
-          ))}
-
-        {/* Expanded detail card */}
-        {hasExpandedContent && isExpanded && (
-          <ActivityPreviewCard colors={colors} isSubActivity={false} s={s}>
-            {expandedContent}
-          </ActivityPreviewCard>
-        )}
-
-        {/* Read more link */}
-        {hasExpandedContent && (
-          <ActivityReadMoreButton
-            colors={colors}
-            isExpanded={isExpanded}
-            isSubActivity={false}
-            onPress={() => onToggle(item.ids.id)}
-            s={s}
-          />
-        )}
-
-        {/* Action button */}
-        {shouldShowActionButton && (
-          <ActivityActionButton
-            colors={colors}
-            isSubActivity={false}
-            label={item.content.actionButton!.label}
-            onPress={handleActionPress}
-            s={s}
-          />
-        )}
+        {hasBody ? (
+          <View style={s.body}>
+            {hasPreviewContent ? inset : null}
+            {interactiveWidget}
+            {action}
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
