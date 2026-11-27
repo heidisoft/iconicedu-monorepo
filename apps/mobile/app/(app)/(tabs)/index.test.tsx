@@ -1,6 +1,45 @@
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 
+let mockReferralEnabled = true;
+jest.mock('@/hooks/use-mobile-feature-flag', () => ({
+  useMobileFeatureFlag: () => mockReferralEnabled,
+}));
+let mockViewingAsChild = false;
+let mockProfileKind = 'guardian';
+let mockSupportChannel: { id: string; topic: string } | null = null;
+const mockParentTiles = jest.fn(
+  (_props: {
+    orgId: string;
+    accountId: string;
+    onAddChild: () => void;
+    onRefer?: () => void;
+  }) => null,
+);
+jest.mock('@/components/home/parent-home-tiles', () => ({
+  ParentHomeTiles: (props: Parameters<typeof mockParentTiles>[0]) => {
+    const { Text } = require('react-native');
+    mockParentTiles(props);
+    return <Text>Family suggestions tile</Text>;
+  },
+}));
+jest.mock('@/components/home/parent-referral-explainer', () => ({
+  ParentReferralExplainer: ({
+    orgId,
+    onClose,
+  }: {
+    orgId: string;
+    onClose: () => void;
+  }) => {
+    const { Text, Pressable, View } = require('react-native');
+    return (
+      <View>
+        <Text>Referral explainer for {orgId}</Text>
+        <Pressable accessibilityLabel="Close mock referral explainer" onPress={onClose} />
+      </View>
+    );
+  },
+}));
 const mockInvalidateQueries = jest.fn(() => Promise.resolve());
 const mockRefetchAccount = jest.fn(() => Promise.resolve());
 const mockRefetchProfile = jest.fn(() => Promise.resolve());
@@ -66,7 +105,9 @@ jest.mock('@/providers/family-view-provider', () => ({
   useFamilyView: () => ({
     familySwitchOptions: [],
     switchFamilyView: jest.fn(),
-    isViewingAsChild: false,
+    isViewingAsChild: mockViewingAsChild,
+    guardianProfileId: 'guardian-profile',
+    guardianAccountId: 'account-1',
   }),
 }));
 
@@ -87,7 +128,7 @@ jest.mock('@/hooks/use-profile', () => ({
   useProfile: () => ({
     data: {
       id: 'profile-1',
-      kind: 'guardian',
+      kind: mockProfileKind,
       first_name: 'Parent',
       last_name: 'One',
       display_name: 'Parent One',
@@ -144,7 +185,7 @@ jest.mock('@/hooks/use-learning-spaces', () => ({
 
 jest.mock('@/hooks/use-support-channel', () => ({
   useSupportChannel: () => ({
-    data: null,
+    data: mockSupportChannel,
     isPending: false,
     refetch: mockRefetchSupportChannel,
   }),
@@ -206,6 +247,10 @@ import HomeScreen from './index';
 describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockViewingAsChild = false;
+    mockProfileKind = 'guardian';
+    mockReferralEnabled = true;
+    mockSupportChannel = null;
   });
 
   it('refreshes home data when the tab receives focus', async () => {
@@ -235,4 +280,72 @@ describe('HomeScreen', () => {
     expect(screen.getByText('completed-carousel:1')).toBeTruthy();
     expect(screen.queryByText('Completed Classes')).toBeNull();
   });
+});
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockViewingAsChild = false;
+  mockProfileKind = 'guardian';
+  mockReferralEnabled = true;
+  mockSupportChannel = null;
+});
+it('opens the existing Add Child flow from parent homepage tiles', () => {
+  render(<HomeScreen />);
+  const props = mockParentTiles.mock.calls.at(-1)![0];
+  expect(props).toMatchObject({ orgId: 'org-1', accountId: 'account-1' });
+  props.onAddChild();
+  expect(mockRouterPush).toHaveBeenCalledWith('/(app)/settings/child');
+});
+it.each(['child', 'educator', 'staff', 'admin'])(
+  'hides parent promotions from %s profiles',
+  (kind) => {
+    mockProfileKind = kind;
+    render(<HomeScreen />);
+    expect(mockParentTiles).not.toHaveBeenCalled();
+  },
+);
+it('hides parent promotions while viewing a child', () => {
+  mockViewingAsChild = true;
+  render(<HomeScreen />);
+  expect(mockParentTiles).not.toHaveBeenCalled();
+});
+
+it('opens the reward explainer before sharing or navigation', () => {
+  const view = render(<HomeScreen />);
+  act(() => mockParentTiles.mock.calls.at(-1)![0].onRefer!());
+  expect(view.getByText('Referral explainer for org-1')).toBeTruthy();
+  expect(mockRouterPush).not.toHaveBeenCalled();
+  fireEvent.press(view.getByLabelText('Close mock referral explainer'));
+  expect(view.queryByText('Referral explainer for org-1')).toBeNull();
+});
+it('places family suggestions before the other Overview tiles', () => {
+  const view = render(<HomeScreen />);
+  const suggestions = view.getByText('Family suggestions tile');
+  const upcoming = view.getByText('Upcoming Sessions');
+  let row = suggestions.parent;
+  while (row && row.findAll((node) => node === upcoming).length === 0) row = row.parent;
+  expect(row?.findAll((node) => node === suggestions || node === upcoming)[0]).toBe(
+    suggestions,
+  );
+});
+
+it('keeps Add Child available but provides no referral action when referrals are off', () => {
+  mockReferralEnabled = false;
+  const view = render(<HomeScreen />);
+  const props = mockParentTiles.mock.calls.at(-1)![0];
+  expect(props.onRefer).toBeUndefined();
+  props.onAddChild();
+  expect(mockRouterPush).toHaveBeenCalledWith('/(app)/settings/child');
+  expect(view.queryByText('Referral explainer for org-1')).toBeNull();
+});
+it('closes an open referral explainer when the flag turns off', () => {
+  const view = render(<HomeScreen />);
+  act(() => mockParentTiles.mock.calls.at(-1)![0].onRefer!());
+  expect(view.getByText('Referral explainer for org-1')).toBeTruthy();
+  mockReferralEnabled = false;
+  view.rerender(<HomeScreen />);
+  expect(view.queryByText('Referral explainer for org-1')).toBeNull();
+  mockReferralEnabled = true;
+  view.rerender(<HomeScreen />);
+  expect(view.queryByText('Referral explainer for org-1')).toBeNull();
 });

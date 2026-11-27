@@ -45,6 +45,10 @@ export const lightColors = {
   infoSubtle: '#eef2fb',
   // Decorative pastel tiles (campaign categories, schedule card). Fills only —
   // pair with the matching *Fg for text/icons on top.
+  promotionPink: '#f3d6ee',
+  promotionYellow: '#f5e7a3',
+  promotionPinkForeground: '#1c4d49',
+  promotionYellowForeground: '#1c4d49',
   pink: '#f3d4e6',
   pinkFg: '#6b2b52',
   peach: '#f4cba6',
@@ -99,6 +103,10 @@ export const darkColors: typeof lightColors = {
   info: '#7f9fe0',
   infoForeground: '#0b1836',
   infoSubtle: '#172554',
+  promotionPink: '#3e293c',
+  promotionYellow: '#3e3824',
+  promotionPinkForeground: '#f2d3ed',
+  promotionYellowForeground: '#f4e2a0',
   pink: '#4a2a3d',
   pinkFg: '#f3d4e6',
   peach: '#4a3524',

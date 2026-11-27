@@ -1,3 +1,4 @@
+import { ICONIC_IOS_STORE_URL, ICONIC_ANDROID_STORE_URL } from '@iconicedu/utils';
 import type { Metadata } from 'next';
 import {
   MARKETING_FAQS,
@@ -2148,10 +2149,7 @@ export function organizationJsonLd() {
       { '@type': 'Country', name: 'Qatar' },
       { '@type': 'Place', name: 'Global online communities' },
     ],
-    sameAs: [
-      'https://apps.apple.com/us/app/iconic-academy/id6762158186',
-      'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',
-    ],
+    sameAs: [ICONIC_IOS_STORE_URL, ICONIC_ANDROID_STORE_URL],
   };
 }
 

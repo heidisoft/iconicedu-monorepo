@@ -1,4 +1,5 @@
 export const platformFeatureFlagKeys = {
+  enableParentReferrals: 'enable-parent-referrals',
   enableClassroomWhiteboard: 'classroom-whiteboard',
   enableClassroomMeetingSettings: 'classroom-meeting-settings',
   enableMobileOnboardingAddressSearch: 'enable-mobile-onboarding-address-search',

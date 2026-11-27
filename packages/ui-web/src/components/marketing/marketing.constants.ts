@@ -1,3 +1,4 @@
+import { ICONIC_IOS_STORE_URL, ICONIC_ANDROID_STORE_URL } from '@iconicedu/utils';
 export const HERO_SUBJECTS = [
   { icon: '📐', label: 'Math' },
   { icon: '📚', label: 'ELA' },
@@ -51,12 +52,12 @@ export const MOBILE_APP_LINKS = [
   {
     label: 'Download on the App Store',
     shortLabel: 'App Store',
-    href: 'https://apps.apple.com/us/app/iconic-academy/id6762158186',
+    href: ICONIC_IOS_STORE_URL,
   },
   {
     label: 'Get it on Google Play',
     shortLabel: 'Google Play',
-    href: 'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',
+    href: ICONIC_ANDROID_STORE_URL,
   },
 ] as const;
 

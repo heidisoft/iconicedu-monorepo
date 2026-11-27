@@ -14,11 +14,15 @@ type OrgGetStartedClientProps = {
   orgSlug: string;
   orgName: string;
   initialEmail?: string;
+  initialReferralCode?: string;
   enableGoogleSignIn?: boolean;
   enableAppleSignIn?: boolean;
 };
 
-export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
+export function resolveOrgGetStartedCallbackUrl(
+  orgSlug: string,
+  referralCode?: string,
+): string {
   if (typeof window === 'undefined') {
     return '/auth/callback?intent=get-started&source=self-signup';
   }
@@ -26,6 +30,7 @@ export function resolveOrgGetStartedCallbackUrl(orgSlug: string): string {
   callbackUrl.searchParams.set('org', orgSlug);
   callbackUrl.searchParams.set('intent', 'get-started');
   callbackUrl.searchParams.set('source', 'self-signup');
+  if (referralCode) callbackUrl.searchParams.set('referral', referralCode);
   return callbackUrl.toString();
 }
 
@@ -33,6 +38,7 @@ export default function OrgGetStartedClient({
   orgSlug,
   orgName,
   initialEmail,
+  initialReferralCode,
   enableGoogleSignIn = false,
   enableAppleSignIn = false,
 }: OrgGetStartedClientProps) {
@@ -48,6 +54,14 @@ export default function OrgGetStartedClient({
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
+        ...(initialReferralCode
+          ? {
+              emailRedirectTo: resolveOrgGetStartedCallbackUrl(
+                orgSlug,
+                initialReferralCode,
+              ),
+            }
+          : {}),
         shouldCreateUser: shouldCreateUserForIntent('get-started'),
         captchaToken: captchaToken ?? undefined,
       },
@@ -73,7 +87,7 @@ export default function OrgGetStartedClient({
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: resolveOrgGetStartedCallbackUrl(orgSlug),
+        redirectTo: resolveOrgGetStartedCallbackUrl(orgSlug, initialReferralCode),
       },
     });
 

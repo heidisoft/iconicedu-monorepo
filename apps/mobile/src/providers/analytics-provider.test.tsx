@@ -9,6 +9,7 @@ import { render, screen } from '@testing-library/react-native';
 jest.mock('posthog-react-native', () => ({
   PostHogProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   usePostHog: jest.fn(),
+  PostHog: jest.fn(),
 }));
 
 // Provide a key so the module-level POSTHOG_KEY constant is non-empty on import.
@@ -18,7 +19,7 @@ jest.mock('expo-constants', () => ({
   default: { expoConfig: { extra: { posthogKey: 'ph_test_key' } } },
 }));
 
-import { usePostHog } from 'posthog-react-native';
+import { PostHog, usePostHog } from 'posthog-react-native';
 import {
   AnalyticsProvider,
   hasPostHogNativeReplayModule,
@@ -70,6 +71,49 @@ describe('AnalyticsProvider / useAnalytics', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (usePostHog as jest.Mock).mockReturnValue(mockPh);
+  });
+
+  it('uses the development project only for flags and keeps analytics on its original client', () => {
+    process.env.EXPO_PUBLIC_POSTHOG_FLAGS_KEY = 'phc_development_flags';
+    process.env.EXPO_PUBLIC_POSTHOG_FLAGS_HOST = 'https://flags.example.com';
+    const flagClient = { identify: jest.fn(), reset: jest.fn(), shutdown: jest.fn() };
+    (PostHog as unknown as jest.Mock).mockImplementation(() => flagClient);
+    try {
+      const view = renderWrapped();
+      const [key, options] = (PostHog as unknown as jest.Mock).mock.calls[0];
+      expect(key).toBe('phc_development_flags');
+      expect(options).toMatchObject({
+        host: 'https://flags.example.com',
+        persistence: 'memory',
+        captureAppLifecycleEvents: false,
+        enableSessionReplay: false,
+        errorTracking: { autocapture: false },
+      });
+      expect(options.before_send({ event: 'analytics_event' })).toBeNull();
+      screen.getByTestId('result').props.onPress();
+      expect(mockPh.capture).toHaveBeenCalledWith('test_event', undefined);
+      expect(flagClient.identify).toHaveBeenCalledWith('user_1', undefined);
+      expect(flagClient.reset).toHaveBeenCalled();
+      view.unmount();
+      expect(flagClient.shutdown).toHaveBeenCalled();
+    } finally {
+      delete process.env.EXPO_PUBLIC_POSTHOG_FLAGS_KEY;
+      delete process.env.EXPO_PUBLIC_POSTHOG_FLAGS_HOST;
+    }
+  });
+
+  it('ignores the development flag project in release builds', () => {
+    process.env.EXPO_PUBLIC_POSTHOG_FLAGS_KEY = 'phc_development_flags';
+    const development = jest.replaceProperty(globalThis, '__DEV__', false);
+    try {
+      renderWrapped();
+      expect(PostHog).not.toHaveBeenCalled();
+      screen.getByTestId('result').props.onPress();
+      expect(mockPh.capture).toHaveBeenCalledWith('test_event', undefined);
+    } finally {
+      development.restore();
+      delete process.env.EXPO_PUBLIC_POSTHOG_FLAGS_KEY;
+    }
   });
 
   it('renders children', () => {

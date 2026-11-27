@@ -92,10 +92,7 @@ describe('marketing components', () => {
     expect(screen.getByText('Mobile apps')).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: 'Download on the App Store' }),
-    ).toHaveAttribute(
-      'href',
-      'https://apps.apple.com/us/app/iconic-academy/id6762158186',
-    );
+    ).toHaveAttribute('href', 'https://apps.apple.com/app/iconic-academy/id6762158186');
     expect(screen.getByRole('link', { name: 'Get it on Google Play' })).toHaveAttribute(
       'href',
       'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',
@@ -126,10 +123,7 @@ describe('marketing components', () => {
     );
     expect(
       screen.getByRole('link', { name: 'Download on the App Store' }),
-    ).toHaveAttribute(
-      'href',
-      'https://apps.apple.com/us/app/iconic-academy/id6762158186',
-    );
+    ).toHaveAttribute('href', 'https://apps.apple.com/app/iconic-academy/id6762158186');
     expect(screen.getByRole('link', { name: 'Get it on Google Play' })).toHaveAttribute(
       'href',
       'https://play.google.com/store/apps/details?id=com.heidisoft.iconicedu',

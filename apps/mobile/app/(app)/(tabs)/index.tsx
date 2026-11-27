@@ -1,3 +1,7 @@
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
+import { ParentReferralExplainer } from '@/components/home/parent-referral-explainer';
+import { ParentHomeTiles } from '@/components/home/parent-home-tiles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useState, useCallback, useRef } from 'react';
 import {
@@ -763,10 +767,19 @@ function makeStyles(C: AppColors) {
 // ---------------------------------------------------------------------------
 
 export default function HomeScreen() {
+  const enableParentReferrals = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableParentReferrals,
+  );
   const { user } = useAuth();
   const scrollRef = useRef<ScrollView>(null);
   const queryClient = useQueryClient();
-  const { familySwitchOptions, switchFamilyView, isViewingAsChild } = useFamilyView();
+  const {
+    familySwitchOptions,
+    switchFamilyView,
+    isViewingAsChild,
+    guardianAccountId,
+    guardianProfileId,
+  } = useFamilyView();
   const {
     data: profile,
     isPending: profileLoading,
@@ -898,6 +911,10 @@ export default function HomeScreen() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [familySwitchOpen, setFamilySwitchOpen] = useState(false);
+  const [referralExplainerOpen, setReferralExplainerOpen] = useState(false);
+  React.useEffect(() => {
+    if (!enableParentReferrals) setReferralExplainerOpen(false);
+  }, [enableParentReferrals]);
   const [switchingProfileId, setSwitchingProfileId] = useState<string | null>(null);
   const [todaySectionY, setTodaySectionY] = useState(0);
   const [thisWeekSectionY, setThisWeekSectionY] = useState(0);
@@ -1273,6 +1290,23 @@ export default function HomeScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={s.metricsRow}
             >
+              {!isViewingAsChild &&
+                profileData?.kind === 'guardian' &&
+                guardianProfileId &&
+                orgId && (
+                  <ParentHomeTiles
+                    width={metricCardWidth}
+                    referralsEnabled={enableParentReferrals}
+                    orgId={orgId}
+                    accountId={guardianAccountId}
+                    onAddChild={() => router.push('/(app)/settings/child')}
+                    onRefer={
+                      enableParentReferrals
+                        ? () => setReferralExplainerOpen(true)
+                        : undefined
+                    }
+                  />
+                )}
               <TouchableOpacity
                 style={[
                   s.metricCard,
@@ -1507,6 +1541,15 @@ export default function HomeScreen() {
 
         <AppSupportFooter isLoading={supportFooterLoading} />
       </ScrollView>
+      {enableParentReferrals &&
+        !isViewingAsChild &&
+        profileData?.kind === 'guardian' &&
+        referralExplainerOpen && (
+          <ParentReferralExplainer
+            orgId={orgId ?? ''}
+            onClose={() => setReferralExplainerOpen(false)}
+          />
+        )}
       <BottomSheet
         visible={familySwitchOpen}
         onClose={() => setFamilySwitchOpen(false)}

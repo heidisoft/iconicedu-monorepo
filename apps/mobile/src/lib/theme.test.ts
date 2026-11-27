@@ -56,3 +56,28 @@ describe('mobile theme tokens', () => {
     expect(darkColors.tealBg).toBe(darkColors.actionSubtle);
   });
 });
+
+function luminance(hex: string) {
+  const channels = hex
+    .slice(1)
+    .match(/../g)!
+    .map((channel) => {
+      const value = parseInt(channel, 16) / 255;
+      return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+    });
+  return channels[0]! * 0.2126 + channels[1]! * 0.7152 + channels[2]! * 0.0722;
+}
+it('keeps flat promotion colors distinct from Overview with readable text in both modes', () => {
+  for (const colors of [lightColors, darkColors]) {
+    const existing = [colors.periwinkle, colors.primarySubtle, colors.peach];
+    expect(colors.promotionPink).not.toBe(colors.promotionYellow);
+    for (const [fill, foreground] of [
+      [colors.promotionPink, colors.promotionPinkForeground],
+      [colors.promotionYellow, colors.promotionYellowForeground],
+    ] as const) {
+      expect(existing).not.toContain(fill);
+      const values = [luminance(fill), luminance(foreground)].sort((a, b) => a - b);
+      expect((values[1]! + 0.05) / (values[0]! + 0.05)).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+});
