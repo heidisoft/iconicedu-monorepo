@@ -170,6 +170,23 @@ export function compactTime(iso: string, now: number = Date.now()): string {
   );
 }
 
+/**
+ * Inbox section header: "Today" → "Today, Mar 9"; "Yesterday" → "Yesterday, Mar 8".
+ * Broader buckets ("This week", "Earlier") span several days and stay as-is.
+ */
+export function formatFeedSectionLabel(
+  label: string,
+  firstItemIso?: string | null,
+): string {
+  if (!firstItemIso || !/^(today|yesterday)$/i.test(label.trim())) return label;
+  const date = new Date(firstItemIso);
+  if (Number.isNaN(date.getTime())) return label;
+  const day = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' }).format(
+    date,
+  );
+  return `${label}, ${day}`;
+}
+
 function normalizeForCompare(value: string) {
   return value
     .toLowerCase()
@@ -239,6 +256,65 @@ export function getLeadingAvatar(item: ActivityFeedItemVM): ActivityLeadingAvata
     seed: avatar?.seed ?? actor.ids.id,
     themeKey: actor.ui?.themeKey ?? null,
   };
+}
+
+export type ActivityTagTone = 'neutral' | 'success' | 'warning' | 'danger' | 'info';
+export type ActivityTag = { label: string; tone: ActivityTagTone };
+
+function completionStatus(item: ActivityFeedItemVM): string | null {
+  const metadata = (item.metadata ?? {}) as Record<string, unknown>;
+  const completion =
+    metadata.sessionCompletion && typeof metadata.sessionCompletion === 'object'
+      ? (metadata.sessionCompletion as Record<string, unknown>)
+      : null;
+  return typeof completion?.status === 'string' ? completion.status : null;
+}
+
+/**
+ * Short status tag shown top-right on system notifications. It describes what
+ * *happened* (Rescheduled, Canceled, Action needed…) rather than the inbox tab,
+ * which would read "Classes" on nearly every row and tell the reader nothing.
+ * Person-driven rows return null — the avatar + sentence already say it.
+ */
+export function getActivityTag(item: ActivityFeedItemVM): ActivityTag | null {
+  switch (item.verb) {
+    case 'class.session.rescheduled':
+      return { label: 'Rescheduled', tone: 'warning' };
+    case 'class.session.canceled':
+      return { label: 'Canceled', tone: 'danger' };
+    case 'class.schedule.created':
+      return { label: 'New class', tone: 'success' };
+    case 'class.schedule.ended':
+      return { label: 'Class ended', tone: 'neutral' };
+    case 'session.reminder.sent':
+      return { label: 'Reminder', tone: 'info' };
+    case 'session.feedback_request.sent':
+      return { label: 'Feedback', tone: 'info' };
+    case 'session.completion.dispute_reported':
+      return { label: 'Issue reported', tone: 'danger' };
+    case 'message.unviewed_intended_participants':
+      return { label: 'Unseen', tone: 'warning' };
+    case 'session.completion_check.batch.sent':
+      return { label: 'Action needed', tone: 'warning' };
+    case 'session.completion_check.sent': {
+      const status = completionStatus(item);
+      if (status === 'confirmed' || status === 'auto_confirmed') {
+        return { label: 'Confirmed', tone: 'success' };
+      }
+      if (status === 'disputed') return { label: 'Reported', tone: 'danger' };
+      return { label: 'Action needed', tone: 'warning' };
+    }
+    default:
+      return null;
+  }
+}
+
+/** Meta-line timestamp: "Just now", "5m ago", "3h ago", "2d ago", "Mar 4". */
+export function metaTime(iso: string, now: number = Date.now()): string {
+  const compact = compactTime(iso, now);
+  if (!compact) return '';
+  if (compact === 'now') return 'Just now';
+  return /^\d+[mhd]$/.test(compact) ? `${compact} ago` : compact;
 }
 
 function getInitials(name: string): string {
@@ -329,26 +405,48 @@ export function makeActivityItemStyles(C: AppColors) {
     // Content
     content: { flex: 1, minWidth: 0 },
     topRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    // Sentence headline (person-driven rows)
     headlineText: { flex: 1, fontSize: 15, lineHeight: 21 },
     subHeadlineText: { flex: 1, fontSize: 14, lineHeight: 19 },
+    // Title + detail (system rows)
+    titleText: { flex: 1, fontSize: 15, lineHeight: 21 },
+    detailText: { fontSize: 14, lineHeight: 20, marginTop: 2 },
     strong: { fontWeight: '700' },
     strongRead: { fontWeight: '600' },
-    trailing: {
+
+    // Status tag (top-right)
+    tag: {
+      flexShrink: 0,
+      borderRadius: 6,
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      marginTop: 1,
+    },
+    tagText: {
+      fontSize: 11,
+      lineHeight: 14,
+      fontWeight: '700',
+      letterSpacing: 0.4,
+      textTransform: 'uppercase',
+    },
+
+    // Meta row — time on the left, unread dot on the right
+    metaRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingTop: 2,
+      justifyContent: 'space-between',
+      gap: 8,
+      marginTop: 6,
     },
-    timeText: { fontSize: 13, fontVariant: ['tabular-nums'] },
+    metaText: { fontSize: 13, fontVariant: ['tabular-nums'] },
     unreadDot: { width: 8, height: 8, borderRadius: 4 },
 
-    // Meta row (category)
-    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
-    metaText: { fontSize: 13 },
-
-    // Body — everything under the headline aligns with the headline text
+    // Body — previews and actions align with the headline text
     body: { marginLeft: ACTIVITY_BODY_INDENT, marginTop: 12, gap: 10 },
     subBody: { marginLeft: SUB_BODY_INDENT, marginTop: 8, gap: 8 },
+    // Interactive widgets (completion check, rating) use the full card width so
+    // their side-by-side buttons have room on narrow phones.
+    widget: { marginTop: 14 },
 
     // Inset panel (preview / expanded content) — recessed, no border
     inset: {
@@ -360,11 +458,9 @@ export function makeActivityItemStyles(C: AppColors) {
     },
     insetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.border },
     insetText: { fontSize: 14, lineHeight: 20, color: C.text },
-    readMoreBtn: { alignSelf: 'flex-start' },
-    readMoreText: { fontSize: 13, fontWeight: '600' },
 
-    // Actions
-    actionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+    // Actions — one horizontal row: primary action, then Read more / Show less
+    actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     actionBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -375,6 +471,7 @@ export function makeActivityItemStyles(C: AppColors) {
     },
     actionBtnPrimary: { backgroundColor: C.action },
     actionBtnTonal: { backgroundColor: C.actionSubtle },
+    actionBtnGhost: { paddingHorizontal: 10 },
     actionBtnText: { fontSize: 14, fontWeight: '600' },
 
     // Sub-activity: compact leaf view
@@ -563,6 +660,7 @@ function ActivityLeading({
 
 type ActivityHeaderRowProps = {
   colors: AppColors;
+  isDark: boolean;
   s: ActivityItemStyles;
   avatar: ActivityLeadingAvatar | null;
   IconComponent: ActivityIconComponent;
@@ -574,11 +672,29 @@ type ActivityHeaderRowProps = {
   secondary?: string;
   emphasis?: string;
   occurredAt: string;
-  tabLabel?: string;
+  tag: ActivityTag | null;
 };
+
+function ActivityTagPill({
+  isDark,
+  s,
+  tag,
+}: {
+  isDark: boolean;
+  s: ActivityItemStyles;
+  tag: ActivityTag;
+}) {
+  const { bg, fg } = isDark ? toneColorsDark(tag.tone) : toneColors(tag.tone);
+  return (
+    <View style={[s.tag, { backgroundColor: bg }]} testID="activity-tag">
+      <Text style={[s.tagText, { color: fg }]}>{tag.label}</Text>
+    </View>
+  );
+}
 
 function ActivityHeaderRow({
   colors,
+  isDark,
   s,
   avatar,
   IconComponent,
@@ -590,10 +706,13 @@ function ActivityHeaderRow({
   secondary,
   emphasis,
   occurredAt,
-  tabLabel,
+  tag,
 }: ActivityHeaderRowProps) {
-  const showTab = !isSubActivity && Boolean(tabLabel && tabLabel !== 'All');
   const strongStyle = isRead ? s.strongRead : s.strong;
+  // Person-driven rows read as one sentence ("Marc F sent a message in Math");
+  // system rows split into a title and a detail line so the "what" scans first.
+  const isSentence = Boolean(avatar) || isSubActivity;
+  const detail = [secondary, emphasis].filter(Boolean).join(' ');
 
   return (
     <View style={s.itemRow}>
@@ -608,68 +727,72 @@ function ActivityHeaderRow({
 
       <View style={s.content}>
         <View style={s.topRow}>
-          <Text
-            style={[
-              isSubActivity ? s.subHeadlineText : s.headlineText,
-              { color: colors.textMuted },
-            ]}
-          >
-            <Text style={[strongStyle, { color: colors.text }]}>{primary}</Text>
-            {secondary ? ` ${secondary}` : null}
-            {emphasis ? (
-              <>
-                {' '}
-                <Text style={[strongStyle, { color: colors.text }]}>{emphasis}</Text>
-              </>
-            ) : null}
-          </Text>
-
-          <View style={s.trailing}>
+          {isSentence ? (
             <Text
-              style={[s.timeText, { color: isRead ? colors.textMuted : colors.text }]}
-              accessibilityLabel={relativeTime(occurredAt)}
+              style={[
+                isSubActivity ? s.subHeadlineText : s.headlineText,
+                { color: colors.textMuted },
+              ]}
             >
-              {compactTime(occurredAt)}
+              <Text style={[strongStyle, { color: colors.text }]}>{primary}</Text>
+              {secondary ? ` ${secondary}` : null}
+              {emphasis ? (
+                <>
+                  {' '}
+                  <Text style={[strongStyle, { color: colors.text }]}>{emphasis}</Text>
+                </>
+              ) : null}
             </Text>
-            {isRead ? null : (
-              <View
-                style={[s.unreadDot, { backgroundColor: colors.action }]}
-                accessibilityLabel="Unread"
-                testID="activity-unread-indicator"
-              />
-            )}
-          </View>
+          ) : (
+            <Text style={[s.titleText, strongStyle, { color: colors.text }]}>
+              {primary}
+            </Text>
+          )}
+
+          {tag && !isSubActivity ? (
+            <ActivityTagPill isDark={isDark} s={s} tag={tag} />
+          ) : null}
         </View>
 
-        {showTab ? (
-          <View style={s.metaRow}>
-            <Text style={[s.metaText, { color: colors.textMuted }]}>{tabLabel}</Text>
-          </View>
+        {!isSentence && detail ? (
+          <Text style={[s.detailText, { color: colors.textMuted }]}>{detail}</Text>
         ) : null}
+
+        <View style={s.metaRow}>
+          <Text
+            style={[s.metaText, { color: colors.textMuted }]}
+            accessibilityLabel={relativeTime(occurredAt)}
+          >
+            {metaTime(occurredAt)}
+          </Text>
+          {isRead ? null : (
+            <View
+              style={[s.unreadDot, { backgroundColor: colors.action }]}
+              accessibilityLabel="Unread"
+              testID="activity-unread-indicator"
+            />
+          )}
+        </View>
       </View>
     </View>
   );
 }
 
 function ActivityInset({
-  colors,
   expandedContent,
   isExpanded,
   numberOfLines,
-  onToggle,
   previewText,
   s,
 }: {
-  colors: AppColors;
   expandedContent?: string;
   isExpanded: boolean;
   numberOfLines: number;
-  onToggle: () => void;
   previewText: string | null;
   s: ActivityItemStyles;
 }) {
-  const hasExpanded = Boolean(expandedContent);
-  if (!previewText && !hasExpanded) return null;
+  const showExpanded = Boolean(expandedContent) && isExpanded;
+  if (!previewText && !showExpanded) return null;
 
   return (
     <View style={s.inset}>
@@ -679,56 +802,65 @@ function ActivityInset({
         </Text>
       ) : null}
 
-      {hasExpanded && isExpanded ? (
+      {showExpanded ? (
         <>
           {previewText ? <View style={s.insetDivider} /> : null}
           <Text style={s.insetText}>{expandedContent}</Text>
         </>
       ) : null}
-
-      {hasExpanded ? (
-        <TouchableOpacity
-          onPress={onToggle}
-          hitSlop={8}
-          style={s.readMoreBtn}
-          accessibilityRole="button"
-        >
-          <Text style={[s.readMoreText, { color: colors.action }]}>
-            {isExpanded ? 'Show less' : 'Read more'}
-          </Text>
-        </TouchableOpacity>
-      ) : null}
     </View>
   );
 }
 
-function ActivityActionButton({
+function ActivityActions({
+  action,
   colors,
-  label,
-  onPress,
+  expandLabel,
+  onExpandToggle,
   s,
-  variant,
 }: {
+  action: {
+    label: string;
+    onPress: () => void;
+    variant?: 'default' | 'outline' | 'secondary';
+  } | null;
   colors: AppColors;
-  label: string;
-  onPress: () => void;
+  expandLabel: string | null;
+  onExpandToggle: () => void;
   s: ActivityItemStyles;
-  variant?: 'default' | 'outline' | 'secondary';
 }) {
-  const isPrimary = variant === 'default';
+  if (!action && !expandLabel) return null;
+  const isPrimary = action?.variant === 'default';
   const fg = isPrimary ? colors.actionForeground : colors.action;
+
   return (
-    <View style={s.actionsRow}>
-      <TouchableOpacity
-        style={[s.actionBtn, isPrimary ? s.actionBtnPrimary : s.actionBtnTonal]}
-        onPress={onPress}
-        activeOpacity={0.8}
-        accessibilityRole="button"
-        accessibilityLabel={label}
-      >
-        <Text style={[s.actionBtnText, { color: fg }]}>{label}</Text>
-        <ArrowRight size={15} color={fg} />
-      </TouchableOpacity>
+    <View style={s.actionsRow} testID="activity-actions-row">
+      {action ? (
+        <TouchableOpacity
+          style={[s.actionBtn, isPrimary ? s.actionBtnPrimary : s.actionBtnTonal]}
+          onPress={action.onPress}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={action.label}
+        >
+          <Text style={[s.actionBtnText, { color: fg }]} numberOfLines={1}>
+            {action.label}
+          </Text>
+          <ArrowRight size={15} color={fg} />
+        </TouchableOpacity>
+      ) : null}
+
+      {expandLabel ? (
+        <TouchableOpacity
+          style={[s.actionBtn, s.actionBtnGhost]}
+          onPress={onExpandToggle}
+          hitSlop={4}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
+          <Text style={[s.actionBtnText, { color: colors.action }]}>{expandLabel}</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -776,7 +908,7 @@ export function ActivityItem({
     !isSubActivity && (canShowFeedbackRequest || canShowCompletionCheck);
   const shouldShowPreview = !hidesDefaultContent;
   const shouldShowActionButton = Boolean(actionButton) && !hidesDefaultContent;
-  const tabLabel = TAB_LABELS[item.tabKey] ?? item.tabKey;
+  const tag = getActivityTag(item);
 
   const handlePress = () => {
     if (!isRead) onMarkRead(item.ids.id);
@@ -791,6 +923,7 @@ export function ActivityItem({
   const header = (
     <ActivityHeaderRow
       colors={colors}
+      isDark={isDark}
       s={s}
       avatar={avatar}
       IconComponent={IconComponent}
@@ -802,36 +935,49 @@ export function ActivityItem({
       secondary={secondary}
       emphasis={emphasis}
       occurredAt={item.timestamps.occurredAt}
-      tabLabel={tabLabel}
+      tag={tag}
     />
   );
 
   const inset = shouldShowPreview ? (
     <ActivityInset
-      colors={colors}
       expandedContent={expandedContent}
       isExpanded={isExpanded}
       numberOfLines={isSubActivity ? 3 : 4}
-      onToggle={() => onToggle(item.ids.id)}
       previewText={previewText}
       s={s}
     />
   ) : null;
 
-  const action =
-    shouldShowActionButton && actionButton ? (
-      <ActivityActionButton
-        colors={colors}
-        label={actionButton.label}
-        onPress={handleActionPress}
-        s={s}
-        variant={actionButton.variant}
-      />
-    ) : null;
+  const expandLabel =
+    shouldShowPreview && hasExpandedContent
+      ? isExpanded
+        ? 'Show less'
+        : 'Read more'
+      : null;
+  const actions = (
+    <ActivityActions
+      action={
+        shouldShowActionButton && actionButton
+          ? {
+              label: actionButton.label,
+              onPress: handleActionPress,
+              variant: actionButton.variant,
+            }
+          : null
+      }
+      colors={colors}
+      expandLabel={expandLabel}
+      onExpandToggle={() => onToggle(item.ids.id)}
+      s={s}
+    />
+  );
+  const hasActions =
+    (shouldShowActionButton && Boolean(actionButton)) || Boolean(expandLabel);
 
   // Sub-activity: compact leaf view
   if (isSubActivity) {
-    const hasBody = Boolean(inset) || Boolean(action);
+    const hasBody = Boolean(previewText) || hasActions;
     return (
       <Pressable
         onPress={handlePress}
@@ -841,7 +987,7 @@ export function ActivityItem({
         {hasBody ? (
           <View style={s.subBody}>
             {inset}
-            {action}
+            {hasActions ? actions : null}
           </View>
         ) : null}
       </Pressable>
@@ -871,8 +1017,8 @@ export function ActivityItem({
   ) : null;
 
   const hasPreviewContent =
-    shouldShowPreview && (Boolean(previewText) || hasExpandedContent);
-  const hasBody = hasPreviewContent || Boolean(action) || Boolean(interactiveWidget);
+    shouldShowPreview && (Boolean(previewText) || (hasExpandedContent && isExpanded));
+  const hasBody = hasPreviewContent || hasActions;
 
   return (
     <View style={s.itemOuter}>
@@ -886,10 +1032,11 @@ export function ActivityItem({
         {hasBody ? (
           <View style={s.body}>
             {hasPreviewContent ? inset : null}
-            {interactiveWidget}
-            {action}
+            {hasActions ? actions : null}
           </View>
         ) : null}
+
+        {interactiveWidget ? <View style={s.widget}>{interactiveWidget}</View> : null}
       </Pressable>
     </View>
   );

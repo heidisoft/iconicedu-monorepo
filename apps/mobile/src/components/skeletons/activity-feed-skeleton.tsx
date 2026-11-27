@@ -5,12 +5,12 @@ import { PulseBox } from './pulse-box';
 
 type Props = { count?: number };
 
-// Mirrors ActivityItem's card: 40px leading visual, headline with the compact
-// time pinned top-right, then an inset panel aligned under the headline.
+// Mirrors ActivityItem's card: 40px leading visual, headline with a status tag
+// pinned top-right, a meta line, then an inset panel aligned under the headline.
 const LEADING_SIZE = 40;
 const CONTENT_GAP = 12;
 const CARD_PADDING = 16;
-const TIME_WIDTH = 28;
+const TAG_WIDTH = 64;
 
 const ROWS = [
   {
@@ -36,7 +36,7 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
   const rows = ROWS.slice(0, Math.max(0, Math.min(count, ROWS.length)));
   const cardInnerWidth = Math.max(168, width - 32 - CARD_PADDING * 2);
   const bodyWidth = Math.max(126, cardInnerWidth - LEADING_SIZE - CONTENT_GAP);
-  const headlineWidth = Math.max(96, bodyWidth - TIME_WIDTH - 8);
+  const headlineWidth = Math.max(96, bodyWidth - TAG_WIDTH - 8);
   const clamp = (value: number) => Math.min(value, headlineWidth);
   const clampInset = (value: number) => Math.min(value, bodyWidth - 24);
 
@@ -70,7 +70,7 @@ export function ActivityFeedSkeleton({ count = 3 }: Props) {
                     />
                   ))}
                 </View>
-                <PulseBox width={TIME_WIDTH} height={12} radius={4} />
+                <PulseBox width={TAG_WIDTH} height={20} radius={6} />
               </View>
 
               <PulseBox width={row.metaWidth} height={12} radius={4} />

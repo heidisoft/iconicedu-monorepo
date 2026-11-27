@@ -315,7 +315,7 @@ export function ActivityCompletionCheck({
           >
             <Check size={16} color={colors.actionForeground} strokeWidth={2.5} />
             <Text style={styles.yesButtonText}>
-              {isLoading ? 'Saving...' : 'Confirm lesson'}
+              {isLoading ? 'Saving...' : 'Confirm'}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -335,7 +335,7 @@ export function ActivityCompletionCheck({
           >
             <Flag size={15} color={colors.text} />
             <Text style={[styles.noButtonText, { color: colors.text }]}>
-              Report a problem
+              Report issue
             </Text>
           </TouchableOpacity>
         </View>
@@ -563,6 +563,9 @@ function makeStyles(colors: AppColors) {
       fontSize: 14,
       lineHeight: 20,
     },
+    // Side by side, equal width. Short labels ("Confirm" / "Report issue") keep
+    // both on one line on standard phones; wrap is only a fallback for very
+    // narrow screens or large accessibility text sizes.
     buttonRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -570,6 +573,9 @@ function makeStyles(colors: AppColors) {
       gap: 8,
     },
     yesButton: {
+      flexGrow: 1,
+      flexBasis: 0,
+      minWidth: 112,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -587,6 +593,9 @@ function makeStyles(colors: AppColors) {
       textAlign: 'center',
     },
     noButton: {
+      flexGrow: 1,
+      flexBasis: 0,
+      minWidth: 128,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',

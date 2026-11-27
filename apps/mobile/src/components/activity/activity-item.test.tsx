@@ -1,5 +1,12 @@
 import React from 'react';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react-native';
 import {
   AlertCircle,
   Bell,
@@ -16,10 +23,13 @@ import {
   ActivityItem,
   compactTime,
   formatActivityPrimaryHeadline,
+  formatFeedSectionLabel,
+  getActivityTag,
   getIconKey,
   getLeadingAvatar,
   isPreviewRedundant,
   makeActivityItemStyles,
+  metaTime,
 } from './activity-item';
 import { shouldShowCompletionPromptTitle } from './activity-completion-check';
 import { lightColors } from '@/lib/theme';
@@ -191,6 +201,88 @@ describe('ActivityItem', () => {
     ).toBe(true);
     expect(isPreviewRedundant('Marc F sent a message', 'Hellow how are you')).toBe(false);
     expect(isPreviewRedundant('Anything', '   ')).toBe(true);
+  });
+
+  it('splits system notifications into a title, a detail line and a status tag', () => {
+    const item = {
+      ...makeBaseActivity(),
+      verb: 'class.session.rescheduled',
+      content: {
+        leading: { kind: 'icon', iconKey: 'CalendarCheck', tone: 'warning' },
+        headline: {
+          primary: 'ELA with Ms Denise',
+          secondary: 'Moved to Thu, Apr 9 at 10:00 AM',
+        },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item);
+
+    expect(screen.getByText('ELA with Ms Denise')).toBeTruthy();
+    expect(screen.getByText('Moved to Thu, Apr 9 at 10:00 AM')).toBeTruthy();
+    expect(screen.getByText('Rescheduled')).toBeTruthy();
+  });
+
+  it('does not tag person-driven notifications', () => {
+    renderActivity(makeBaseActivity());
+
+    expect(getActivityTag(makeBaseActivity())).toBeNull();
+    expect(screen.queryByTestId('activity-tag')).toBeNull();
+  });
+
+  it('tags completion checks by their resolution status', () => {
+    const base = { ...makeBaseActivity(), verb: 'session.completion_check.sent' };
+    expect(getActivityTag(base as ActivityFeedItemVM)).toEqual({
+      label: 'Action needed',
+      tone: 'warning',
+    });
+    expect(
+      getActivityTag({
+        ...base,
+        metadata: { sessionCompletion: { status: 'auto_confirmed' } },
+      } as ActivityFeedItemVM),
+    ).toEqual({ label: 'Confirmed', tone: 'success' });
+    expect(
+      getActivityTag({
+        ...base,
+        metadata: { sessionCompletion: { status: 'disputed' } },
+      } as ActivityFeedItemVM),
+    ).toEqual({ label: 'Reported', tone: 'danger' });
+  });
+
+  it('places Read more beside the action button in one row', () => {
+    const onToggle = jest.fn();
+    const item = {
+      ...makeBaseActivity(),
+      content: {
+        ...makeBaseActivity().content,
+        expandedContent: 'Full message body',
+        actionButton: { label: 'Open message', variant: 'outline' },
+      },
+    } as ActivityFeedItemVM;
+
+    renderActivity(item, { onToggle });
+
+    const row = screen.getByTestId('activity-actions-row');
+    expect(within(row).getByLabelText('Open message')).toBeTruthy();
+    expect(within(row).getByText('Read more')).toBeTruthy();
+    fireEvent.press(within(row).getByText('Read more'));
+    expect(onToggle).toHaveBeenCalledWith('activity-1');
+  });
+
+  it('formats meta timestamps and dated section headers', () => {
+    const now = new Date('2026-04-10T12:00:00.000Z').getTime();
+    expect(metaTime('2026-04-10T11:59:30.000Z', now)).toBe('Just now');
+    expect(metaTime('2026-04-10T11:55:00.000Z', now)).toBe('5m ago');
+    expect(metaTime('2026-03-04T12:00:00.000Z', now)).toBe('Mar 4');
+
+    expect(formatFeedSectionLabel('Today', '2026-03-09T15:00:00.000Z')).toBe(
+      'Today, Mar 9',
+    );
+    expect(formatFeedSectionLabel('This week', '2026-03-06T15:00:00.000Z')).toBe(
+      'This week',
+    );
+    expect(formatFeedSectionLabel('Today', undefined)).toBe('Today');
   });
 
   it('formats compact timestamps for the top-right corner', () => {
@@ -665,7 +757,8 @@ describe('ActivityItem', () => {
     expect(screen.getByText('Rate your session')).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Math Foundations — needs confirmation'));
-    expect(screen.getByText('Confirm lesson')).toBeTruthy();
+    expect(screen.getByLabelText('Confirm lesson')).toBeTruthy();
+    expect(screen.getByText('Confirm')).toBeTruthy();
   });
 
   it('submits completion confirmation by stable row id', async () => {
@@ -689,7 +782,7 @@ describe('ActivityItem', () => {
 
     renderActivity(item, { currentProfileId: 'profile-1' });
 
-    fireEvent.press(screen.getByText('Confirm lesson'));
+    fireEvent.press(screen.getByLabelText('Confirm lesson'));
 
     await waitFor(() => {
       expect(mockConfirmSessionCompletion).toHaveBeenCalledWith(
