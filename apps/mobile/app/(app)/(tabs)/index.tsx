@@ -1300,6 +1300,9 @@ export default function HomeScreen() {
                     orgId={orgId}
                     accountId={guardianAccountId}
                     onAddChild={() => router.push('/(app)/settings/child')}
+                    onRequestClass={
+                      canRequestClasses ? () => setClassRequestOpen(true) : undefined
+                    }
                     onRefer={
                       enableParentReferrals
                         ? () => setReferralExplainerOpen(true)

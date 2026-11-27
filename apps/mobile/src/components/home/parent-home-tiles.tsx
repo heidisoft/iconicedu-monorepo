@@ -7,7 +7,14 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
-import { ArrowRight, ChevronDown, Gift, UserPlus, X } from 'lucide-react-native';
+import {
+  ArrowRight,
+  ChevronDown,
+  Gift,
+  UserPlus,
+  BookOpen,
+  X,
+} from 'lucide-react-native';
 import { useTheme } from '@/providers/theme-provider';
 import { useHomeTileDismissal } from '@/hooks/use-home-tile-dismissal';
 
@@ -18,6 +25,7 @@ type Props = {
   referralsEnabled?: boolean;
   onAddChild: () => void;
   onRefer?: () => void;
+  onRequestClass?: () => void;
 };
 
 function PromotionCarousel({
@@ -25,6 +33,7 @@ function PromotionCarousel({
   width = 176,
   onAddChild,
   onRefer,
+  onRequestClass,
 }: Omit<Props, 'orgId' | 'accountId' | 'referralsEnabled'> & { scope: string }) {
   const { colors } = useTheme();
   const { fontScale } = useWindowDimensions();
@@ -59,6 +68,21 @@ function PromotionCarousel({
       onPress: onAddChild,
       Icon: UserPlus,
     },
+    ...(onRequestClass
+      ? [
+          {
+            id: 'class',
+            background: colors.promotionMint,
+            foreground: colors.promotionMintForeground,
+            title: 'Request a class',
+            description: 'Find the right tutor for your child.',
+            action: 'Request a class',
+            hint: 'Choose a child and subjects using Explore Classes.',
+            onPress: onRequestClass,
+            Icon: BookOpen,
+          },
+        ]
+      : []),
   ];
   const current = Math.min(active, promotions.length - 1);
   const selected = promotions[current]!;
@@ -198,7 +222,11 @@ function PromotionCarousel({
                   fontWeight: '700',
                 }}
               >
-                {promotion.id === 'child' ? 'Add child' : promotion.action}
+                {promotion.id === 'child'
+                  ? 'Add child'
+                  : promotion.id === 'class'
+                    ? 'Request class'
+                    : promotion.action}
               </Text>
               <ArrowRight size={12} color={promotion.background} />
             </Pressable>
@@ -275,6 +303,7 @@ export function ParentHomeTiles({
   orgId,
   accountId,
   referralsEnabled = false,
+  onRequestClass,
   onRefer,
   ...props
 }: Props) {
@@ -283,9 +312,10 @@ export function ParentHomeTiles({
   const referralAction = referralsEnabled ? onRefer : undefined;
   return (
     <PromotionCarousel
-      key={`${scope}:${referralAction ? 'referrals' : 'child'}`}
+      key={`${scope}:${referralAction ? 'referrals' : 'child'}:${onRequestClass ? 'classes' : 'none'}`}
       scope={scope}
       onRefer={referralAction}
+      onRequestClass={onRequestClass}
       {...props}
     />
   );

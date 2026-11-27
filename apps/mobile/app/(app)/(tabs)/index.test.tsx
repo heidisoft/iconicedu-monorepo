@@ -6,6 +6,12 @@ jest.mock('@/hooks/use-mobile-feature-flag', () => ({
   useMobileFeatureFlag: () => mockReferralEnabled,
 }));
 let mockViewingAsChild = false;
+let mockHasChild = false;
+const mockSubmitClassRequest = jest.fn();
+jest.mock('@/lib/api/queries', () => ({
+  ...jest.requireActual('@/lib/api/queries'),
+  submitClassRequest: (...args: unknown[]) => mockSubmitClassRequest(...args),
+}));
 let mockProfileKind = 'guardian';
 let mockSupportChannel: { id: string; topic: string } | null = null;
 const mockParentTiles = jest.fn(
@@ -14,6 +20,7 @@ const mockParentTiles = jest.fn(
     accountId: string;
     onAddChild: () => void;
     onRefer?: () => void;
+    onRequestClass?: () => void;
   }) => null,
 );
 jest.mock('@/components/home/parent-home-tiles', () => ({
@@ -103,7 +110,16 @@ jest.mock('@/providers/theme-provider', () => ({
 
 jest.mock('@/providers/family-view-provider', () => ({
   useFamilyView: () => ({
-    familySwitchOptions: [],
+    familySwitchOptions: mockHasChild
+      ? [
+          {
+            kind: 'child',
+            profileId: 'child-1',
+            displayName: 'Child One',
+            label: 'Child One',
+          },
+        ]
+      : [],
     switchFamilyView: jest.fn(),
     isViewingAsChild: mockViewingAsChild,
     guardianProfileId: 'guardian-profile',
@@ -288,6 +304,11 @@ beforeEach(() => {
   mockProfileKind = 'guardian';
   mockReferralEnabled = true;
   mockSupportChannel = null;
+  mockHasChild = false;
+  mockSubmitClassRequest.mockResolvedValue({
+    success: true,
+    channelId: 'request-channel',
+  });
 });
 it('opens the existing Add Child flow from parent homepage tiles', () => {
   render(<HomeScreen />);
@@ -348,4 +369,38 @@ it('closes an open referral explainer when the flag turns off', () => {
   mockReferralEnabled = true;
   view.rerender(<HomeScreen />);
   expect(view.queryByText('Referral explainer for org-1')).toBeNull();
+});
+
+it('opens the existing first-time class request flow from the new suggestion and submits to its conversation', async () => {
+  mockHasChild = true;
+  mockReferralEnabled = false;
+  const view = render(<HomeScreen />);
+  act(() => mockParentTiles.mock.calls.at(-1)![0].onRequestClass!());
+  expect(view.getByText('Explore Classes')).toBeTruthy();
+  expect(view.getByText('Child One')).toBeTruthy();
+  fireEvent.press(view.getByText('Submit request'));
+  expect(view.getByText('Select at least one subject.')).toBeTruthy();
+  expect(mockSubmitClassRequest).not.toHaveBeenCalled();
+  fireEvent.press(view.getByText('Math'));
+  fireEvent.press(view.getByText('Submit request'));
+  await waitFor(() =>
+    expect(mockSubmitClassRequest).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestIntent: 'ongoing-tutoring',
+        studentProfileIds: ['child-1'],
+        subjects: ['Math'],
+      }),
+    ),
+  );
+  await waitFor(() =>
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      pathname: '/(app)/channel/[channelId]',
+      params: { channelId: 'request-channel' },
+    }),
+  );
+  expect(view.queryByText('Explore Classes')).toBeNull();
+});
+it('does not offer the class request slide until there is a student', () => {
+  render(<HomeScreen />);
+  expect(mockParentTiles.mock.calls.at(-1)![0].onRequestClass).toBeUndefined();
 });

@@ -195,3 +195,58 @@ it('removes the referral slide without leaving the pager on an empty page', asyn
   expect(screen.queryByText('Refer another parent')).toBeNull();
   expect(screen.queryByLabelText('Next family suggestion')).toBeNull();
 });
+
+it.each([false, true])(
+  'adds Request a class to the same stack (referrals=%s)',
+  async (referralsEnabled) => {
+    const request = jest.fn();
+    render(
+      <ParentHomeTiles
+        orgId="org"
+        accountId="parent"
+        referralsEnabled={referralsEnabled}
+        onAddChild={jest.fn()}
+        onRefer={jest.fn()}
+        onRequestClass={request}
+      />,
+    );
+    await screen.findByTestId('parent-promotion-tile');
+    for (let i = 0; i < (referralsEnabled ? 2 : 1); i++)
+      fireEvent.press(screen.getByLabelText('Next family suggestion'));
+    expect(screen.getByText('Request a class')).toBeTruthy();
+    expect(screen.getByTestId('parent-promotion-tile').props.style.backgroundColor).toBe(
+      lightColors.promotionMint,
+    );
+    expect([
+      lightColors.promotionPink,
+      lightColors.promotionYellow,
+      lightColors.periwinkle,
+      lightColors.peach,
+      lightColors.primarySubtle,
+    ]).not.toContain(lightColors.promotionMint);
+    fireEvent.press(screen.getByLabelText('Request a class'));
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText('Family suggestions').props.accessibilityValue.max).toBe(
+      referralsEnabled ? 3 : 2,
+    );
+  },
+);
+it('uses a flat mint dark variant for the class request slide', async () => {
+  mockColors = darkColors;
+  render(
+    <ParentHomeTiles
+      orgId="org"
+      accountId="parent"
+      onAddChild={jest.fn()}
+      onRequestClass={jest.fn()}
+    />,
+  );
+  await screen.findByTestId('parent-promotion-tile');
+  fireEvent.press(screen.getByLabelText('Next family suggestion'));
+  expect(screen.getByTestId('parent-promotion-tile').props.style.backgroundColor).toBe(
+    darkColors.promotionMint,
+  );
+  expect(screen.getByText('Request a class').props.style.color).toBe(
+    darkColors.promotionMintForeground,
+  );
+});

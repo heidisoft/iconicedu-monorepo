@@ -142,3 +142,12 @@ The close button dismisses the entire suggestions tile. Dismissals are device-lo
 preferences in AsyncStorage, scoped by organization, guardian account, carousel ID
 and version. They survive app restarts without changing profile or family data.
 A failed save keeps the tile visible and offers a retry.
+
+The same parent Overview suggestion stack also offers **Request a class** when a
+child profile is available. It uses a flat mint surface with a dark variant, and
+opens the existing first-time Explore Classes sheet. Student and subject selection,
+request validation, the authenticated onboarding class-request endpoint and the
+resulting request conversation are shared with the original homepage CTA. Parents
+can request another class even when they already have active subjects. The slide
+is independent of the referral flag; parent-role and child-view restrictions still
+apply to the entire stack. Existing carousel dismissals remain respected.

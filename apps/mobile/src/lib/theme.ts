@@ -47,6 +47,8 @@ export const lightColors = {
   // pair with the matching *Fg for text/icons on top.
   promotionPink: '#f3d6ee',
   promotionYellow: '#f5e7a3',
+  promotionMint: '#cbe8df',
+  promotionMintForeground: '#1c4d49',
   promotionPinkForeground: '#1c4d49',
   promotionYellowForeground: '#1c4d49',
   pink: '#f3d4e6',
@@ -105,6 +107,8 @@ export const darkColors: typeof lightColors = {
   infoSubtle: '#172554',
   promotionPink: '#3e293c',
   promotionYellow: '#3e3824',
+  promotionMint: '#233d37',
+  promotionMintForeground: '#cbe8df',
   promotionPinkForeground: '#f2d3ed',
   promotionYellowForeground: '#f4e2a0',
   pink: '#4a2a3d',
