@@ -171,6 +171,27 @@ export function useUnreadSync(params: {
         },
         handleReadStateChange,
       )
+      // Also refresh the channel list when the user sends a message themselves —
+      // the unread trigger only fires for recipients, so the sender's own preview
+      // would not update without this subscription.
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `sender_profile_id=eq.${profileId}`,
+        },
+        (payload: { new?: { channel_id?: string | null } | null }) => {
+          const channelId = payload?.new?.channel_id ?? null;
+          invalidateChannelLists(
+            orgIdRef.current,
+            profileIdRef.current,
+            profileKindRef.current,
+            typeof channelId === 'string' ? channelId : null,
+          );
+        },
+      )
       .subscribe();
 
     return () => {

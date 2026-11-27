@@ -35,6 +35,12 @@ Responses are `LearningSpaceLifecycleResult` from `@iconicedu/shared-types`.
 Errors: `404` class not found, `409` a session is live (`55006`) or the
 30-day restore window has passed (`55000`), `403` not an org admin.
 
+Staff can also archive from the mobile conversation list (swipe a row, then
+Archive). That calls `PATCH /channels/:channelId/archive` with `{ orgId }`,
+which applies the same owner/admin/staff check. A class channel runs the
+`archive_learning_space` cascade above. A DM is set to `status = 'archived'`
+(read-only history). Org-wide channels such as support are refused with `400`.
+
 Archive and delete are refused while a class session is `starting` or `live`;
 end it first so attendance and summaries are finalized.
 

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -231,5 +232,18 @@ export class ChannelsController {
       extractBearerToken(req.headers.authorization),
       { ...body, channelId },
     );
+  }
+
+  @Patch(':channelId/archive')
+  @UseGuards(AuthGuard)
+  archiveChannel(
+    @Req() req: AuthenticatedRequest,
+    @Param('channelId') channelId: string,
+    @Body() body: { orgId?: string },
+  ) {
+    return this.channelsService.archiveChannel(req.user.id, {
+      orgId: body?.orgId ?? '',
+      channelId,
+    });
   }
 }

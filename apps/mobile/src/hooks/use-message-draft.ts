@@ -11,6 +11,14 @@ import {
 
 const DRAFT_KEY_PREFIX = 'message-draft:';
 
+// Lets the conversation list refresh after a write lands, including the final
+// flush that runs as a composer unmounts (which can finish after the list
+// regains focus and has already re-read storage).
+const draftWriteListeners = new Set<() => void>();
+function notifyDraftWritten() {
+  draftWriteListeners.forEach((listener) => listener());
+}
+
 export type MessageDraftScope = {
   accountId: string;
   profileId: string;
@@ -131,6 +139,7 @@ export function useMessageDraft(
     if (!storageKey) return;
     try {
       await AsyncStorage.removeItem(storageKey);
+      notifyDraftWritten();
     } catch {
       // Best-effort — a failed clear just leaves a stale draft to expire later.
     }
@@ -152,6 +161,7 @@ export function useMessageDraft(
       };
       try {
         await AsyncStorage.setItem(storageKey, JSON.stringify(entry));
+        notifyDraftWritten();
         setStatus('saved');
         if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
         savedStatusTimerRef.current = setTimeout(() => setStatus('idle'), 2000);
@@ -162,28 +172,45 @@ export function useMessageDraft(
     [scope, storageKey],
   );
 
+  // The write a still-pending debounce would perform, so it can be flushed
+  // instead of dropped when the composer unmounts or changes scope.
+  const pendingWriteRef = useRef<(() => void) | null>(null);
+
   const notifyContentChanged = useCallback(
     (content: string, mentions?: MessageMentionVM[]) => {
       if (!enabled || !storageKey) return;
       if (debounceRef.current) clearTimeout(debounceRef.current);
 
-      if (!content.trim()) {
-        // Nothing left to draft — clear any previously persisted content
-        // after the same debounce window rather than leaving it stale.
-        debounceRef.current = setTimeout(() => {
-          void removePersisted();
-        }, MESSAGE_DRAFT_AUTOSAVE_DEBOUNCE_MS);
-        return;
-      }
-
+      // Nothing left to draft — clear any previously persisted content
+      // after the same debounce window rather than leaving it stale.
+      const write = content.trim()
+        ? () => void persist(content, mentions)
+        : () => void removePersisted();
+      pendingWriteRef.current = write;
       debounceRef.current = setTimeout(() => {
-        void persist(content, mentions);
+        debounceRef.current = null;
+        pendingWriteRef.current = null;
+        write();
       }, MESSAGE_DRAFT_AUTOSAVE_DEBOUNCE_MS);
     },
     [enabled, storageKey, persist, removePersisted],
   );
 
+  useEffect(
+    () => () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+      const pendingWrite = pendingWriteRef.current;
+      pendingWriteRef.current = null;
+      pendingWrite?.();
+    },
+    [storageKey],
+  );
+
   const clearDraft = useCallback(async () => {
+    pendingWriteRef.current = null;
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
@@ -197,7 +224,6 @@ export function useMessageDraft(
 
   useEffect(
     () => () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
       if (savedStatusTimerRef.current) clearTimeout(savedStatusTimerRef.current);
     },
     [],
@@ -216,16 +242,16 @@ export function useMessageDraft(
 // ─── Conversation-list draft indicators ────────────────────────────────────────
 
 /**
- * Lists channel ids that have a non-expired, non-empty MAIN-composer draft
- * (thread drafts are intentionally excluded — the conversation list only
+ * Maps channel id → draft text for every non-expired, non-empty MAIN-composer
+ * draft (thread drafts are intentionally excluded — the conversation list only
  * shows one row per channel/DM, not per thread) for the given account/profile/org.
  */
-export async function listMessageDraftChannelIds(scope: {
+export async function listMessageDraftPreviews(scope: {
   accountId: string;
   profileId: string;
   orgId: string;
-}): Promise<Set<string>> {
-  const result = new Set<string>();
+}): Promise<Map<string, string>> {
+  const result = new Map<string, string>();
   if (!scope.accountId || !scope.profileId || !scope.orgId) return result;
 
   try {
@@ -249,7 +275,7 @@ export async function listMessageDraftChannelIds(scope: {
         ) {
           continue;
         }
-        result.add(parsed.channelId);
+        result.set(parsed.channelId, parsed.content);
       } catch {
         // Skip a corrupt entry rather than failing the whole list.
       }
@@ -262,30 +288,34 @@ export async function listMessageDraftChannelIds(scope: {
 }
 
 /**
- * Reactively exposes the set of channel ids with a visible draft indicator,
+ * Reactively exposes channel id → draft text for the conversation list,
  * refreshed on mount and via the returned `refresh()` (call on screen focus
  * so a draft saved in a composer shows up when the user backs out to the list).
  */
-export function useMessageDraftChannelIds(
+export function useMessageDraftPreviews(
   scope: { accountId: string; profileId: string; orgId: string } | null,
   enabled: boolean,
-): { channelIds: Set<string>; refresh: () => Promise<void> } {
-  const [channelIds, setChannelIds] = useState<Set<string>>(new Set());
+): { drafts: Map<string, string>; refresh: () => Promise<void> } {
+  const [drafts, setDrafts] = useState<Map<string, string>>(new Map());
 
   const refresh = useCallback(async () => {
     if (!enabled || !scope?.accountId || !scope.profileId || !scope.orgId) {
-      setChannelIds(new Set());
+      setDrafts(new Map());
       return;
     }
-    const ids = await listMessageDraftChannelIds(scope);
-    setChannelIds(ids);
+    setDrafts(await listMessageDraftPreviews(scope));
   }, [enabled, scope?.accountId, scope?.profileId, scope?.orgId]);
 
   useEffect(() => {
     void refresh();
+    const listener = () => void refresh();
+    draftWriteListeners.add(listener);
+    return () => {
+      draftWriteListeners.delete(listener);
+    };
   }, [refresh]);
 
-  return { channelIds, refresh };
+  return { drafts, refresh };
 }
 
 // ─── Sign-out / profile-switch hygiene ─────────────────────────────────────────

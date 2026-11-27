@@ -1,4 +1,9 @@
-import { ForbiddenException, InternalServerErrorException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ChannelsService } from './channels.service';
 import { ThreadsService } from '@iconicedu/api/modules/threads/threads.service';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -61,6 +66,11 @@ jest.mock('@iconicedu/api/lib/supabase/session', () => ({
 jest.mock('@iconicedu/api/lib/supabase/service', () => ({
   createSupabaseServiceClient: jest.fn(() => mockServiceClient),
 }));
+const mockRequireAdminAccount = jest.fn();
+jest.mock('@iconicedu/api/lib/auth/require-admin-account', () => ({
+  requireAdminAccount: (...args: unknown[]) => mockRequireAdminAccount(...args),
+}));
+const mockLifecycleRun = jest.fn();
 // PrismaService is injected but not used by markRead.
 jest.mock('@iconicedu/api/prisma/prisma.service', () => ({
   PrismaService: jest.fn(),
@@ -77,7 +87,9 @@ const BASE_INPUT = {
 
 function makeService() {
   // PrismaService is unused in these read-state tests.
-  return new ChannelsService({} as never, new ThreadsService());
+  return new ChannelsService({} as never, new ThreadsService(), {
+    run: mockLifecycleRun,
+  } as never);
 }
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
@@ -1085,5 +1097,114 @@ describe('ChannelsService.getDirectMessages', () => {
 
     expect(channelsChain.in).toHaveBeenCalledWith('status', ['active', 'archived']);
     expect(result).toMatchObject({ id: 'channel-1', is_archived: true });
+  });
+});
+
+describe('ChannelsService.archiveChannel', () => {
+  const ORG_ID = '11111111-1111-4111-8111-111111111111';
+  const CHANNEL_ID = '22222222-2222-4222-8222-222222222222';
+  const SPACE_ID = '33333333-3333-4333-8333-333333333333';
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    for (const m of ['from', 'select', 'eq', 'is', 'update']) {
+      (mockServiceClient as Record<string, jest.Mock>)[m].mockReturnValue(
+        mockServiceClient,
+      );
+    }
+    mockRequireAdminAccount.mockResolvedValue({ accountId: 'staff-account-1' });
+  });
+
+  it('rejects callers without an owner/admin/staff role before touching the channel', async () => {
+    mockRequireAdminAccount.mockRejectedValueOnce(new ForbiddenException('Forbidden'));
+
+    await expect(
+      makeService().archiveChannel('auth-user-1', {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+    expect(mockRequireAdminAccount).toHaveBeenCalledWith('auth-user-1', ORG_ID);
+    expect(mockServiceClient.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed ids', async () => {
+    await expect(
+      makeService().archiveChannel('auth-user-1', {
+        orgId: 'org',
+        channelId: CHANNEL_ID,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockRequireAdminAccount).not.toHaveBeenCalled();
+  });
+
+  it('returns 404 for a channel outside the org', async () => {
+    mockMaybeSingle.mockResolvedValueOnce({ data: null, error: null });
+
+    await expect(
+      makeService().archiveChannel('auth-user-1', {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+      }),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('runs the full class archive cascade for a class channel', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: { id: CHANNEL_ID, kind: 'channel', status: 'active' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: { learning_space_id: SPACE_ID }, error: null });
+    mockLifecycleRun.mockResolvedValueOnce({ changed: true });
+
+    await expect(
+      makeService().archiveChannel('auth-user-1', {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+      }),
+    ).resolves.toEqual({ archived: true });
+    expect(mockLifecycleRun).toHaveBeenCalledWith('archive', 'auth-user-1', {
+      orgId: ORG_ID,
+      learningSpaceId: SPACE_ID,
+    });
+    expect(mockServiceClient.update).not.toHaveBeenCalled();
+  });
+
+  it('archives a DM as read-only history', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: { id: CHANNEL_ID, kind: 'dm', status: 'active' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: null, error: null });
+
+    await expect(
+      makeService().archiveChannel('auth-user-1', {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+      }),
+    ).resolves.toEqual({ archived: true });
+    expect(mockServiceClient.update).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'archived', archived_at: expect.any(String) }),
+    );
+    expect(mockLifecycleRun).not.toHaveBeenCalled();
+  });
+
+  it('refuses org-wide channels such as support', async () => {
+    mockMaybeSingle
+      .mockResolvedValueOnce({
+        data: { id: CHANNEL_ID, kind: 'channel', status: 'active' },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: null, error: null });
+
+    await expect(
+      makeService().archiveChannel('auth-user-1', {
+        orgId: ORG_ID,
+        channelId: CHANNEL_ID,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(mockServiceClient.update).not.toHaveBeenCalled();
   });
 });

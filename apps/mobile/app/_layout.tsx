@@ -5,6 +5,7 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import { PortalHost } from '@rn-primitives/portal';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
@@ -93,10 +94,12 @@ function RootContent() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AppProviders>
-        <RootContent />
-      </AppProviders>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppProviders>
+          <RootContent />
+        </AppProviders>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
