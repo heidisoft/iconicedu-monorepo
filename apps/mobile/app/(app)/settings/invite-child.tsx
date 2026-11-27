@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +17,10 @@ import { useAuth } from '@/providers/auth-provider';
 import { useFamilyView } from '@/providers/family-view-provider';
 import { fetchProfileSettings } from '@/lib/api/profile-settings';
 import { sendFamilyChildInvite } from '@/lib/api/family-invites';
+import {
+  ProfileTextInput,
+  profileFieldStyles,
+} from '@/components/profile/profile-text-input';
 
 export default function InviteChildScreen() {
   const { colors } = useTheme();
@@ -157,8 +160,8 @@ export default function InviteChildScreen() {
                   : 'Invite your child by email. They will join your family after signing in with the email link.'}
               </Text>
               <View style={{ gap: 8 }}>
-                <Text style={{ color: colors.text }}>Child email</Text>
-                <TextInput
+                <Text style={profileFieldStyles(colors).label}>Child email</Text>
+                <ProfileTextInput
                   accessibilityLabel="Child email"
                   value={email}
                   onChangeText={(value) => {
@@ -173,15 +176,7 @@ export default function InviteChildScreen() {
                   maxLength={254}
                   placeholder="child@example.com"
                   placeholderTextColor={colors.textFaint}
-                  style={{
-                    color: colors.text,
-                    backgroundColor: colors.inputBg,
-                    borderWidth: 1,
-                    borderColor: colors.border,
-                    borderRadius: 10,
-                    padding: 12,
-                    minHeight: 48,
-                  }}
+                  returnKeyType="done"
                 />
               </View>
               <Pressable

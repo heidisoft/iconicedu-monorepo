@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -34,6 +35,7 @@ import { BirthYearSelect } from '@/components/auth/birth-year-select';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { RegionalFields } from './regional-fields';
 import { ThemeModePicker } from './theme-mode-options';
+import { ProfileTextInput, profileFieldStyles } from './profile-text-input';
 export const sectionTitles: Record<ProfileSettingsSection, string> = {
   identity: 'Identity',
   photo: 'Photo',
@@ -75,6 +77,7 @@ export function ProfileSectionForm({
   const family = useFamilyView();
   const value = (key: string, fallback = '') =>
     typeof profile[key] === 'string' ? (profile[key] as string) : fallback;
+  const identityInputs = useRef<Record<string, TextInput | null>>({});
   const [firstName, setFirst] = useState(value('first_name'));
   const [lastName, setLast] = useState(value('last_name'));
   const [displayName, setDisplay] = useState(value('display_name'));
@@ -101,21 +104,22 @@ export function ProfileSectionForm({
   );
   const show = (key: ProfileSettingsSection) => section === key;
   const text = { color: colors.text };
-  const inputStyle = {
-    color: colors.text,
-    backgroundColor: colors.inputBg,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    minHeight: 48,
-  };
   const fieldStyles = {
-    label: { ...text, marginTop: 8 },
-    labelOptional: { color: colors.textMuted },
-    inputWrap: { borderColor: colors.border, borderWidth: 1, borderRadius: 10 },
+    label: { ...profileFieldStyles(colors).label, marginBottom: 6 },
+    labelOptional: { color: colors.textMuted, fontSize: 13 },
+    inputWrap: {
+      backgroundColor: colors.inputBg,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      minHeight: 52,
+      paddingHorizontal: 16,
+      marginBottom: 16,
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+    },
     inputWrapFocused: { borderColor: colors.teal },
-    input: { ...text, padding: 12 },
+    input: { color: colors.text, flex: 1, fontSize: 16, paddingVertical: 14 },
     placeholderColor: colors.textFaint,
   };
   const error = (e: unknown) =>
@@ -341,6 +345,7 @@ export function ProfileSectionForm({
       )}
       <ScrollView
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={{ padding: 20, gap: 12, paddingBottom: 48 }}
       >
         {show('photo') && avatar ? (
@@ -369,16 +374,31 @@ export function ProfileSectionForm({
             ] as const
           )
             .filter(([label]) => !onDraftSave || label !== 'Display name')
-            .map(([label, val, setter]) => (
-              <View key={label}>
-                <Text style={text}>{label}</Text>
-                <TextInput
+            .map(([label, val, setter], index, fields) => (
+              <View key={label} style={{ gap: 8 }}>
+                <Text style={profileFieldStyles(colors).label}>{label}</Text>
+                <ProfileTextInput
                   accessibilityLabel={label}
                   value={val}
                   editable={!disabled}
                   maxLength={100}
                   onChangeText={setter}
-                  style={inputStyle}
+                  ref={(input) => {
+                    identityInputs.current[label] = input;
+                  }}
+                  placeholder={label}
+                  autoCapitalize="words"
+                  autoCorrect={false}
+                  autoComplete={
+                    index === 0 ? 'given-name' : index === 1 ? 'family-name' : 'off'
+                  }
+                  returnKeyType={index < fields.length - 1 ? 'next' : 'done'}
+                  blurOnSubmit={index === fields.length - 1}
+                  onSubmitEditing={() => {
+                    const next = fields[index + 1];
+                    if (next) identityInputs.current[next[0]]?.focus();
+                    else Keyboard.dismiss();
+                  }}
                 />
               </View>
             ))}
@@ -474,6 +494,7 @@ export function ProfileSectionForm({
                   setPostal('');
                 }}
                 colors={colors}
+                disabled={disabled}
               />
             )}
             {show('location') && countryCode ? (
@@ -486,14 +507,16 @@ export function ProfileSectionForm({
                 setRegion={setRegion}
                 setPostalCode={setPostal}
                 s={fieldStyles}
+                disabled={disabled}
               />
             ) : null}
             {show('child') && (
               <>
-                <Text style={text}>Birth year</Text>
-                <BirthYearSelect value={year} onChange={setYear} />
-                <Text style={text}>Grade</Text>
+                <Text style={profileFieldStyles(colors).label}>Birth year</Text>
+                <BirthYearSelect disabled={disabled} value={year} onChange={setYear} />
+                <Text style={profileFieldStyles(colors).label}>Grade</Text>
                 <GradeLevelSelect
+                  disabled={disabled}
                   value={grade}
                   onChange={setGrade}
                   options={optionsForCountry(normalizeCountryCode(countryCode))}
@@ -552,15 +575,14 @@ export function ProfileSectionForm({
         )}
         {section === 'about' && (
           <>
-            <Text style={text}>Bio</Text>
-            <TextInput
+            <Text style={profileFieldStyles(colors).label}>Bio</Text>
+            <ProfileTextInput
               accessibilityLabel="Bio"
               value={bio}
               onChangeText={setBio}
               editable={!disabled}
               multiline
               maxLength={2000}
-              style={[inputStyle, { minHeight: 140, textAlignVertical: 'top' }]}
             />
             <Text style={{ color: colors.textMuted }}>{bio.length} / 2,000</Text>
           </>

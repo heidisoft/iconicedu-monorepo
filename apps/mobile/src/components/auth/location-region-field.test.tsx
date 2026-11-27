@@ -30,3 +30,18 @@ it('uses the country-specific province list and leaves the selection on dismissa
   fireEvent.press(screen.getByLabelText('Close province picker'));
   expect(onChange).not.toHaveBeenCalled();
 });
+it('does not open the region picker while saving', () => {
+  const onChange = jest.fn();
+  render(
+    <LocationRegionField
+      countryCode="US"
+      value="NY"
+      label="State"
+      onChange={onChange}
+      disabled
+    />,
+  );
+  fireEvent.press(screen.getByLabelText('State'));
+  expect(screen.queryByText('Choose state')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+});

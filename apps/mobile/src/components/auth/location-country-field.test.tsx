@@ -60,3 +60,18 @@ it('keeps the selection on close and starts a fresh search when reopened', () =>
   expect(screen.getByLabelText('Search country').props.value).toBe('');
   expect(screen.getByLabelText('United States')).toBeTruthy();
 });
+it('does not open the country picker while saving', () => {
+  const onChange = jest.fn();
+  render(
+    <LocationCountryField
+      countries={countries}
+      countryCode="US"
+      onChange={onChange}
+      colors={lightColors}
+      disabled
+    />,
+  );
+  fireEvent.press(screen.getByLabelText('Country: United States. Change country'));
+  expect(screen.queryByText('Choose country')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+});

@@ -47,3 +47,20 @@ it('uses the supplied country-specific grade labels', () => {
     local[0]!.label,
   );
 });
+it('does not open or change grade while saving', () => {
+  const onChange = jest.fn();
+  render(
+    <GradeLevelSelect
+      value={GradeLevel.Grade2}
+      onChange={onChange}
+      options={options}
+      disabled
+    />,
+  );
+  fireEvent.press(screen.getByLabelText('Grade level'));
+  expect(screen.queryByText('Choose grade level')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Grade level').props.accessibilityState.disabled).toBe(
+    true,
+  );
+});

@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 import { ChevronDown } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchableSelectionSheet } from '@iconicedu/ui-native/components/searchable-selection-sheet';
 import { timezoneIds, timezoneOption } from '@/components/auth/timezone-options';
 import { useTheme } from '@/providers/theme-provider';
+import { ProfileTextInput, profileFieldStyles } from './profile-text-input';
 
 export function RegionalFields({
   timezone,
@@ -72,52 +73,55 @@ export function RegionalFields({
             : locales.find((item) => item.id === locale)?.label;
         return (
           <View key={key} style={{ gap: 8 }}>
-            <Text style={{ color: colors.text }}>{label}</Text>
+            <Text style={profileFieldStyles(colors).label}>{label}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={`Choose ${label}`}
               accessibilityState={{ disabled, expanded: picker === key }}
+              accessibilityValue={{
+                text:
+                  selected ??
+                  (key === 'timezone' ? 'Select time zone' : 'Select language / region'),
+              }}
               disabled={disabled}
               onPress={() => {
                 Keyboard.dismiss();
                 setPicker(key);
               }}
               style={{
-                backgroundColor: colors.inputBg,
-                borderColor: colors.border,
-                borderWidth: 1,
-                borderRadius: 10,
-                minHeight: 48,
-                padding: 12,
+                ...profileFieldStyles(colors).selector,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
               }}
             >
-              <Text style={{ color: colors.text, flex: 1 }}>{selected}</Text>
+              <Text
+                style={{
+                  color: selected ? colors.text : colors.textMuted,
+                  flex: 1,
+                  fontSize: 17,
+                }}
+              >
+                {selected ??
+                  (key === 'timezone' ? 'Select time zone' : 'Select language / region')}
+              </Text>
               <ChevronDown size={20} color={colors.textMuted} />
             </Pressable>
           </View>
         );
       })}
       <View style={{ gap: 8 }}>
-        <Text style={{ color: colors.text }}>Languages Spoken</Text>
-        <TextInput
+        <Text style={profileFieldStyles(colors).label}>Languages Spoken</Text>
+        <ProfileTextInput
           accessibilityLabel="Languages spoken"
           value={languages}
           editable={!disabled}
           onChangeText={setLanguages}
           placeholder="English, Sinhala"
           placeholderTextColor={colors.textFaint}
-          style={{
-            color: colors.text,
-            backgroundColor: colors.inputBg,
-            borderColor: colors.border,
-            borderWidth: 1,
-            borderRadius: 10,
-            minHeight: 48,
-            padding: 12,
-          }}
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="done"
         />
         <Text style={{ color: colors.textMuted, fontSize: 13 }}>
           Separate languages with commas.

@@ -49,3 +49,13 @@ it('preserves the value on dismissal and adds the new year on reopening after Ne
     '2010',
   );
 });
+it('does not open or change birth year while saving', () => {
+  const onChange = jest.fn();
+  render(<BirthYearSelect value="2015" onChange={onChange} disabled />);
+  fireEvent.press(screen.getByLabelText('Year of birth'));
+  expect(screen.queryByText('Choose birth year')).toBeNull();
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.getByLabelText('Year of birth').props.accessibilityState.disabled).toBe(
+    true,
+  );
+});

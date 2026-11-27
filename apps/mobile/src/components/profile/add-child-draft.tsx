@@ -20,6 +20,7 @@ import { createChildProfile } from '@/lib/api/queries';
 import { BirthYearSelect } from '@/components/auth/birth-year-select';
 import { GradeLevelSelect } from '@/components/auth/grade-level-select';
 import { ProfileDetails } from './profile-details';
+import { ProfileTextInput, profileFieldStyles } from './profile-text-input';
 
 export function AddChildDraft() {
   const { colors } = useTheme();
@@ -38,7 +39,6 @@ export function AddChildDraft() {
   const [birthYear, setBirthYear] = useState('');
   const [grade, setGrade] = useState<string | null>(null);
   const [email, setEmail] = useState('');
-  const [focusedField, setFocusedField] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const submitting = useRef(false);
@@ -73,22 +73,7 @@ export function AddChildDraft() {
   ]!;
   const suggestedDisplayName =
     `${firstName.trim().slice(0, 98)} ${lastName.trim().charAt(0).toUpperCase()}`.trim();
-  const labelStyle = {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '500' as const,
-  };
-  const inputStyle = {
-    color: colors.text,
-    backgroundColor: colors.inputBg,
-    borderColor: colors.border,
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    minHeight: 52,
-    fontSize: 16,
-  };
+  const labelStyle = profileFieldStyles(colors).label;
 
   async function create(values: {
     firstName: string;
@@ -256,7 +241,7 @@ export function AddChildDraft() {
                   <Text style={labelStyle} nativeID="child-first-name-label">
                     First name *
                   </Text>
-                  <TextInput
+                  <ProfileTextInput
                     accessibilityLabel="First name"
                     accessibilityLabelledBy="child-first-name-label"
                     value={firstName}
@@ -272,19 +257,13 @@ export function AddChildDraft() {
                     returnKeyType="next"
                     onSubmitEditing={() => lastNameInput.current?.focus()}
                     blurOnSubmit={false}
-                    onFocus={() => setFocusedField('firstName')}
-                    onBlur={() => setFocusedField(null)}
-                    style={[
-                      inputStyle,
-                      focusedField === 'firstName' && { borderColor: colors.teal },
-                    ]}
                   />
                 </View>
                 <View style={{ gap: 8 }}>
                   <Text style={labelStyle} nativeID="child-last-name-label">
                     Last name *
                   </Text>
-                  <TextInput
+                  <ProfileTextInput
                     ref={lastNameInput}
                     accessibilityLabel="Last name"
                     accessibilityLabelledBy="child-last-name-label"
@@ -301,19 +280,13 @@ export function AddChildDraft() {
                     returnKeyType="next"
                     onSubmitEditing={() => displayNameInput.current?.focus()}
                     blurOnSubmit={false}
-                    onFocus={() => setFocusedField('lastName')}
-                    onBlur={() => setFocusedField(null)}
-                    style={[
-                      inputStyle,
-                      focusedField === 'lastName' && { borderColor: colors.teal },
-                    ]}
                   />
                 </View>
                 <View style={{ gap: 8 }}>
                   <Text style={labelStyle} nativeID="child-display-name-label">
                     Display name (optional)
                   </Text>
-                  <TextInput
+                  <ProfileTextInput
                     ref={displayNameInput}
                     accessibilityLabel="Display name"
                     accessibilityLabelledBy="child-display-name-label"
@@ -326,12 +299,6 @@ export function AddChildDraft() {
                     maxLength={100}
                     editable={!disabled}
                     returnKeyType="done"
-                    onFocus={() => setFocusedField('displayName')}
-                    onBlur={() => setFocusedField(null)}
-                    style={[
-                      inputStyle,
-                      focusedField === 'displayName' && { borderColor: colors.teal },
-                    ]}
                   />
                   <Text style={{ color: colors.textMuted, fontSize: 13 }}>
                     Leave blank to use their first name and last initial.
@@ -342,23 +309,18 @@ export function AddChildDraft() {
             {section(
               'Learning Details',
               <>
-                <View
-                  style={{ gap: 8 }}
-                  accessibilityElementsHidden={disabled}
-                  importantForAccessibility={disabled ? 'no-hide-descendants' : 'auto'}
-                  pointerEvents={disabled ? 'none' : 'auto'}
-                >
+                <View style={{ gap: 8 }}>
                   <Text style={labelStyle}>Birth year *</Text>
-                  <BirthYearSelect value={birthYear} onChange={setBirthYear} />
+                  <BirthYearSelect
+                    disabled={disabled}
+                    value={birthYear}
+                    onChange={setBirthYear}
+                  />
                 </View>
-                <View
-                  style={{ gap: 8 }}
-                  accessibilityElementsHidden={disabled}
-                  importantForAccessibility={disabled ? 'no-hide-descendants' : 'auto'}
-                  pointerEvents={disabled ? 'none' : 'auto'}
-                >
+                <View style={{ gap: 8 }}>
                   <Text style={labelStyle}>Grade level *</Text>
                   <GradeLevelSelect
+                    disabled={disabled}
                     value={grade}
                     onChange={setGrade}
                     options={optionsForCountry(
@@ -379,7 +341,7 @@ export function AddChildDraft() {
                   <Text style={labelStyle} nativeID="child-email-label">
                     Email (optional)
                   </Text>
-                  <TextInput
+                  <ProfileTextInput
                     accessibilityLabel="Child email"
                     accessibilityLabelledBy="child-email-label"
                     value={email}
@@ -393,12 +355,6 @@ export function AddChildDraft() {
                     maxLength={254}
                     editable={!disabled}
                     returnKeyType="done"
-                    onFocus={() => setFocusedField('email')}
-                    onBlur={() => setFocusedField(null)}
-                    style={[
-                      inputStyle,
-                      focusedField === 'email' && { borderColor: colors.teal },
-                    ]}
                   />
                   <Text style={{ color: colors.textMuted, fontSize: 13, lineHeight: 19 }}>
                     Add an email if your child will sign in independently. You can send an
