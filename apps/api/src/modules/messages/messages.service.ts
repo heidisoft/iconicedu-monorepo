@@ -130,6 +130,19 @@ function buildWritableProfileDisplayName(profile: WritableProfileRow) {
   return fullName || 'Someone';
 }
 
+/**
+ * A private message only notifies and highlights people who can read it, so
+ * mentions of channel members outside the audience are dropped.
+ */
+export function restrictMentionsToAudience(
+  mentions: MessageMentionVM[],
+  visibility: { visibility_type?: string | null; visibility_user_ids?: string[] | null },
+): MessageMentionVM[] {
+  if (visibility.visibility_type !== 'specific-users') return mentions;
+  const audience = new Set(visibility.visibility_user_ids ?? []);
+  return mentions.filter((mention) => audience.has(mention.profileId));
+}
+
 export function sanitizeMentions(
   content: string,
   mentions: MessageMentionVM[] | undefined,
@@ -1635,6 +1648,10 @@ export class MessagesService {
         requestedProfileIds: input.audience?.profileIds,
         supportVisibility,
       });
+      sanitizedMentions = restrictMentionsToAudience(
+        sanitizedMentions,
+        messageVisibility,
+      );
       const writeAccess = await resolveChannelWriteAccessForMessage({
         serviceSupabase,
         activityContext,
@@ -1792,7 +1809,9 @@ export class MessagesService {
     const serviceSupabase = createSupabaseServiceClient();
     const { data: message, error: messageError } = await serviceSupabase
       .from('messages')
-      .select('id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at')
+      .select(
+        'id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at, visibility_type, visibility_user_ids',
+      )
       .eq('id', messageId)
       .maybeSingle<{
         id: string;
@@ -1802,6 +1821,8 @@ export class MessagesService {
         type: string;
         created_at: string;
         deleted_at: string | null;
+        visibility_type: string | null;
+        visibility_user_ids: string[] | null;
       }>();
     if (messageError) throw new InternalServerErrorException(messageError.message);
     if (!message || message.org_id !== input.orgId) {
@@ -1839,11 +1860,14 @@ export class MessagesService {
       if (channelMembersResponse.error) {
         throw new InternalServerErrorException(channelMembersResponse.error.message);
       }
-      sanitizedMentions = sanitizeMentions(
-        content,
-        input.mentions,
-        new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
-        actor.profile.id,
+      sanitizedMentions = restrictMentionsToAudience(
+        sanitizeMentions(
+          content,
+          input.mentions,
+          new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
+          actor.profile.id,
+        ),
+        message,
       );
     }
 

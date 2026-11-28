@@ -88,6 +88,7 @@ import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { ChatImageViewer, type ChatImageViewerItem } from './chat-image-viewer';
 import { ChatPdfViewer } from './chat-pdf-viewer';
 import type { AttachmentPayload } from './attachment-sheet';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -645,7 +646,9 @@ export function SocialBar({
                 <ThreadPill
                   thread={thread!}
                   colors={colors}
-                  onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
+                  // Expanding an existing thread only reads it, so it stays available in
+                  // read-only views (replying inside is disabled separately).
+                  onPress={onThreadPress ?? (() => {})}
                   expanded={threadExpanded}
                   unreadCount={threadUnreadCount}
                 />
@@ -666,7 +669,8 @@ export function SocialBar({
           <ThreadPill
             thread={thread!}
             colors={colors}
-            onPress={disabledActions ? () => {} : (onThreadPress ?? (() => {}))}
+            // Read-only viewers can still expand a thread to read the replies.
+            onPress={onThreadPress ?? (() => {})}
             expanded={threadExpanded}
             unreadCount={threadUnreadCount}
           />
@@ -960,12 +964,18 @@ export function VisibilityBadge({
     participants: audienceParticipants,
   });
   if (!copy) return null;
+  // Staff can review private messages they are not part of, read-only.
+  const isStaffReview = isOutsideMessageAudience({
+    visibility: message.core.visibility,
+    senderProfileId: message.core.sender.ids.id,
+    viewerProfileId: currentProfileId,
+  });
 
   return (
     <Tooltip delayDuration={0}>
       <TooltipTrigger
         accessibilityRole="button"
-        accessibilityLabel={`${copy.summary}. Tap to show names`}
+        accessibilityLabel={`${copy.summary}${isStaffReview ? '. Staff view, read-only' : ''}. Tap to show names`}
         hitSlop={8}
       >
         <View
@@ -1005,6 +1015,14 @@ export function VisibilityBadge({
               {name}
             </Text>
           ))}
+          {isStaffReview ? (
+            <Text
+              testID="message-staff-review-note"
+              style={{ fontSize: 11, color: '#cbd5e1', marginTop: 4 }}
+            >
+              Staff view · you can read this but not reply
+            </Text>
+          ) : null}
         </View>
       </TooltipContent>
     </Tooltip>

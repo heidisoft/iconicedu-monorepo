@@ -82,6 +82,7 @@ import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { supabase } from '@/lib/supabase/client';
 import { ReplyReferenceBlock } from '@/components/messages/reply-reference-block';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -1651,7 +1652,15 @@ function FeedPost({
             onProfilePress={onProfilePress}
             onLongPress={onLongPress}
             onSendAnnotation={onSendAnnotation}
-            isReadOnly={isReadOnly}
+            // Staff can review private messages they are not part of, read-only.
+            isReadOnly={
+              isReadOnly ||
+              isOutsideMessageAudience({
+                visibility: message.core.visibility,
+                senderProfileId: message.core.sender.ids.id,
+                viewerProfileId: currentProfileId,
+              })
+            }
             onReplyReferencePress={onReplyReferencePress}
           />
         ))}

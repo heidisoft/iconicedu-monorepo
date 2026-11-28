@@ -110,6 +110,7 @@ import {
 import { useMessageDraft } from './use-message-draft';
 import type { MessageDraftScope } from './message-draft-store';
 import { generateClientMessageId } from './client-message-id';
+import { isMessageSendRejectedError } from './message-send-rejected-error';
 import {
   canAddressPrivately,
   canInitiateRestrictedMessage,
@@ -231,6 +232,8 @@ interface MessageInputProps {
   audienceParticipants?: UserProfileVM[];
   /** Fixed audience description for a private thread reply composer. */
   inheritedAudienceLabel?: string | null;
+  /** Profile ids of an inherited private audience; @mention suggestions are limited to them. */
+  inheritedAudienceProfileIds?: string[] | null;
   enableMessageListFormatting?: boolean;
   replyTarget?: { senderName: string; snippet: string } | null;
   onClearReply?: () => void;
@@ -364,6 +367,7 @@ export function MessageInput({
   enableMessageReplyReference = false,
   audienceParticipants,
   inheritedAudienceLabel,
+  inheritedAudienceProfileIds,
   enableMessageListFormatting = false,
   replyTarget = null,
   onClearReply,
@@ -454,10 +458,16 @@ export function MessageInput({
   const recordingChunksRef = React.useRef<Blob[]>([]);
   const recordingSessionRef = React.useRef<RecordingSession | null>(null);
   const recordingStopModeRef = React.useRef<'complete' | 'cancel'>('complete');
-  const mentionCandidates = React.useMemo(
-    () => getMentionCandidates(participants, currentUserId),
-    [participants, currentUserId],
-  );
+  // A private message only reaches its audience, so only suggest people in it.
+  const mentionAudienceIds = audienceProfileIds.length
+    ? audienceProfileIds
+    : (inheritedAudienceProfileIds ?? null);
+  const mentionCandidates = React.useMemo(() => {
+    const candidates = getMentionCandidates(participants, currentUserId);
+    if (!mentionAudienceIds) return candidates;
+    const audience = new Set(mentionAudienceIds);
+    return candidates.filter((candidate) => audience.has(candidate.id));
+  }, [participants, currentUserId, mentionAudienceIds]);
   const filteredMentionCandidates = React.useMemo(() => {
     if (!mentionState) return [];
     return mentionCandidates.filter((candidate) =>
@@ -817,14 +827,17 @@ export function MessageInput({
           }
           resetComposer();
           setAudienceProfileIds([]);
-        } catch {
+        } catch (error) {
           // Keep the attachments + content in the composer so nothing is
           // lost; the user can inspect/retry (Send reuses the same
           // clientMessageId above) or remove attachments to start over.
+          // A refused send (e.g. a disallowed private audience) explains why.
           setAttachmentError(
-            enableMessageSendReliability
-              ? 'Could not send. Your files are still attached — tap Send to retry.'
-              : 'Could not send attachment(s). Please try again.',
+            isMessageSendRejectedError(error)
+              ? error.message
+              : enableMessageSendReliability
+                ? 'Could not send. Your files are still attached — tap Send to retry.'
+                : 'Could not send attachment(s). Please try again.',
           );
         } finally {
           setIsAttachingFile(false);

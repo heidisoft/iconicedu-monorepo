@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Animated,
   View,
@@ -656,13 +656,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onSaveEdit,
   onCancelEdit,
   enableMentions = false,
-  mentionCandidates = [],
+  mentionCandidates: allMentionCandidates = [],
   enableFormatting = false,
   enableSendReliability = false,
   audienceParticipants = [],
 }) => {
   const [text, setText] = useState('');
   const [audienceProfileIds, setAudienceProfileIds] = useState<string[]>([]);
+  // A private message only reaches its audience (a thread reply inherits the
+  // parent's), so only suggest people in it.
+  const mentionAudienceIds = audienceProfileIds.length
+    ? audienceProfileIds
+    : !quoteReplyTo && replyTo?.core.visibility.type === 'specific-users'
+      ? replyTo.core.visibility.userIds
+      : null;
+  const mentionCandidates = useMemo(() => {
+    if (!mentionAudienceIds) return allMentionCandidates;
+    const audience = new Set(mentionAudienceIds);
+    return allMentionCandidates.filter((candidate) => audience.has(candidate.id));
+  }, [allMentionCandidates, mentionAudienceIds]);
   const [inputKey, setInputKey] = useState(0);
   const [sending, setSending] = useState(false);
   const sendProgress = useRef(new Animated.Value(0)).current;

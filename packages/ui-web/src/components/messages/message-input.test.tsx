@@ -1,11 +1,12 @@
 /* @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserProfileVM } from '@iconicedu/shared-types';
 
 import { MESSAGE_INPUT_FILE_ACCEPT } from './message-input.attachments';
 import { buildAssignmentDraftFromContent, MessageInput } from './message-input';
+import { MessageSendRejectedError } from './message-send-rejected-error';
 import {
   getMentionCandidates,
   getMentionPopupPosition,
@@ -455,6 +456,90 @@ describe('MessageInput audience selection', () => {
     expect(
       screen.getByRole('button', { name: /Everyone in this channel/i }),
     ).toBeTruthy();
+  });
+});
+
+describe('MessageInput mention suggestions in private messages', () => {
+  const member = (id: string, name: string, kind: 'staff' | 'educator' | 'guardian') =>
+    createParticipant({
+      kind,
+      ids: { id },
+      profile: { ...createParticipant().profile, displayName: name },
+    });
+  const channel = [
+    member('staff-1', 'Sam Staff', 'staff'),
+    member('parent-1', 'Pat Parent', 'guardian'),
+    member('parent-2', 'Quinn Parent', 'guardian'),
+  ];
+
+  async function suggestionsAfterTypingAt(
+    props: Partial<React.ComponentProps<typeof MessageInput>> = {},
+    pickAudience?: RegExp,
+  ) {
+    const user = userEvent.setup();
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel}
+        currentUserId="staff-1"
+        {...props}
+      />,
+    );
+    if (pickAudience) {
+      await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: pickAudience }));
+      await user.keyboard('{Escape}');
+    }
+    await user.type(screen.getByPlaceholderText('Write a message...'), '@');
+    return screen.queryAllByRole('option').map((option) => option.textContent ?? '');
+  }
+
+  it('suggests every other member for an everyone message', async () => {
+    const options = await suggestionsAfterTypingAt();
+    expect(options.some((text) => text.includes('Pat Parent'))).toBe(true);
+    expect(options.some((text) => text.includes('Quinn Parent'))).toBe(true);
+  });
+
+  it('suggests only the selected audience for a private message', async () => {
+    const options = await suggestionsAfterTypingAt({}, /Pat Parent/);
+    expect(options.some((text) => text.includes('Pat Parent'))).toBe(true);
+    expect(options.some((text) => text.includes('Quinn Parent'))).toBe(false);
+  });
+
+  it('suggests only the inherited audience in a private thread reply', async () => {
+    const options = await suggestionsAfterTypingAt({
+      audienceParticipants: undefined,
+      inheritedAudienceLabel: 'Pat Parent',
+      inheritedAudienceProfileIds: ['staff-1', 'parent-1'],
+    });
+    expect(options.some((text) => text.includes('Pat Parent'))).toBe(true);
+    expect(options.some((text) => text.includes('Quinn Parent'))).toBe(false);
+  });
+});
+
+describe('MessageInput refused attachment sends', () => {
+  it('shows the refusal reason and keeps the attachment', async () => {
+    const reason = 'You cannot send private messages to students';
+    const onAttachFiles = vi.fn().mockRejectedValue(new MessageSendRejectedError(reason));
+    const { container } = render(
+      <MessageInput
+        onSend={vi.fn()}
+        onAttachFiles={onAttachFiles}
+        currentUserId="sender"
+      />,
+    );
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: { files: [new File(['x'], 'note.pdf', { type: 'application/pdf' })] },
+    });
+    await waitFor(() => expect(screen.getByText('note.pdf')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => expect(screen.getByText(reason)).toBeTruthy());
+    expect(onAttachFiles).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('note.pdf')).toBeTruthy();
   });
 });
 

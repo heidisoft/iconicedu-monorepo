@@ -27,6 +27,10 @@ import { ExternalLiveSessionJoinDialog } from '@iconicedu/ui-web/components/mess
 import { useLiveSessionNavigation } from '@iconicedu/web/components/live-sessions/use-live-session-navigation';
 
 import { createApiClient } from '@iconicedu/web/lib/api/http-client';
+import {
+  unwrapMessageSendResult,
+  type MessageSendRejection,
+} from '@iconicedu/web/lib/messages/message-send-rejection';
 import { createSupabaseMessagesRealtimeClient } from '@iconicedu/web/lib/messages/realtime/supabase-messages-realtime-client';
 import { createSupabaseBrowserClient } from '@iconicedu/web/lib/supabase/client';
 import {
@@ -159,9 +163,15 @@ type MessagesShellClientProps = {
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
 
-  sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
-  sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
-  sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
+  sendTextMessage: (
+    input: MessageSendTextInput,
+  ) => Promise<MessageVM | MessageSendRejection>;
+  sendFileMessage: (
+    input: MessageSendFileInput,
+  ) => Promise<MessageVM | MessageSendRejection>;
+  sendFilesMessage: (
+    input: MessageSendFilesInput,
+  ) => Promise<MessageVM | MessageSendRejection>;
   editTextMessage: (input: MessageEditTextInput) => Promise<MessageVM>;
   toggleReaction: (input: {
     orgId: string;
@@ -198,15 +208,33 @@ export function MessagesShellClient({
   enableMessageAudience = false,
   enableStaffMessageReview = false,
   panelRegistry,
-  sendTextMessage,
-  sendFileMessage,
-  sendFilesMessage,
+  sendTextMessage: sendTextMessageAction,
+  sendFileMessage: sendFileMessageAction,
+  sendFilesMessage: sendFilesMessageAction,
   editTextMessage,
   toggleReaction,
   toggleSavedMessage,
   deleteMessage,
   toggleHiddenMessage,
 }: MessagesShellClientProps) {
+  // Server actions return safeguarding/permission refusals instead of throwing
+  // (Next.js hides thrown messages in production); surface them as a
+  // MessageSendRejectedError so the composer can show the reason.
+  const sendTextMessage = useCallback(
+    async (input: MessageSendTextInput) =>
+      unwrapMessageSendResult(await sendTextMessageAction(input)),
+    [sendTextMessageAction],
+  );
+  const sendFileMessage = useCallback(
+    async (input: MessageSendFileInput) =>
+      unwrapMessageSendResult(await sendFileMessageAction(input)),
+    [sendFileMessageAction],
+  );
+  const sendFilesMessage = useCallback(
+    async (input: MessageSendFilesInput) =>
+      unwrapMessageSendResult(await sendFilesMessageAction(input)),
+    [sendFilesMessageAction],
+  );
   const [channelState, setChannelState] = useState(channel);
   const onlineProfileIdsRef = useRef(new Set<string>());
   const presenceClient = useMemo(() => createSupabaseBrowserClient(), []);

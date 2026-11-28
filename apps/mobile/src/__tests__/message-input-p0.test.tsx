@@ -319,3 +319,81 @@ describe('MessageInput — send-failure recovery (enableMessageSendReliability)'
     expect(firstId).not.toBe(secondId);
   });
 });
+
+describe('MessageInput — mention suggestions in private messages', () => {
+  const candidates = [
+    { id: 'staff-1', displayName: 'Sam Staff', role: 'staff' },
+    { id: 'parent-1', displayName: 'Pat Parent', role: 'guardian' },
+    { id: 'parent-2', displayName: 'Pat Other', role: 'guardian' },
+  ];
+  const typeAt = () => {
+    const input = screen.getByLabelText('Message input');
+    fireEvent.changeText(input, '@Pat');
+    fireEvent(input, 'selectionChange', {
+      nativeEvent: { selection: { start: 4, end: 4 } },
+    });
+  };
+
+  it('suggests every matching member for an everyone message', () => {
+    render(
+      <MessageInput
+        onSend={jest.fn()}
+        profileId="staff-1"
+        enableMentions
+        mentionCandidates={candidates}
+      />,
+    );
+    typeAt();
+    expect(screen.getByLabelText('Mention Pat Parent')).toBeTruthy();
+    expect(screen.getByLabelText('Mention Pat Other')).toBeTruthy();
+  });
+
+  it('suggests only the selected audience', () => {
+    render(
+      <MessageInput
+        onSend={jest.fn()}
+        profileId="staff-1"
+        enableMentions
+        mentionCandidates={candidates}
+        audienceParticipants={[
+          { id: 'staff-1', name: 'Sam Staff', role: 'staff' },
+          { id: 'parent-1', name: 'Pat Parent', role: 'guardian' },
+          { id: 'parent-2', name: 'Pat Other', role: 'guardian' },
+        ]}
+      />,
+    );
+    fireEvent.press(screen.getByLabelText('Message audience Pat Parent'));
+    typeAt();
+    expect(screen.getByLabelText('Mention Pat Parent')).toBeTruthy();
+    expect(screen.queryByLabelText('Mention Pat Other')).toBeNull();
+  });
+
+  it('suggests only the inherited audience when replying in a private thread', () => {
+    const replyTo = {
+      ids: { id: 'private-1', orgId: 'org-1' },
+      core: {
+        type: 'text',
+        sender: {
+          ids: { id: 'staff-1', orgId: 'org-1' },
+          profile: { displayName: 'Sam Staff' },
+        },
+        createdAt: '2026-01-01T00:00:00Z',
+        visibility: { type: 'specific-users', userIds: ['staff-1', 'parent-1'] },
+      },
+      social: { reactions: [] },
+      content: { text: 'Private' },
+    } as never;
+    render(
+      <MessageInput
+        onSend={jest.fn()}
+        profileId="staff-1"
+        enableMentions
+        mentionCandidates={candidates}
+        replyTo={replyTo}
+      />,
+    );
+    typeAt();
+    expect(screen.getByLabelText('Mention Pat Parent')).toBeTruthy();
+    expect(screen.queryByLabelText('Mention Pat Other')).toBeNull();
+  });
+});

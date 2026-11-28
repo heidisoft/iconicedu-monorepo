@@ -1,5 +1,10 @@
 'use server';
 
+import {
+  toMessageSendRejection,
+  type MessageSendRejection,
+} from '@iconicedu/web/lib/messages/message-send-rejection';
+
 import type {
   MessageEditTextInput,
   MessageMentionVM,
@@ -981,7 +986,7 @@ export async function sendTextMessageWithSupabase(
 
 export async function sendTextMessageAction(
   input: MessageSendTextInput,
-): Promise<MessageVM> {
+): Promise<MessageVM | MessageSendRejection> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
   const serviceSupabase = createSupabaseServiceClient();
@@ -1000,7 +1005,12 @@ export async function sendTextMessageAction(
     orgId: input.orgId,
   });
   const api = createApiClient(supabase);
-  const created = await api.post<{ id: string } | MessageVM>('/messages/text', input);
+  let created: { id: string } | MessageVM;
+  try {
+    created = await api.post<{ id: string } | MessageVM>('/messages/text', input);
+  } catch (error) {
+    return toMessageSendRejection(error);
+  }
   const createdMessageId =
     typeof (created as { id?: unknown })?.id === 'string'
       ? ((created as { id: string }).id as string)
@@ -1322,7 +1332,7 @@ export async function sendFileMessageWithSupabase(
 
 export async function sendFileMessageAction(
   input: MessageSendFileInput,
-): Promise<MessageVM> {
+): Promise<MessageVM | MessageSendRejection> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
   const serviceSupabase = createSupabaseServiceClient();
@@ -1341,7 +1351,12 @@ export async function sendFileMessageAction(
     orgId: input.orgId,
   });
   const api = createApiClient(supabase);
-  const created = await api.post<{ id: string } | MessageVM>('/messages/file', input);
+  let created: { id: string } | MessageVM;
+  try {
+    created = await api.post<{ id: string } | MessageVM>('/messages/file', input);
+  } catch (error) {
+    return toMessageSendRejection(error);
+  }
   const createdMessageId =
     typeof (created as { id?: unknown })?.id === 'string'
       ? ((created as { id: string }).id as string)
@@ -1677,7 +1692,7 @@ export async function sendFilesMessageWithSupabase(
 
 export async function sendFilesMessageAction(
   input: MessageSendFilesInput,
-): Promise<MessageVM> {
+): Promise<MessageVM | MessageSendRejection> {
   const supabase = await createSupabaseServerClient();
   const authUser = await requireAuthedUser(supabase);
   const serviceSupabase = createSupabaseServiceClient();
@@ -1696,7 +1711,12 @@ export async function sendFilesMessageAction(
     orgId: input.orgId,
   });
   const api = createApiClient(supabase);
-  const created = await api.post<{ id: string } | MessageVM>('/messages/files', input);
+  let created: { id: string } | MessageVM;
+  try {
+    created = await api.post<{ id: string } | MessageVM>('/messages/files', input);
+  } catch (error) {
+    return toMessageSendRejection(error);
+  }
   const createdMessageId =
     typeof (created as { id?: unknown })?.id === 'string'
       ? ((created as { id: string }).id as string)

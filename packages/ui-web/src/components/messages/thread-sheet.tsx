@@ -161,6 +161,11 @@ export function ThreadSheet({
             currentUserId={currentUserId}
             showCreateMessageTypeButton={showCreateMessageTypeButton}
             inheritedAudienceLabel={inheritedAudienceLabel}
+            inheritedAudienceProfileIds={
+              parentMessage?.core.visibility.type === 'specific-users'
+                ? parentMessage.core.visibility.userIds
+                : null
+            }
           />
         )}
       </div>

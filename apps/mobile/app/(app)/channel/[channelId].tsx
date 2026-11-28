@@ -12,6 +12,7 @@ import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { isOutsideMessageAudience } from '@iconicedu/utils';
+import { getMessageSendRefusal } from '@/components/messages/message-send-refusal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
@@ -473,6 +474,15 @@ export default function ChannelConversationScreen() {
             void refetch();
           }
         } catch (error) {
+          const refusal = getMessageSendRefusal(error);
+          if (refusal) {
+            // A refused send (e.g. a disallowed private audience) cannot succeed
+            // on retry: explain why and drop the "Not sent" row. The composer
+            // keeps the draft so the audience can be changed.
+            setPendingUploads((prev) => prev.filter((p) => p.id !== clientMessageId));
+            Alert.alert('Message not sent', refusal);
+            throw error;
+          }
           reportMobileObservedError({
             error,
             source: 'mobile.messages.channel.send_text',

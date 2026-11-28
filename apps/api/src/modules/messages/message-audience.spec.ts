@@ -1,5 +1,8 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { resolveChannelAudienceVisibility } from './messages.service';
+import {
+  resolveChannelAudienceVisibility,
+  restrictMentionsToAudience,
+} from './messages.service';
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
 import { enforceMessageAudiencePolicy } from '@iconicedu/api/lib/messages/message-audience-policy';
 
@@ -426,4 +429,35 @@ describe('audience lookup boundaries', () => {
       ).rejects.toThrow('Local lookup failed');
     },
   );
+});
+
+describe('restrictMentionsToAudience', () => {
+  const mentions = [
+    { profileId: 'parent-1', displayName: 'Pat', start: 0, end: 4 },
+    { profileId: 'parent-2', displayName: 'Sam', start: 5, end: 9 },
+  ];
+
+  it('keeps only mentions of people in a private audience', () => {
+    expect(
+      restrictMentionsToAudience(mentions, {
+        visibility_type: 'specific-users',
+        visibility_user_ids: ['tutor-1', 'parent-1'],
+      }),
+    ).toEqual([mentions[0]]);
+  });
+
+  it('drops every mention when the audience is unknown', () => {
+    expect(
+      restrictMentionsToAudience(mentions, {
+        visibility_type: 'specific-users',
+        visibility_user_ids: null,
+      }),
+    ).toEqual([]);
+  });
+
+  it('leaves everyone messages untouched', () => {
+    expect(restrictMentionsToAudience(mentions, { visibility_type: 'all' })).toBe(
+      mentions,
+    );
+  });
 });
