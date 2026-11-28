@@ -8,6 +8,7 @@ import type {
   UUID,
 } from '@iconicedu/shared-types';
 import { ScrollArea } from '@iconicedu/ui-web/ui/scroll-area';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 import { ThreadMessageList } from '@iconicedu/ui-web/components/messages/shared/thread-message-list';
 import { useMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
@@ -56,7 +57,7 @@ export function ThreadSheet({
   ) => Promise<void> | void;
   getMessageActionState?: (messageId: string) => MessageActionState | undefined;
 }) {
-  const { channel } = useMessagesState();
+  const { channel, enableStaffMessageReview } = useMessagesState();
   const { onSendReply, onProfileClick, onToggleReaction, onToggleSaved, onToggleHidden } =
     actions;
   const messages = useMemo(
@@ -77,6 +78,14 @@ export function ThreadSheet({
       .filter((name): name is string => Boolean(name));
     return names.length ? names.join(', ') : 'the original audience';
   }, [channel.collections.participants, parentMessage]);
+  const isStaffReview =
+    enableStaffMessageReview && parentMessage
+      ? isOutsideMessageAudience({
+          visibility: parentMessage.core.visibility,
+          senderProfileId: parentMessage.core.sender.ids.id,
+          viewerProfileId: currentUserId,
+        })
+      : false;
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageCountRef = useRef(messages.length);
@@ -135,6 +144,13 @@ export function ThreadSheet({
           <div className="px-4 py-3 text-xs text-muted-foreground">
             Read-only supervised conversation
           </div>
+        ) : isStaffReview ? (
+          <div
+            className="px-4 py-3 text-xs text-muted-foreground"
+            data-testid="thread-staff-review-notice"
+          >
+            Staff view · only the people in this private conversation can reply
+          </div>
         ) : (
           <MessageInput
             onSend={onSendReply}
@@ -145,6 +161,11 @@ export function ThreadSheet({
             currentUserId={currentUserId}
             showCreateMessageTypeButton={showCreateMessageTypeButton}
             inheritedAudienceLabel={inheritedAudienceLabel}
+            inheritedAudienceProfileIds={
+              parentMessage?.core.visibility.type === 'specific-users'
+                ? parentMessage.core.visibility.userIds
+                : null
+            }
           />
         )}
       </div>

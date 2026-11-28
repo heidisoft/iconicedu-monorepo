@@ -6,6 +6,8 @@ import { reportObservedError } from '@iconicedu/utils';
 import type { MessageListRef } from '@iconicedu/ui-web/components/messages/message-list';
 import { resolveWebMessageUiTheme } from '@iconicedu/ui-web/components/messages/themes/registry';
 import { MessageInput } from '@iconicedu/ui-web/components/messages/message-input';
+import { isHiddenStaffReviewMessage } from '@iconicedu/ui-web/components/messages/staff-review.utils';
+import { isMessageSendRejectedError } from '@iconicedu/ui-web/components/messages/message-send-rejected-error';
 import { TypingIndicator } from '@iconicedu/ui-web/components/messages/typing-indicator';
 import { useMessages } from '@iconicedu/ui-web/hooks/use-messages';
 import { getProfileDisplayName } from '@iconicedu/ui-web/lib/display-name';
@@ -125,6 +127,8 @@ export interface MessagesContainerProps {
   /** Gates clientMessageId-based idempotent retry of failed sends. Default off. */
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
+  /** Gates the read-only staff view of private messages the viewer is not part of. Default off. */
+  enableStaffMessageReview?: boolean;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>
@@ -414,6 +418,7 @@ export function MessagesContainer({
   joinLiveSession,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
+  enableStaffMessageReview = false,
 }: MessagesContainerProps) {
   const messageListRef = useRef<MessageListRef>(null);
   const messagesRef = useRef<MessageVM[]>([]);
@@ -976,6 +981,14 @@ export function MessagesContainer({
               clearReplyTo();
             }
           } catch (error) {
+            if (isMessageSendRejectedError(error)) {
+              // A refused send (e.g. an audience the safeguarding rules do not
+              // allow) cannot succeed on retry: show why and drop the bubble.
+              // The composer keeps the text and audience so it can be changed.
+              toast.error(error.message);
+              deleteMessage(optimisticMessage.ids.id);
+              throw error;
+            }
             reportObservedError({
               error,
               source: 'web.messages.send_message',
@@ -1711,10 +1724,21 @@ export function MessagesContainer({
     };
   }, []);
 
+  // Read through a ref so a flag change does not tear down the subscription.
+  const staffReviewGateRef = useRef({ channel, enableStaffMessageReview });
+  staffReviewGateRef.current = { channel, enableStaffMessageReview };
+
   useEffect(() => {
     if (!realtimeClient) return;
     let isActive = true;
     let cleanup: (() => void) | undefined;
+    const isHiddenFromViewer = (message: MessageVM) =>
+      isHiddenStaffReviewMessage({
+        message,
+        channel: staffReviewGateRef.current.channel,
+        viewerProfileId: currentUserId,
+        enableStaffMessageReview: staffReviewGateRef.current.enableStaffMessageReview,
+      });
 
     const subscribe = async () => {
       const result = await realtimeClient.subscribe({
@@ -1722,6 +1746,12 @@ export function MessagesContainer({
         channelId: channel.ids.id,
         onEvent: (event) => {
           if (!isActive) return;
+          if (
+            (event.type === 'message-added' || event.type === 'message-updated') &&
+            isHiddenFromViewer(event.message)
+          ) {
+            return;
+          }
           if (event.type === 'message-added') {
             const exists = messagesRef.current.some(
               (message) => message.ids.id === event.message.ids.id,
@@ -2332,6 +2362,7 @@ export function MessagesContainer({
                   ? participants
                   : undefined
               }
+              currentUserKind={currentUserProfile?.kind ?? null}
               currentUserId={resolvedCurrentUserId}
               channelId={channel.ids.id}
               showCreateMessageTypeButton={showCreateMessageTypeButton}

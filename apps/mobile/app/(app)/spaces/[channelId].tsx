@@ -36,7 +36,10 @@ import { resolveMobileMessageUiTheme } from '@/components/messages/themes/regist
 import {
   MessageInput,
   type EditingMessageContext,
+  type MessageSendMeta,
 } from '@/components/messages/message-input';
+import { getMessageSendRefusal } from '@/components/messages/message-send-refusal';
+import { useChannelMessageAudience } from '@/hooks/use-channel-message-audience';
 import { TypingIndicator } from '@/components/messages/typing-indicator';
 import { ConversationHeader } from '@/components/messages/conversation-header';
 import { MessageActionsSheet } from '@/components/messages/message-actions-sheet';
@@ -68,6 +71,8 @@ type PendingUpload = {
   createdAt: string;
   caption?: string;
   failed?: boolean;
+  /** Private audience chosen for this send, reused on retry. */
+  audienceProfileIds?: string[];
 };
 
 type SpaceTab = 'messages' | 'sessions';
@@ -184,6 +189,14 @@ export default function SpaceDetailScreen() {
     void refreshConversation();
   }, [channelId, isFocused, orgId, refreshConversation]);
   const isStaffReadOnly = false;
+  // Same private-message setup as the channel screen (and web classrooms).
+  const {
+    canChooseMessageAudience,
+    enableMentions,
+    channelMembers,
+    mentionCandidates,
+    isStaffReviewMessage,
+  } = useChannelMessageAudience({ orgId, channelId: channelId ?? '', profileId });
 
   const {
     schedules,
@@ -273,15 +286,24 @@ export default function SpaceDetailScreen() {
   // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
   const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
-  const handleThreadOpen = useCallback((msg: MessageVM) => {
-    setQuoteReplyTarget(null);
-    setThreadReplyTarget(msg);
-  }, []);
+  // Staff can review private messages they are not part of, read-only.
+  const handleThreadOpen = useCallback(
+    (msg: MessageVM) => {
+      if (isStaffReviewMessage(msg)) return;
+      setQuoteReplyTarget(null);
+      setThreadReplyTarget(msg);
+    },
+    [isStaffReviewMessage],
+  );
 
-  const handleQuoteReply = useCallback((msg: MessageVM) => {
-    setThreadReplyTarget(null);
-    setQuoteReplyTarget(msg);
-  }, []);
+  const handleQuoteReply = useCallback(
+    (msg: MessageVM) => {
+      if (isStaffReviewMessage(msg)) return;
+      setThreadReplyTarget(null);
+      setQuoteReplyTarget(msg);
+    },
+    [isStaffReviewMessage],
+  );
 
   const handleMarkUnread = useCallback(
     async (msg: MessageVM) => {
@@ -446,10 +468,12 @@ export default function SpaceDetailScreen() {
   }, [activeTab, handlePushNotificationMoment]);
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, meta?: MessageSendMeta) => {
       if (!channelId || !profileId || !orgId) return;
+      const mentions = meta?.mentions?.length ? meta.mentions : undefined;
       try {
         if (threadReplyTarget) {
+          // Replies inherit the parent's audience, so none is sent.
           const threadId = threadReplyTarget.social?.thread?.ids.id;
           await sendTextMessage(
             channelId,
@@ -458,10 +482,20 @@ export default function SpaceDetailScreen() {
             text,
             threadReplyTarget.ids.id,
             threadId,
+            mentions ? { mentions } : undefined,
           );
           setThreadReplyTarget(null);
           void refetch();
         } else if (quoteReplyTarget) {
+          await sendTextMessage(channelId, profileId, orgId, text, undefined, undefined, {
+            replyToMessageId: quoteReplyTarget.ids.id,
+            mentions,
+          });
+          setQuoteReplyTarget(null);
+        } else {
+          const audienceProfileIds = meta?.audienceProfileIds?.length
+            ? meta.audienceProfileIds
+            : undefined;
           await sendTextMessage(
             channelId,
             profileId,
@@ -469,13 +503,15 @@ export default function SpaceDetailScreen() {
             text,
             undefined,
             undefined,
-            quoteReplyTarget.ids.id,
+            mentions || audienceProfileIds ? { mentions, audienceProfileIds } : undefined,
           );
-          setQuoteReplyTarget(null);
-        } else {
-          await sendTextMessage(channelId, profileId, orgId, text);
         }
       } catch (error) {
+        const refusal = getMessageSendRefusal(error);
+        if (refusal) {
+          Alert.alert('Message not sent', refusal);
+          return;
+        }
         reportMobileObservedError({
           error,
           source: 'mobile.messages.spaces.send_text',
@@ -504,7 +540,12 @@ export default function SpaceDetailScreen() {
   );
 
   const handleSendAttachment = useCallback(
-    async (attachments: AttachmentPayload[], caption?: string) => {
+    async (
+      attachments: AttachmentPayload[],
+      caption?: string,
+      _clientMessageId?: string,
+      audienceProfileIds?: string[],
+    ) => {
       if (!channelId || !profileId || !orgId || !attachments.length) return;
 
       const type: PendingUpload['type'] =
@@ -525,6 +566,7 @@ export default function SpaceDetailScreen() {
           senderName,
           createdAt: new Date().toISOString(),
           caption,
+          audienceProfileIds,
         },
       ]);
 
@@ -550,6 +592,10 @@ export default function SpaceDetailScreen() {
             orgId,
             { ...attachment, storagePath },
             caption,
+            undefined,
+            undefined,
+            undefined,
+            audienceProfileIds,
           );
         } else {
           const uploaded = await Promise.all(
@@ -572,15 +618,42 @@ export default function SpaceDetailScreen() {
           );
 
           if (uploaded.length === 1) {
-            await sendFileMessage(channelId, profileId, orgId, uploaded[0], caption);
+            await sendFileMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded[0],
+              caption,
+              undefined,
+              undefined,
+              undefined,
+              audienceProfileIds,
+            );
           } else {
-            await sendFilesMessage(channelId, profileId, orgId, uploaded, caption);
+            await sendFilesMessage(
+              channelId,
+              profileId,
+              orgId,
+              uploaded,
+              caption,
+              undefined,
+              undefined,
+              undefined,
+              audienceProfileIds,
+            );
           }
         }
 
         setPendingUploads((prev) => prev.filter((upload) => upload.id !== pendingId));
         void handlePushNotificationMoment();
-      } catch {
+      } catch (error) {
+        const refusal = getMessageSendRefusal(error);
+        if (refusal) {
+          // Cannot succeed on retry: explain why instead of leaving a "Not sent" row.
+          setPendingUploads((prev) => prev.filter((upload) => upload.id !== pendingId));
+          Alert.alert('Message not sent', refusal);
+          return;
+        }
         setPendingUploads((prev) =>
           prev.map((upload) =>
             upload.id === pendingId ? { ...upload, failed: true } : upload,
@@ -619,6 +692,10 @@ export default function SpaceDetailScreen() {
             orgId,
             { ...a, storagePath },
             caption,
+            undefined,
+            undefined,
+            undefined,
+            pending.audienceProfileIds,
           );
         } else {
           const uploaded = await Promise.all(
@@ -635,9 +712,29 @@ export default function SpaceDetailScreen() {
             }),
           );
           if (uploaded.length === 1) {
-            await sendFileMessage(channelId!, profileId, orgId, uploaded[0], caption);
+            await sendFileMessage(
+              channelId!,
+              profileId,
+              orgId,
+              uploaded[0],
+              caption,
+              undefined,
+              undefined,
+              undefined,
+              pending.audienceProfileIds,
+            );
           } else {
-            await sendFilesMessage(channelId!, profileId, orgId, uploaded, caption);
+            await sendFilesMessage(
+              channelId!,
+              profileId,
+              orgId,
+              uploaded,
+              caption,
+              undefined,
+              undefined,
+              undefined,
+              pending.audienceProfileIds,
+            );
           }
         }
         setPendingUploads((prev) => prev.filter((p) => p.id !== pendingId));
@@ -766,6 +863,7 @@ export default function SpaceDetailScreen() {
             onReactionToggle={isStaffReadOnly ? undefined : handleReactionToggle}
             onThreadOpen={isStaffReadOnly ? undefined : handleThreadOpen}
             onProfilePress={setProfileUser}
+            audienceParticipants={channelMembers}
             pendingUploads={pendingUploads}
             onRetryUpload={handleRetryUpload}
             isReadOnly={isStaffReadOnly}
@@ -804,6 +902,12 @@ export default function SpaceDetailScreen() {
             editingMessage={editingMessage}
             onSaveEdit={handleSaveEdit}
             onCancelEdit={handleCancelEdit}
+            audienceParticipants={canChooseMessageAudience ? channelMembers : undefined}
+            currentProfileKind={
+              (profile as { kind?: string | null } | undefined)?.kind ?? null
+            }
+            enableMentions={enableMentions}
+            mentionCandidates={mentionCandidates}
           />
         </KeyboardAvoidingView>
       ) : (
@@ -903,7 +1007,10 @@ export default function SpaceDetailScreen() {
         visible={actionsVisible}
         message={actionsMessage}
         isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
-        isReadOnly={isStaffReadOnly}
+        isReadOnly={
+          isStaffReadOnly ||
+          (actionsMessage ? isStaffReviewMessage(actionsMessage) : false)
+        }
         onClose={() => setActionsVisible(false)}
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}

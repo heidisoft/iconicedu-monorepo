@@ -11,6 +11,8 @@ import {
 import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { useChannelMessageAudience } from '@/hooks/use-channel-message-audience';
+import { getMessageSendRefusal } from '@/components/messages/message-send-refusal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
@@ -27,7 +29,6 @@ import {
   buildMessageStoragePath,
   deleteMessage,
   fetchChannelMetaByChannelId,
-  fetchChannelMembers,
   fetchChannelReadState,
   ensureDirectMessageChannelForProfiles,
   markChannelUnread,
@@ -56,7 +57,6 @@ import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
-import { getMentionCandidates } from '@/lib/messages/message-mentions';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { usePushConsent } from '@/providers/push-consent-provider';
@@ -88,9 +88,6 @@ export default function ChannelConversationScreen() {
   );
   const enableMessageSendReliability = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageSendReliability,
-  );
-  const enableChannelCommunications = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableChannelCommunications,
   );
 
   const orgId = account?.org_id ?? '';
@@ -131,22 +128,18 @@ export default function ChannelConversationScreen() {
   const resolvedThemeKey = channelMeta?.themeKey ?? null;
   const resolvedMessageUiThemeKey = channelMeta?.messageUiThemeKey ?? 'feed';
 
-  const canChooseMessageAudience = enableChannelCommunications && !isSupportChannel;
-  // Channel members power mention autocomplete and audience selection.
-  const { data: channelMembers } = useQuery({
-    queryKey: ['channelMembers', orgId, channelId, profileId] as const,
-    queryFn: () => fetchChannelMembers(orgId, channelId ?? '', profileId),
-    enabled:
-      (enableMobileMessageComposerParity || canChooseMessageAudience) &&
-      !!orgId &&
-      !!channelId &&
-      !!profileId,
-    staleTime: 60_000,
+  // Channel members power mention autocomplete, audience selection, and badge names.
+  const {
+    canChooseMessageAudience,
+    channelMembers,
+    mentionCandidates,
+    isStaffReviewMessage,
+  } = useChannelMessageAudience({
+    orgId,
+    channelId: channelId ?? '',
+    profileId,
+    isSupportChannel,
   });
-  const mentionCandidates = useMemo(
-    () => getMentionCandidates(channelMembers ?? [], profileId),
-    [channelMembers, profileId],
-  );
 
   const {
     data: messages,
@@ -250,15 +243,23 @@ export default function ChannelConversationScreen() {
   // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
   const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
-  const handleThreadOpen = useCallback((msg: MessageVM) => {
-    setQuoteReplyTarget(null);
-    setThreadReplyTarget(msg);
-  }, []);
+  const handleThreadOpen = useCallback(
+    (msg: MessageVM) => {
+      if (isStaffReviewMessage(msg)) return;
+      setQuoteReplyTarget(null);
+      setThreadReplyTarget(msg);
+    },
+    [isStaffReviewMessage],
+  );
 
-  const handleQuoteReply = useCallback((msg: MessageVM) => {
-    setThreadReplyTarget(null);
-    setQuoteReplyTarget(msg);
-  }, []);
+  const handleQuoteReply = useCallback(
+    (msg: MessageVM) => {
+      if (isStaffReviewMessage(msg)) return;
+      setThreadReplyTarget(null);
+      setQuoteReplyTarget(msg);
+    },
+    [isStaffReviewMessage],
+  );
 
   const handleMarkUnread = useCallback(
     async (msg: MessageVM) => {
@@ -453,6 +454,15 @@ export default function ChannelConversationScreen() {
             void refetch();
           }
         } catch (error) {
+          const refusal = getMessageSendRefusal(error);
+          if (refusal) {
+            // A refused send (e.g. a disallowed private audience) cannot succeed
+            // on retry: explain why and drop the "Not sent" row. The composer
+            // keeps the draft so the audience can be changed.
+            setPendingUploads((prev) => prev.filter((p) => p.id !== clientMessageId));
+            Alert.alert('Message not sent', refusal);
+            throw error;
+          }
           reportMobileObservedError({
             error,
             source: 'mobile.messages.channel.send_text',
@@ -957,6 +967,7 @@ export default function ChannelConversationScreen() {
             channelId={channelId ?? ''}
             currentProfileId={profileId}
             currentAccountId={accountId}
+            audienceParticipants={channelMembers}
             lastReadMessageId={channelReadState?.lastReadMessageId ?? null}
             lastReadAt={channelReadState?.lastReadAt ?? null}
             unreadCount={channelReadState?.unreadCount ?? 0}
@@ -1017,6 +1028,7 @@ export default function ChannelConversationScreen() {
             enableFormatting={enableMobileMessageComposerParity}
             enableSendReliability={enableMessageSendReliability}
             audienceParticipants={canChooseMessageAudience ? channelMembers : undefined}
+            currentProfileKind={profileKind}
           />
         </KeyboardAvoidingView>
       )}
@@ -1106,7 +1118,10 @@ export default function ChannelConversationScreen() {
         visible={actionsVisible}
         message={actionsMessage}
         isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
-        isReadOnly={isStaffReadOnly}
+        isReadOnly={
+          isStaffReadOnly ||
+          (actionsMessage ? isStaffReviewMessage(actionsMessage) : false)
+        }
         onClose={() => setActionsVisible(false)}
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}

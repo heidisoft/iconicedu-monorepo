@@ -16,7 +16,9 @@ import {
   AppState,
 } from 'react-native';
 import { GraduationCap, LifeBuoy, MessageSquare } from 'lucide-react-native';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 import type { MessageVM } from '@iconicedu/shared-types';
+import type { MessageAudienceParticipant } from './message-visibility';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 import { MessageItem } from './message-item';
@@ -439,6 +441,7 @@ export type MessageListProps = {
   channelId?: string;
   currentProfileId: string;
   currentAccountId?: string;
+  audienceParticipants?: MessageAudienceParticipant[];
   onLoadMore?: () => boolean | void | Promise<boolean | void>;
   loading?: boolean;
   refreshing?: boolean;
@@ -485,6 +488,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   channelId,
   currentProfileId,
   currentAccountId,
+  audienceParticipants,
   onLoadMore,
   loading = false,
   refreshing = false,
@@ -727,6 +731,11 @@ export const MessageList: React.FC<MessageListProps> = ({
       }
 
       const isOwn = item.core.sender.ids.id === currentProfileId;
+      const isStaffReview = isOutsideMessageAudience({
+        visibility: item.core.visibility,
+        senderProfileId: item.core.sender.ids.id,
+        viewerProfileId: currentProfileId,
+      });
 
       // A new group starts if: different sender, no prev message, or >5 min gap
       const isGroupStart = !prevMsg || !areMessagesInSameVisualGroup(prevMsg, item);
@@ -745,7 +754,8 @@ export const MessageList: React.FC<MessageListProps> = ({
           onProfilePress={onProfilePress}
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
-          isReadOnly={isReadOnly}
+          audienceParticipants={audienceParticipants}
+          isReadOnly={isReadOnly || isStaffReview}
           onSendAnnotation={onSendAnnotation}
           messageUiThemeKey={messageUiThemeKey}
           isPinned={pinnedMessageIds?.has(item.ids.id) ?? false}
@@ -760,6 +770,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     [
       currentProfileId,
       currentAccountId,
+      audienceParticipants,
       channelId,
       listData,
       colors,

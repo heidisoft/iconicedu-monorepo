@@ -1,11 +1,12 @@
 /* @vitest-environment jsdom */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { UserProfileVM } from '@iconicedu/shared-types';
 
 import { MESSAGE_INPUT_FILE_ACCEPT } from './message-input.attachments';
 import { buildAssignmentDraftFromContent, MessageInput } from './message-input';
+import { MessageSendRejectedError } from './message-send-rejected-error';
 import {
   getMentionCandidates,
   getMentionPopupPosition,
@@ -360,15 +361,86 @@ describe('message-input mention helpers', () => {
 });
 
 describe('MessageInput audience selection', () => {
+  it.each(['staff', 'educator'] as const)(
+    '%s can select one exact parent, then send to everyone after reset',
+    async (kind) => {
+      const user = userEvent.setup();
+      const onSend = vi.fn().mockResolvedValue(undefined);
+      const self = createParticipant({ kind, ids: { id: 'sender' } });
+      const first = createParticipant({
+        ids: { id: 'parent-A' },
+        profile: { ...createParticipant().profile, displayName: 'Parent Alpha' },
+      });
+      const second = createParticipant({
+        ids: { id: 'parent-B' },
+        profile: { ...createParticipant().profile, displayName: 'Parent Beta' },
+      });
+      render(
+        <MessageInput
+          onSend={onSend}
+          participants={[self, first, second]}
+          audienceParticipants={[self, first, second]}
+          currentUserId="sender"
+        />,
+      );
+      await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+      expect(screen.queryByRole('menuitemcheckbox', { name: /Alex Johnson/ })).toBeNull();
+      await user.click(screen.getByRole('menuitemcheckbox', { name: /Parent Alpha/ }));
+      await user.keyboard('{Escape}');
+      await user.type(screen.getByPlaceholderText('Write a message...'), 'Private');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+      await waitFor(() =>
+        expect(onSend).toHaveBeenLastCalledWith('Private', [], null, undefined, [
+          'parent-A',
+        ]),
+      );
+      await user.type(screen.getByPlaceholderText('Write a message...'), 'Public');
+      await user.click(screen.getByRole('button', { name: 'Send' }));
+      await waitFor(() =>
+        expect(onSend).toHaveBeenLastCalledWith('Public', [], null, undefined),
+      );
+    },
+  );
+  it('preserves the selected recipients on failure and retry', async () => {
+    const user = userEvent.setup();
+    const onSend = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Offline'))
+      .mockResolvedValue(undefined);
+    const parent = createParticipant({ ids: { id: 'parent-1' } });
+    const self = createParticipant({ kind: 'staff', ids: { id: 'sender' } });
+    render(
+      <MessageInput
+        onSend={onSend}
+        participants={[self, parent]}
+        audienceParticipants={[self, parent]}
+        currentUserId="sender"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+    await user.click(screen.getByRole('menuitem', { name: 'Parent' }));
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Private retry');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(1));
+    expect(screen.getByPlaceholderText('Write a message...')).toHaveValue(
+      'Private retry',
+    );
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() => expect(onSend).toHaveBeenCalledTimes(2));
+    expect(onSend).toHaveBeenLastCalledWith('Private retry', [], null, undefined, [
+      'parent-1',
+    ]);
+  });
   it('sends the resolved parent audience and resets to everyone', async () => {
     const user = userEvent.setup();
     const onSend = vi.fn().mockResolvedValue(undefined);
     const parent = createParticipant({ ids: { id: 'parent-1' } });
+    const self = createParticipant({ kind: 'staff', ids: { id: 'staff-1' } });
     render(
       <MessageInput
         onSend={onSend}
-        participants={[parent]}
-        audienceParticipants={[parent]}
+        participants={[self, parent]}
+        audienceParticipants={[self, parent]}
         currentUserId="staff-1"
       />,
     );
@@ -384,6 +456,185 @@ describe('MessageInput audience selection', () => {
     expect(
       screen.getByRole('button', { name: /Everyone in this channel/i }),
     ).toBeTruthy();
+  });
+});
+
+describe('MessageInput mention suggestions in private messages', () => {
+  const member = (id: string, name: string, kind: 'staff' | 'educator' | 'guardian') =>
+    createParticipant({
+      kind,
+      ids: { id },
+      profile: { ...createParticipant().profile, displayName: name },
+    });
+  const channel = [
+    member('staff-1', 'Sam Staff', 'staff'),
+    member('parent-1', 'Pat Parent', 'guardian'),
+    member('parent-2', 'Quinn Parent', 'guardian'),
+  ];
+
+  async function suggestionsAfterTypingAt(
+    props: Partial<React.ComponentProps<typeof MessageInput>> = {},
+    pickAudience?: RegExp,
+  ) {
+    const user = userEvent.setup();
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel}
+        currentUserId="staff-1"
+        {...props}
+      />,
+    );
+    if (pickAudience) {
+      await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: pickAudience }));
+      await user.keyboard('{Escape}');
+    }
+    await user.type(screen.getByPlaceholderText('Write a message...'), '@');
+    return screen.queryAllByRole('option').map((option) => option.textContent ?? '');
+  }
+
+  it('suggests every other member for an everyone message', async () => {
+    const options = await suggestionsAfterTypingAt();
+    expect(options.some((text) => text.includes('Pat Parent'))).toBe(true);
+    expect(options.some((text) => text.includes('Quinn Parent'))).toBe(true);
+  });
+
+  it('suggests only the selected audience for a private message', async () => {
+    const options = await suggestionsAfterTypingAt({}, /Pat Parent/);
+    expect(options.some((text) => text.includes('Pat Parent'))).toBe(true);
+    expect(options.some((text) => text.includes('Quinn Parent'))).toBe(false);
+  });
+
+  it('suggests only the inherited audience in a private thread reply', async () => {
+    const options = await suggestionsAfterTypingAt({
+      audienceParticipants: undefined,
+      inheritedAudienceLabel: 'Pat Parent',
+      inheritedAudienceProfileIds: ['staff-1', 'parent-1'],
+    });
+    expect(options.some((text) => text.includes('Pat Parent'))).toBe(true);
+    expect(options.some((text) => text.includes('Quinn Parent'))).toBe(false);
+  });
+});
+
+describe('MessageInput refused attachment sends', () => {
+  it('shows the refusal reason and keeps the attachment', async () => {
+    const reason = 'You cannot send private messages to students';
+    const onAttachFiles = vi.fn().mockRejectedValue(new MessageSendRejectedError(reason));
+    const { container } = render(
+      <MessageInput
+        onSend={vi.fn()}
+        onAttachFiles={onAttachFiles}
+        currentUserId="sender"
+      />,
+    );
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    fireEvent.change(fileInput, {
+      target: { files: [new File(['x'], 'note.pdf', { type: 'application/pdf' })] },
+    });
+    await waitFor(() => expect(screen.getByText('note.pdf')).toBeTruthy());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }));
+
+    await waitFor(() => expect(screen.getByText(reason)).toBeTruthy());
+    expect(onAttachFiles).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('note.pdf')).toBeTruthy();
+  });
+});
+
+describe('MessageInput audience safeguarding', () => {
+  const member = (id: string, kind: 'staff' | 'educator' | 'guardian' | 'child') =>
+    createParticipant({
+      kind,
+      ids: { id },
+      profile: { ...createParticipant().profile, displayName: `${kind} ${id}` },
+    });
+  const channel = [
+    member('staff-1', 'staff'),
+    member('tutor-1', 'educator'),
+    member('parent-1', 'guardian'),
+    member('parent-2', 'guardian'),
+    member('student-1', 'child'),
+    member('student-2', 'child'),
+  ];
+
+  async function openPicker(currentUserId: string) {
+    const user = userEvent.setup();
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel}
+        currentUserId={currentUserId}
+      />,
+    );
+    const trigger = screen.queryByRole('button', { name: /Message audience:/i });
+    if (trigger) await user.click(trigger);
+    return { user, trigger };
+  }
+
+  const options = () =>
+    screen.queryAllByRole('menuitemcheckbox').map((item) => item.textContent ?? '');
+
+  it('hides the audience picker from students', async () => {
+    const { trigger } = await openPicker('student-1');
+    expect(trigger).toBeNull();
+  });
+
+  it('shows the picker to a staff observer who is not in the participant list', async () => {
+    const user = userEvent.setup();
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel.filter((person) => person.ids.id !== 'staff-1')}
+        currentUserId="staff-1"
+        currentUserKind="staff"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+    expect(screen.getAllByRole('menuitemcheckbox').length).toBeGreaterThan(0);
+  });
+
+  it("uses the sender's own kind over the participant list", async () => {
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel}
+        currentUserId="staff-1"
+        currentUserKind="child"
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Message audience:/i })).toBeNull();
+  });
+
+  it('hides the audience picker when the sender is unknown', async () => {
+    const { trigger } = await openPicker('not-in-channel');
+    expect(trigger).toBeNull();
+  });
+
+  it('lets parents choose only staff and tutors', async () => {
+    await openPicker('parent-1');
+    const visible = options();
+    expect(visible.some((text) => text.includes('staff-1'))).toBe(true);
+    expect(visible.some((text) => text.includes('tutor-1'))).toBe(true);
+    expect(visible.some((text) => /parent-2|student-/.test(text))).toBe(false);
+    expect(screen.queryByRole('menuitem', { name: /^Parents?$/ })).toBeNull();
+  });
+
+  it('lets tutors choose students and explains the parent is included', async () => {
+    const { user } = await openPicker('tutor-1');
+    expect(options()).toHaveLength(5);
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /student-1/ }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByText(/their parent is included automatically/)).toBeTruthy();
+  });
+
+  it('lets staff choose anyone', async () => {
+    await openPicker('staff-1');
+    expect(options()).toHaveLength(5);
   });
 });
 

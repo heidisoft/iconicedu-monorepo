@@ -96,3 +96,4 @@ export * from './annotations/coordinates';
 export * from './annotations/state';
 export * from './annotations/participant-color';
 export * from './mobile-app-links';
+export * from './message-audience-policy';

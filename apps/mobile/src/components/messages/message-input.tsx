@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   Animated,
   View,
@@ -10,6 +10,7 @@ import {
   Image as RNImage,
   ScrollView,
   Keyboard,
+  LayoutAnimation,
   Platform,
   Alert,
 } from 'react-native';
@@ -17,7 +18,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AudioPlayer, createAudioPlayer } from 'expo-audio';
 import type { AudioStatus } from 'expo-audio';
 import { useTheme } from '@/providers/theme-provider';
-import { RoleNameIndicator } from '@/components/profile/role-name-indicator';
 import type { AppColors } from '@/lib/theme';
 import type { MessageMentionVM, MessageVM } from '@iconicedu/shared-types';
 import { EmojiPicker } from './emoji-picker';
@@ -42,6 +42,8 @@ import {
   Bold,
   Italic,
   Check,
+  ChevronDown,
+  ChevronLeft,
 } from 'lucide-react-native';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { useAiAssistEligibility } from '@/hooks/use-ai-assist-eligibility';
@@ -63,6 +65,12 @@ import {
   rankMentionCandidates,
   type MentionCandidate,
 } from '@/lib/messages/message-mentions';
+import type { MessageAudienceParticipant } from './message-visibility';
+import {
+  canAddressPrivately,
+  canInitiateRestrictedMessage,
+  resolveMessageAudienceRole,
+} from '@iconicedu/utils';
 
 // Minimum non-whitespace characters typed before "Refine with AI" appears —
 // picked within the 10-20 char range called out in issue #264 so the
@@ -114,11 +122,7 @@ export type MessageSendMeta = {
   audienceProfileIds?: string[];
 };
 
-export type MessageAudienceParticipant = {
-  id: string;
-  name: string;
-  role: string | null;
-};
+export type { MessageAudienceParticipant } from './message-visibility';
 
 /** Message currently being edited — drives the composer's edit mode. */
 export type EditingMessageContext = {
@@ -198,6 +202,8 @@ type MessageInputProps = {
   enableSendReliability?: boolean;
   /** Eligible channel recipients for audience selection; omitted in DMs and managed support conversations. */
   audienceParticipants?: MessageAudienceParticipant[];
+  /** The sender's own profile kind; staff observers are not in the member list. */
+  currentProfileKind?: string | null;
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -209,35 +215,49 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 8,
+      paddingVertical: 7,
       backgroundColor: C.bg,
       borderTopWidth: 1,
       borderTopColor: C.border,
-      gap: 10,
+      gap: 8,
     },
     replyAccent: {
       width: 3,
       borderRadius: 2,
       alignSelf: 'stretch',
-      minHeight: 28,
+      minHeight: 24,
       backgroundColor: C.teal,
     },
     replyInfo: { flex: 1 },
-    replyKindLabel: {
-      fontSize: 11,
-      fontWeight: '700',
-      textTransform: 'uppercase',
-      letterSpacing: 0.4,
-      color: C.textFaint,
+    replyHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       marginBottom: 2,
+    },
+    replyKindLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: C.textFaint,
+    },
+    replyAudience: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: C.teal,
     },
     replySender: {
       fontSize: 13,
       fontWeight: '600',
       color: C.teal,
-      marginBottom: 1,
+    },
+    replyMessageRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minWidth: 0,
+      gap: 4,
     },
     replyText: {
+      flex: 1,
       fontSize: 13,
       color: C.textMuted,
     },
@@ -597,6 +617,12 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     },
     audienceContent: { paddingHorizontal: 12, gap: 6, alignItems: 'center' },
     audienceLabel: { color: C.textMuted, fontSize: 12, fontWeight: '600' },
+    audienceHint: {
+      color: C.textMuted,
+      fontSize: 11,
+      paddingHorizontal: 12,
+      paddingTop: 4,
+    },
     audienceChip: {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
@@ -606,11 +632,29 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       backgroundColor: C.card,
     },
     audienceChipActive: { backgroundColor: C.actionSubtle, borderColor: C.action },
+    audienceChipRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    audienceChipIcon: { paddingHorizontal: 6 },
     audienceChipText: { color: C.text, fontSize: 12, fontWeight: '600' },
+    audienceChipRole: { color: C.textMuted, fontSize: 11, fontWeight: '500' },
   });
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+function getAudienceRoleLabel(role: string | null): string | null {
+  switch (role) {
+    case 'guardian':
+      return 'Parent';
+    case 'educator':
+      return 'Tutor';
+    case 'child':
+      return 'Student';
+    case 'staff':
+      return 'Staff';
+    default:
+      return null;
+  }
+}
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
@@ -635,13 +679,39 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onSaveEdit,
   onCancelEdit,
   enableMentions = false,
-  mentionCandidates = [],
+  mentionCandidates: allMentionCandidates = [],
   enableFormatting = false,
   enableSendReliability = false,
   audienceParticipants = [],
+  currentProfileKind,
 }) => {
   const [text, setText] = useState('');
   const [audienceProfileIds, setAudienceProfileIds] = useState<string[]>([]);
+  // The picker starts as a single chip showing the current audience; tapping it
+  // reveals the group and person options.
+  const [isAudienceExpanded, setIsAudienceExpanded] = useState(false);
+  const setAudienceExpanded = useCallback((expanded: boolean) => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        180,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+    setIsAudienceExpanded(expanded);
+  }, []);
+  // A private message only reaches its audience (a thread reply inherits the
+  // parent's), so only suggest people in it.
+  const mentionAudienceIds = audienceProfileIds.length
+    ? audienceProfileIds
+    : !quoteReplyTo && replyTo?.core.visibility.type === 'specific-users'
+      ? replyTo.core.visibility.userIds
+      : null;
+  const mentionCandidates = useMemo(() => {
+    if (!mentionAudienceIds) return allMentionCandidates;
+    const audience = new Set(mentionAudienceIds);
+    return allMentionCandidates.filter((candidate) => audience.has(candidate.id));
+  }, [allMentionCandidates, mentionAudienceIds]);
   const [inputKey, setInputKey] = useState(0);
   const [sending, setSending] = useState(false);
   const sendProgress = useRef(new Animated.Value(0)).current;
@@ -1018,6 +1088,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           await draft.clearDraft();
         }
         setAudienceProfileIds([]);
+        setIsAudienceExpanded(false);
       } catch {
         // Failure — leave any persisted draft caption in place, matching the
         // text-send failure path below.
@@ -1058,6 +1129,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         await draft.clearDraft();
       }
       setAudienceProfileIds([]);
+      setIsAudienceExpanded(false);
     } catch {
       // Failure — leave any persisted draft in place so the user's text isn't
       // lost. The parent screen (when send-reliability is on) is responsible
@@ -1232,8 +1304,25 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
   const resolvedPlaceholder = truncatePlaceholder(placeholder);
   const canSaveEdit = text.trim().length > 0 && !savingEdit;
-  const selectableAudienceParticipants = audienceParticipants.filter(
-    (participant) => participant.id !== profileId,
+  // Safeguarding rules (enforced by the API): students cannot start private
+  // messages, parents may only address staff and tutors, and so on.
+  const audienceSenderRole = resolveMessageAudienceRole(
+    currentProfileKind ??
+      audienceParticipants.find((participant) => participant.id === profileId)?.role,
+  );
+  const selectableAudienceParticipants = canInitiateRestrictedMessage(audienceSenderRole)
+    ? audienceParticipants.filter(
+        (participant) =>
+          participant.id !== profileId &&
+          canAddressPrivately(
+            audienceSenderRole,
+            resolveMessageAudienceRole(participant.role),
+          ),
+      )
+    : [];
+  const includesSelectedStudent = selectableAudienceParticipants.some(
+    (participant) =>
+      participant.role === 'child' && audienceProfileIds.includes(participant.id),
   );
   const parentAudienceIds = selectableAudienceParticipants
     .filter((participant) => participant.role === 'guardian')
@@ -1241,6 +1330,35 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const tutorAudienceIds = selectableAudienceParticipants
     .filter((participant) => participant.role === 'educator')
     .map((participant) => participant.id);
+  const selectedAudienceNames = selectableAudienceParticipants
+    .filter((participant) => audienceProfileIds.includes(participant.id))
+    .map((participant) => participant.name);
+  // Mirrors the web "Replying privately · names" label for private thread replies.
+  const audienceGroupOptions = [
+    { label: 'Everyone', ids: [] as string[] },
+    ...(parentAudienceIds.length ? [{ label: 'Parents', ids: parentAudienceIds }] : []),
+    ...(tutorAudienceIds.length ? [{ label: 'Tutors', ids: tutorAudienceIds }] : []),
+  ];
+  const matchedAudienceGroup = audienceGroupOptions.find(
+    (option) =>
+      option.ids.length === audienceProfileIds.length &&
+      option.ids.every((id) => audienceProfileIds.includes(id)),
+  );
+  const currentAudienceLabel =
+    matchedAudienceGroup?.label ??
+    (selectedAudienceNames.length > 1
+      ? `${selectedAudienceNames[0]} +${selectedAudienceNames.length - 1}`
+      : (selectedAudienceNames[0] ?? 'Everyone'));
+  const inheritedAudienceNames =
+    !quoteReplyTo && replyTo?.core.visibility.type === 'specific-users'
+      ? replyTo.core.visibility.userIds
+          .map((id) =>
+            id === profileId
+              ? 'You'
+              : audienceParticipants.find((participant) => participant.id === id)?.name,
+          )
+          .filter((name): name is string => Boolean(name))
+      : [];
 
   return (
     <>
@@ -1252,36 +1370,92 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             contentContainerStyle={s.audienceContent}
           >
             <Text style={s.audienceLabel}>To:</Text>
-            {[
-              { label: 'Everyone', ids: [] as string[] },
-              ...(parentAudienceIds.length
-                ? [{ label: 'Parents', ids: parentAudienceIds }]
-                : []),
-              ...(tutorAudienceIds.length
-                ? [{ label: 'Tutors', ids: tutorAudienceIds }]
-                : []),
-              ...selectableAudienceParticipants.map((participant) => ({
-                label: participant.name,
-                ids: [participant.id],
-              })),
-            ].map((option) => {
-              const active =
-                option.ids.length === audienceProfileIds.length &&
-                option.ids.every((id) => audienceProfileIds.includes(id));
-              return (
+            {!isAudienceExpanded ? (
+              <TouchableOpacity
+                style={[s.audienceChip, s.audienceChipRow, s.audienceChipActive]}
+                onPress={() => setAudienceExpanded(true)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: false }}
+                accessibilityLabel={`Audience: ${currentAudienceLabel}. Show audience options`}
+                testID="message-audience-toggle"
+              >
+                <Text style={s.audienceChipText}>{currentAudienceLabel}</Text>
+                <ChevronDown size={14} color={colors.textMuted} />
+              </TouchableOpacity>
+            ) : (
+              <>
                 <TouchableOpacity
-                  key={`${option.label}:${option.ids.join(',')}`}
-                  style={[s.audienceChip, active && s.audienceChipActive]}
-                  onPress={() => setAudienceProfileIds(option.ids)}
+                  style={[s.audienceChip, s.audienceChipIcon]}
+                  onPress={() => setAudienceExpanded(false)}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`Message audience ${option.label}`}
+                  accessibilityState={{ expanded: true }}
+                  accessibilityLabel="Hide audience options"
+                  testID="message-audience-collapse"
                 >
-                  <Text style={s.audienceChipText}>{option.label}</Text>
+                  <ChevronLeft size={14} color={colors.textMuted} />
                 </TouchableOpacity>
-              );
-            })}
+                {audienceGroupOptions.map((option) => {
+                  const active =
+                    option.ids.length === audienceProfileIds.length &&
+                    option.ids.every((id) => audienceProfileIds.includes(id));
+                  return (
+                    <TouchableOpacity
+                      key={`group:${option.label}`}
+                      style={[s.audienceChip, active && s.audienceChipActive]}
+                      onPress={() => {
+                        setAudienceProfileIds(option.ids);
+                        setAudienceExpanded(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={`Message audience ${option.label}`}
+                    >
+                      <Text style={s.audienceChipText}>{option.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {/* Specific people toggle independently, like the web checkboxes, so the options stay open. */}
+                {selectableAudienceParticipants.map((participant) => {
+                  const selected = audienceProfileIds.includes(participant.id);
+                  const roleLabel = getAudienceRoleLabel(participant.role);
+                  return (
+                    <TouchableOpacity
+                      key={`person:${participant.id}`}
+                      style={[s.audienceChip, selected && s.audienceChipActive]}
+                      onPress={() =>
+                        setAudienceProfileIds((current) =>
+                          current.includes(participant.id)
+                            ? current.filter((id) => id !== participant.id)
+                            : [...current, participant.id],
+                        )
+                      }
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected, selected }}
+                      accessibilityLabel={`Message audience ${participant.name}`}
+                      accessibilityHint={roleLabel ?? undefined}
+                    >
+                      <Text style={s.audienceChipText}>
+                        {participant.name}
+                        {roleLabel ? (
+                          <Text style={s.audienceChipRole}>{` · ${roleLabel}`}</Text>
+                        ) : null}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            )}
           </ScrollView>
+          {selectedAudienceNames.length ? (
+            <Text style={s.audienceHint} testID="message-audience-summary">
+              {`Visible only to ${selectedAudienceNames.join(', ')} and you`}
+            </Text>
+          ) : null}
+          {includesSelectedStudent ? (
+            <Text style={s.audienceHint} testID="message-audience-guardian-hint">
+              Their parent is included automatically
+            </Text>
+          ) : null}
         </View>
       )}
       {/* Reply preview banner — either a thread reply or a quote reply (mutually exclusive) */}
@@ -1289,24 +1463,31 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <View style={s.replyPreview}>
           <View style={s.replyAccent} />
           <View style={s.replyInfo}>
-            <Text style={s.replyKindLabel}>
-              {quoteReplyTo ? 'Replying to' : 'Reply in thread'}
-            </Text>
-            {!quoteReplyTo && replyTo?.core.visibility.type === 'specific-users' ? (
+            <View style={s.replyHeaderRow}>
               <Text style={s.replyKindLabel}>
-                Private · same {replyTo.core.visibility.userIds.length}-person audience
+                {quoteReplyTo ? 'Replying to' : 'Reply in thread'}
               </Text>
-            ) : null}
-            <RoleNameIndicator
-              name={(quoteReplyTo ?? replyTo)!.core.sender.profile.displayName}
-              role={(quoteReplyTo ?? replyTo)!.core.sender.kind}
-              textStyle={s.replySender}
-              numberOfLines={1}
-              iconSize={12}
-            />
-            <Text style={s.replyText} numberOfLines={1}>
-              {getMessagePreviewText((quoteReplyTo ?? replyTo)!)}
-            </Text>
+              {!quoteReplyTo && replyTo?.core.visibility.type === 'specific-users' ? (
+                <Text
+                  style={s.replyAudience}
+                  numberOfLines={1}
+                  testID="reply-private-audience"
+                >
+                  {inheritedAudienceNames.length
+                    ? `· Private · ${inheritedAudienceNames.join(', ')}`
+                    : '· Private audience'}
+                </Text>
+              ) : null}
+            </View>
+            <View style={s.replyMessageRow}>
+              <Text style={s.replySender} numberOfLines={1}>
+                {(quoteReplyTo ?? replyTo)!.core.sender.profile.displayName}
+              </Text>
+              <Text style={s.replyText}>:</Text>
+              <Text style={s.replyText} numberOfLines={1}>
+                {getMessagePreviewText((quoteReplyTo ?? replyTo)!)}
+              </Text>
+            </View>
           </View>
           <TouchableOpacity
             onPress={quoteReplyTo ? onCancelQuoteReply : onCancelReply}

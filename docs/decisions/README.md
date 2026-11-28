@@ -30,6 +30,7 @@ ADRs are written when a decision is made and are **never deleted** — if a deci
 | [003](003-expo-react-native.md)            | Expo for cross-platform mobile                  | Accepted |
 | [004](004-api-first-frontend-boundary.md)  | API-first frontend data boundary                | Accepted |
 | [005](005-zoom-video-sdk-live-sessions.md) | Zoom Video SDK as a live-session video provider | Accepted |
+| [006](006-private-message-safeguarding.md) | Safeguarding rules for private channel messages | Proposed |
 
 ## Creating a new ADR
 

@@ -60,6 +60,8 @@ function setUpServiceClient(input: {
   messagesUpdateMatchedRows?: Array<{ id: string }>;
   /** Status of the message's channel (defaults to active). */
   channelStatus?: string;
+  /** Active channel member profile ids, for mention sanitization. */
+  channelMemberIds?: string[];
 }) {
   const accountId = input.accountId ?? 'account-1';
   const senderAccountId = input.senderAccountId ?? accountId;
@@ -105,6 +107,12 @@ function setUpServiceClient(input: {
     if (table === 'family_links') return familyLinksChain;
     if (table === 'channels') return channelsChain;
     if (table === 'message_text') return messageTextUpdateChain;
+    if (table === 'channel_members') {
+      return makeChain({
+        data: (input.channelMemberIds ?? []).map((profile_id) => ({ profile_id })),
+        error: null,
+      });
+    }
     throw new Error(`Unexpected table access in test: ${table}`);
   });
 
@@ -156,6 +164,53 @@ describe('MessagesService.editTextMessage', () => {
     expect(messagesUpdateChain.update).toHaveBeenCalledWith(
       expect.objectContaining({ is_edited: true }),
     );
+  });
+
+  describe('mentions', () => {
+    const content = 'Thanks @Pat and @Sam';
+    const mentions = [
+      { profileId: 'parent-1', displayName: 'Pat', start: 7, end: 11 },
+      { profileId: 'parent-2', displayName: 'Sam', start: 16, end: 20 },
+    ];
+
+    it('drops mentions of members outside a private audience', async () => {
+      const { messageTextUpdateChain } = setUpServiceClient({
+        messageRow: baseMessageRow({
+          visibility_type: 'specific-users',
+          visibility_user_ids: [SENDER_PROFILE_ID, 'parent-1'],
+        }),
+        channelMemberIds: [SENDER_PROFILE_ID, 'parent-1', 'parent-2'],
+      });
+
+      await service.editTextMessage(AUTH_USER_ID, 'token', MESSAGE_ID, {
+        orgId: ORG_ID,
+        messageId: MESSAGE_ID,
+        content,
+        mentions,
+      });
+
+      expect(messageTextUpdateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: { text: content, mentions: [mentions[0]] } }),
+      );
+    });
+
+    it('keeps mentions of any member on everyone messages', async () => {
+      const { messageTextUpdateChain } = setUpServiceClient({
+        messageRow: baseMessageRow({ visibility_type: 'all', visibility_user_ids: null }),
+        channelMemberIds: [SENDER_PROFILE_ID, 'parent-1', 'parent-2'],
+      });
+
+      await service.editTextMessage(AUTH_USER_ID, 'token', MESSAGE_ID, {
+        orgId: ORG_ID,
+        messageId: MESSAGE_ID,
+        content,
+        mentions,
+      });
+
+      expect(messageTextUpdateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ payload: { text: content, mentions } }),
+      );
+    });
   });
 
   it('fails loudly instead of silently when the is_edited update matches no row', async () => {

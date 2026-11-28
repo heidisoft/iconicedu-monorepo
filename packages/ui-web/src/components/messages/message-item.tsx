@@ -44,7 +44,10 @@ import {
   LinkPreviewMessage,
   LiveSessionStartedMessage,
 } from '@iconicedu/ui-web/components/messages/message-types';
-import type { MessageActionState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import {
+  type MessageActionState,
+  useOptionalMessagesState,
+} from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
 
 interface MessageItemProps {
   message: MessageVM;
@@ -103,7 +106,14 @@ export const MessageItem = memo(function MessageItem({
   pinningMessageIds,
   onTogglePinned,
 }: MessageItemProps) {
-  if (!isMessageVisibleToUser(message, currentUserId)) {
+  const messagesState = useOptionalMessagesState();
+  // Defence in depth for rows a viewer should not have received. While staff
+  // review is enabled the server deliberately returns private messages to
+  // staff outside the audience (read-only), so they must render.
+  if (
+    !isMessageVisibleToUser(message, currentUserId) &&
+    !messagesState?.enableStaffMessageReview
+  ) {
     return null;
   }
 

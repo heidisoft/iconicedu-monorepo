@@ -2,7 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import { render, waitFor, screen, act, fireEvent } from '@testing-library/react';
-import { vi } from 'vitest';
+import { beforeEach, vi } from 'vitest';
 
 import { MessagesContainer } from './messages-container';
 import type { ChannelVM, UserProfileVM } from '@iconicedu/shared-types';
@@ -221,6 +221,81 @@ describe('MessagesContainer', () => {
     expect(latestMessageInputProps.current?.audienceParticipants).toEqual(
       channel.collections.participants,
     );
+  });
+
+  describe('live updates for private messages outside the viewer audience', () => {
+    const privateMessage = {
+      ids: { id: 'private-1', orgId: 'org-1' },
+      core: {
+        type: 'text',
+        sender: makeParticipant('profile-2', 'educator'),
+        createdAt: new Date().toISOString(),
+        visibility: { type: 'specific-users', userIds: ['profile-2', 'parent-1'] },
+      },
+      social: { reactions: [] },
+      content: { text: 'Private note' },
+    };
+
+    function renderWithRealtime(
+      props: Partial<React.ComponentProps<typeof MessagesContainer>> = {},
+    ) {
+      const handlers: Array<(event: any) => void> = [];
+      const realtimeClient = {
+        subscribe: ({ onEvent }: { onEvent: (event: any) => void }) => {
+          handlers.push(onEvent);
+          return { unsubscribe: () => void 0 };
+        },
+        sendTyping: vi.fn(),
+      };
+      render(
+        <MessagesContainer
+          channel={channel}
+          currentUserId="staff-1"
+          realtimeClient={realtimeClient as any}
+          {...props}
+        />,
+      );
+      return (event: any) => act(() => handlers.forEach((handler) => handler(event)));
+    }
+
+    beforeEach(() => {
+      addMessage.mockClear();
+      updateMessage.mockClear();
+    });
+
+    it.each(['message-added', 'message-updated'])(
+      'drops %s while staff review is flagged off',
+      async (type) => {
+        const emit = renderWithRealtime();
+        await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+        emit({ type, message: privateMessage });
+        expect(addMessage).not.toHaveBeenCalled();
+        expect(updateMessage).not.toHaveBeenCalled();
+      },
+    );
+
+    it('delivers it to staff reviewers while the flag is on', async () => {
+      const emit = renderWithRealtime({ enableStaffMessageReview: true });
+      await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+      emit({ type: 'message-added', message: privateMessage });
+      expect(addMessage).toHaveBeenCalledWith(privateMessage);
+    });
+
+    it('always delivers it to members of the audience', async () => {
+      const emit = renderWithRealtime({ currentUserId: 'parent-1' });
+      await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+      emit({ type: 'message-added', message: privateMessage });
+      expect(addMessage).toHaveBeenCalledWith(privateMessage);
+    });
+
+    it('keeps support conversations visible to staff', async () => {
+      const emit = renderWithRealtime({
+        channel: { ...channel, basics: { ...channel.basics, purpose: 'support' } },
+      });
+      await waitFor(() => expect(latestMessageInputProps.current).not.toBeNull());
+      emit({ type: 'message-added', message: privateMessage });
+      expect(addMessage).toHaveBeenCalledWith(privateMessage);
+    });
   });
 
   it('renders typing indicator for other participants', async () => {

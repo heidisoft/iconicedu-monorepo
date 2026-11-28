@@ -4,6 +4,7 @@ import type { MessageRow } from '@iconicedu/shared-types';
 import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { buildChannelFiles } from '@iconicedu/web/lib/messages/builders/channel-messages.builder';
 import { requireEffectiveActorContext } from '@iconicedu/web/lib/family-view/actor-context';
+import { enableChannelCommunications } from '@iconicedu/web/flags';
 
 type MessageVisibilityRow = Pick<
   MessageRow,
@@ -107,6 +108,12 @@ export async function GET(request: Request) {
   const messageVisibilityById = new Map(
     (messageVisibilityResponse.data ?? []).map((message) => [message.id, message]),
   );
+  // Staff review ships with channel audiences: the database already returns
+  // private messages only to people allowed to read them, so while the flag is
+  // on every message it returned keeps its files.
+  const staffReviewEnabled = await enableChannelCommunications.run({
+    identify: { profileId },
+  });
   const visibleFiles = files.filter((file) => {
     if (!file.messageId) {
       return true;
@@ -115,7 +122,7 @@ export async function GET(request: Request) {
     if (!message) {
       return false;
     }
-    return isMessageVisibleToProfile(message, profileId);
+    return staffReviewEnabled || isMessageVisibleToProfile(message, profileId);
   });
 
   return NextResponse.json({

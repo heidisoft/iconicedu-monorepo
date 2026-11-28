@@ -7,17 +7,26 @@ name: Channel member message audiences
 - assertVisible:
     id: message-audience-picker
 - assertVisible: 'Everyone'
+- tapOn:
+    id: message-audience-toggle
 - tapOn: 'Parents'
 - tapOn:
     id: message-input
 - inputText: 'Maestro parent-only welcome'
 - tapOn: 'Send message'
 - assertVisible: 'Maestro parent-only welcome'
-- assertVisible: 'Only visible to selected people'
+- assertVisible: 'Only visible to you.*other.*'
+- tapOn: 'Only visible to you.*other.*'
+- assertVisible: 'Visible to'
+- tapOn:
+    point: '5%,5%'
+- assertNotVisible: 'Visible to'
+- tapOn:
+    id: message-audience-toggle
 - tapOn: 'Tutors'
 - tapOn:
     id: message-input
 - inputText: 'Maestro tutor-only handover'
 - tapOn: 'Send message'
 - assertVisible: 'Maestro tutor-only handover'
-- assertVisible: 'Only visible to selected people'
+- assertVisible: 'Only visible to you.*other.*'

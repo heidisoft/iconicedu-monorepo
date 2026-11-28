@@ -17,6 +17,11 @@ const supabase = {
 };
 const APP_URL = resolveAppUrl();
 
+const staffReviewFlag = vi.hoisted(() => ({ enabled: false }));
+vi.mock('@iconicedu/web/flags', () => ({
+  enableChannelCommunications: { run: vi.fn(async () => staffReviewFlag.enabled) },
+}));
+
 vi.mock('@iconicedu/web/lib/supabase/server', () => ({
   createSupabaseServerClient: vi.fn(() => supabase),
 }));
@@ -154,5 +159,50 @@ describe('GET /api/messages/channel-files', () => {
         },
       ],
     });
+  });
+
+  it('keeps files of private messages the database returned while staff review is on', async () => {
+    staffReviewFlag.enabled = true;
+    try {
+      buildChannelFiles.mockResolvedValueOnce([
+        {
+          ids: { id: 'file-private', orgId: 'org-1', channelId: 'channel-1' },
+          messageId: 'message-private',
+          kind: 'file',
+          url: 'https://example.com/private.pdf',
+          name: 'Private.pdf',
+          createdAt: '2026-02-22T10:00:00.000Z',
+        },
+        {
+          ids: { id: 'file-unreadable', orgId: 'org-1', channelId: 'channel-1' },
+          messageId: 'message-not-returned',
+          kind: 'file',
+          url: 'https://example.com/unreadable.pdf',
+          name: 'Unreadable.pdf',
+          createdAt: '2026-02-22T10:00:00.000Z',
+        },
+      ]);
+      messagesQuery.returns.mockResolvedValueOnce({
+        data: [
+          {
+            id: 'message-private',
+            sender_profile_id: 'profile-2',
+            visibility_type: 'specific-users',
+            visibility_user_id: null,
+            visibility_user_ids: ['profile-2', 'profile-3'],
+          },
+        ],
+      });
+
+      const response = await GET(
+        new Request(`${APP_URL}/api/messages/channel-files?channelId=channel-1`),
+      );
+      const payload = await response.json();
+      expect(payload.files.map((file: { messageId: string }) => file.messageId)).toEqual([
+        'message-private',
+      ]);
+    } finally {
+      staffReviewFlag.enabled = false;
+    }
   });
 });

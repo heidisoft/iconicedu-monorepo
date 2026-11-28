@@ -33,6 +33,10 @@ import {
   resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
 import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
+import {
+  enforceMessageAudiencePolicy,
+  isMessageAudienceReviewer,
+} from '@iconicedu/api/lib/messages/message-audience-policy';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { assertChannelWritable } from '@iconicedu/api/lib/messages/assert-channel-writable';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -124,6 +128,19 @@ function buildWritableProfileDisplayName(profile: WritableProfileRow) {
     .trim();
 
   return fullName || 'Someone';
+}
+
+/**
+ * A private message only notifies and highlights people who can read it, so
+ * mentions of channel members outside the audience are dropped.
+ */
+export function restrictMentionsToAudience(
+  mentions: MessageMentionVM[],
+  visibility: { visibility_type?: string | null; visibility_user_ids?: string[] | null },
+): MessageMentionVM[] {
+  if (visibility.visibility_type !== 'specific-users') return mentions;
+  const audience = new Set(visibility.visibility_user_ids ?? []);
+  return mentions.filter((mention) => audience.has(mention.profileId));
 }
 
 export function sanitizeMentions(
@@ -513,6 +530,12 @@ export async function resolveChannelAudienceVisibility(input: {
       if (!inheritedIds.length) {
         throw new BadRequestException('Referenced message has an invalid empty audience');
       }
+      // Staff can review private messages they are not part of, read-only.
+      if (!inheritedIds.includes(input.senderProfileId)) {
+        throw new ForbiddenException(
+          'Only the people in a private message can reply to it',
+        );
+      }
       return {
         visibility_type: 'specific-users' as const,
         visibility_user_ids: inheritedIds,
@@ -562,8 +585,35 @@ export async function resolveChannelAudienceVisibility(input: {
 
   return {
     visibility_type: 'specific-users' as const,
-    visibility_user_ids: Array.from(new Set([input.senderProfileId, ...requestedIds])),
+    visibility_user_ids: await enforceMessageAudiencePolicy({
+      serviceSupabase: input.serviceSupabase,
+      orgId: input.orgId,
+      channelId: input.channelId,
+      senderProfileId: input.senderProfileId,
+      requestedProfileIds: requestedIds,
+    }),
   };
+}
+
+/**
+ * Staff review of restricted messages ships with channel audiences, so it uses
+ * the same rollout flag. The database grants the matching read-only access.
+ */
+async function canReviewRestrictedMessages(input: {
+  orgId: string;
+  profileId: string;
+}): Promise<boolean> {
+  if (!input.profileId) return false;
+  const enabled = await evaluateApiBooleanFlag({
+    flagKey: apiFeatureFlagKeys.enableChannelCommunications,
+    distinctId: input.profileId,
+  });
+  if (!enabled) return false;
+  return isMessageAudienceReviewer({
+    serviceSupabase: createSupabaseServiceClient(),
+    orgId: input.orgId,
+    profileId: input.profileId,
+  });
 }
 
 async function ensureChannelMembershipForMessageWrite(input: {
@@ -1348,6 +1398,7 @@ export class MessagesService {
     const typedRows = filterVisibleMessageRows(
       (data ?? []) as unknown as RawMessageRow[],
       input.profileId,
+      { includeRestricted: await canReviewRestrictedMessages(input) },
     );
     if (!typedRows.length) return [];
 
@@ -1391,6 +1442,7 @@ export class MessagesService {
     const typedRows = filterVisibleMessageRows(
       (data ?? []) as unknown as RawMessageRow[],
       input.profileId,
+      { includeRestricted: await canReviewRestrictedMessages(input) },
     );
     if (!typedRows.length) return [];
 
@@ -1451,6 +1503,7 @@ export class MessagesService {
     const typedRows = filterVisibleMessageRows(
       (rows ?? []) as unknown as RawMessageRow[],
       input.profileId,
+      { includeRestricted: await canReviewRestrictedMessages(input) },
     );
     if (!typedRows.length) return [];
 
@@ -1595,6 +1648,10 @@ export class MessagesService {
         requestedProfileIds: input.audience?.profileIds,
         supportVisibility,
       });
+      sanitizedMentions = restrictMentionsToAudience(
+        sanitizedMentions,
+        messageVisibility,
+      );
       const writeAccess = await resolveChannelWriteAccessForMessage({
         serviceSupabase,
         activityContext,
@@ -1752,7 +1809,9 @@ export class MessagesService {
     const serviceSupabase = createSupabaseServiceClient();
     const { data: message, error: messageError } = await serviceSupabase
       .from('messages')
-      .select('id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at')
+      .select(
+        'id, org_id, channel_id, sender_profile_id, type, created_at, deleted_at, visibility_type, visibility_user_ids',
+      )
       .eq('id', messageId)
       .maybeSingle<{
         id: string;
@@ -1762,6 +1821,8 @@ export class MessagesService {
         type: string;
         created_at: string;
         deleted_at: string | null;
+        visibility_type: string | null;
+        visibility_user_ids: string[] | null;
       }>();
     if (messageError) throw new InternalServerErrorException(messageError.message);
     if (!message || message.org_id !== input.orgId) {
@@ -1799,11 +1860,14 @@ export class MessagesService {
       if (channelMembersResponse.error) {
         throw new InternalServerErrorException(channelMembersResponse.error.message);
       }
-      sanitizedMentions = sanitizeMentions(
-        content,
-        input.mentions,
-        new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
-        actor.profile.id,
+      sanitizedMentions = restrictMentionsToAudience(
+        sanitizeMentions(
+          content,
+          input.mentions,
+          new Set((channelMembersResponse.data ?? []).map((member) => member.profile_id)),
+          actor.profile.id,
+        ),
+        message,
       );
     }
 

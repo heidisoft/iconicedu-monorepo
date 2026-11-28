@@ -1,5 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { act, render, screen, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
 
 const mockUseLocalSearchParams = jest.fn();
 const mockUseRouter = jest.fn(() => ({ back: jest.fn() }));
@@ -8,6 +10,16 @@ const mockFetchIsChannelMember = jest.fn();
 const mockConversationHeader = jest.fn(() => null);
 const mockUseQuery = jest.fn();
 const mockRefetch = jest.fn();
+const mockSendTextMessage = jest.fn();
+const mockFlags: Record<string, boolean> = {};
+const latestInputProps: { current: any } = { current: null };
+const latestListProps: { current: any } = { current: null };
+const latestActionsSheetProps: { current: any } = { current: null };
+const mockChannelMembers = [
+  { id: 'prof-1', name: 'Staff User', role: 'staff' },
+  { id: 'tutor-1', name: 'Taylor Tutor', role: 'educator' },
+  { id: 'parent-1', name: 'Pat Parent', role: 'guardian' },
+];
 const mockQueryClient = {
   setQueryData: jest.fn(),
   invalidateQueries: jest.fn(),
@@ -99,7 +111,8 @@ jest.mock('@/lib/api/queries', () => ({
   })),
   fetchIsChannelMember: (...args: unknown[]) => mockFetchIsChannelMember(...args),
   markChannelReadState: jest.fn(),
-  sendTextMessage: jest.fn(),
+  sendTextMessage: (...args: unknown[]) => mockSendTextMessage(...args),
+  fetchChannelMembers: jest.fn(async () => []),
   sendFileMessage: jest.fn(),
   sendFilesMessage: jest.fn(),
   uploadChannelFile: jest.fn(),
@@ -129,10 +142,43 @@ jest.mock('@/components/messages/message-list', () => ({
 }));
 
 jest.mock('@/components/messages/message-input', () => ({
-  MessageInput: () => {
+  MessageInput: (props: unknown) => {
+    latestInputProps.current = props;
     const { Text } = require('react-native');
     return <Text>MessageInput</Text>;
   },
+}));
+
+jest.mock('@/components/messages/themes/registry', () => ({
+  resolveMobileMessageUiTheme: () => ({
+    key: 'classic',
+    MessageList: (props: unknown) => {
+      latestListProps.current = props;
+      return null;
+    },
+  }),
+}));
+
+jest.mock('@/components/messages/message-actions-sheet', () => ({
+  MessageActionsSheet: (props: unknown) => {
+    latestActionsSheetProps.current = props;
+    return null;
+  },
+}));
+
+jest.mock('@/hooks/use-push-nudge', () => ({
+  usePushNudge: () => ({
+    isVisible: false,
+    nudgeVariant: null,
+    triggerNudge: jest.fn(async () => undefined),
+    handleEnable: jest.fn(),
+    handleOpenSettings: jest.fn(),
+    handleDismiss: jest.fn(),
+  }),
+}));
+
+jest.mock('@/hooks/use-mobile-feature-flag', () => ({
+  useMobileFeatureFlag: (key: string) => mockFlags[key] ?? false,
 }));
 
 jest.mock('@/components/messages/typing-indicator', () => ({
@@ -179,6 +225,8 @@ describe('SpaceDetailScreen', () => {
             };
           case 'channelMembership':
             return { data: mockFetchIsChannelMember(), isLoading: false };
+          case 'channelMembers':
+            return { data: mockChannelMembers, isLoading: false };
           default:
             return { data: undefined, isLoading: false };
         }
@@ -233,5 +281,115 @@ describe('SpaceDetailScreen', () => {
     renderScreen();
 
     expect(mockRefetch).toHaveBeenCalled();
+  });
+
+  describe('private messages (parity with the channel screen and web)', () => {
+    const privateMessage = {
+      ids: { id: 'private-1', orgId: 'org-1' },
+      core: {
+        type: 'text',
+        sender: {
+          ids: { id: 'tutor-1', orgId: 'org-1' },
+          profile: { displayName: 'Taylor' },
+        },
+        createdAt: '2026-01-01T00:00:00Z',
+        visibility: { type: 'specific-users', userIds: ['tutor-1', 'parent-1'] },
+      },
+      social: { reactions: [] },
+      content: { text: 'Private' },
+    };
+
+    beforeEach(() => {
+      mockUseLocalSearchParams.mockReturnValue({
+        channelId: 'channel-1',
+        topic: 'Biology',
+      });
+      mockFetchIsChannelMember.mockReturnValue(true);
+      for (const key of Object.keys(mockFlags)) delete mockFlags[key];
+      latestInputProps.current = null;
+      latestListProps.current = null;
+      latestActionsSheetProps.current = null;
+    });
+
+    it('offers the audience picker and mentions when the flags are on', () => {
+      mockFlags['enable-channel-communications'] = true;
+      mockFlags['enable-mobile-message-composer-parity'] = true;
+      renderScreen();
+      expect(latestInputProps.current.audienceParticipants).toEqual(mockChannelMembers);
+      expect(latestInputProps.current.enableMentions).toBe(true);
+      expect(latestInputProps.current.mentionCandidates.map((c: any) => c.id)).toEqual([
+        'tutor-1',
+        'parent-1',
+      ]);
+      expect(latestListProps.current.audienceParticipants).toEqual(mockChannelMembers);
+    });
+
+    it('hides the audience picker while channel communications is off', () => {
+      renderScreen();
+      expect(latestInputProps.current.audienceParticipants).toBeUndefined();
+    });
+
+    it('sends the chosen audience and mentions', async () => {
+      mockFlags['enable-channel-communications'] = true;
+      mockSendTextMessage.mockResolvedValue({ id: 'm1' });
+      renderScreen();
+      const mentions = [{ profileId: 'parent-1', displayName: 'Pat', start: 0, end: 4 }];
+      await act(() =>
+        latestInputProps.current.onSend('@Pat hi', {
+          audienceProfileIds: ['parent-1'],
+          mentions,
+        }),
+      );
+      expect(mockSendTextMessage).toHaveBeenCalledWith(
+        'channel-1',
+        'prof-1',
+        'org-1',
+        '@Pat hi',
+        undefined,
+        undefined,
+        { mentions, audienceProfileIds: ['parent-1'] },
+      );
+    });
+
+    it('explains a refused send', async () => {
+      const { ApiError } = jest.requireActual('@/lib/api/http-client');
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      mockSendTextMessage.mockRejectedValue(
+        new ApiError('Students can only send messages to everyone in the channel', 403),
+      );
+      renderScreen();
+      await act(() =>
+        latestInputProps.current.onSend('hi', { audienceProfileIds: ['tutor-1'] }),
+      );
+      expect(alert).toHaveBeenCalledWith(
+        'Message not sent',
+        'Students can only send messages to everyone in the channel',
+      );
+      alert.mockRestore();
+    });
+
+    it('keeps private messages read-only for staff outside the audience', () => {
+      renderScreen();
+      act(() => latestListProps.current.onThreadOpen(privateMessage));
+      expect(latestInputProps.current.replyTo ?? null).toBeNull();
+
+      act(() => latestListProps.current.onMessageLongPress(privateMessage));
+      expect(latestActionsSheetProps.current.isReadOnly).toBe(true);
+      act(() => latestActionsSheetProps.current.onQuoteReply?.(privateMessage));
+      expect(latestInputProps.current.quoteReplyTo ?? null).toBeNull();
+    });
+
+    it('still lets audience members reply in the thread', () => {
+      renderScreen();
+      const ownAudienceMessage = {
+        ...privateMessage,
+        core: {
+          ...privateMessage.core,
+          visibility: { type: 'specific-users', userIds: ['tutor-1', 'prof-1'] },
+        },
+      };
+      act(() => latestListProps.current.onThreadOpen(ownAudienceMessage));
+      expect(latestInputProps.current.replyTo).toBe(ownAudienceMessage);
+    });
   });
 });

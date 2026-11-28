@@ -4,7 +4,7 @@ This guide verifies staff identity labels and restricted audiences in ordinary c
 
 ## What the suite proves
 
-The test matrix covers:
+The coverage and manual parity matrix below covers:
 
 - a public staff welcome visible to every channel member;
 - parent-only, tutor-only, and named-recipient messages;
@@ -14,8 +14,11 @@ The test matrix covers:
 - deleting a reply, a root message without replies, and a root message with replies;
 - hidden content staying absent from channel history, search, pins, saved items, files, unread counts, notifications, and reconnects;
 - a clear `Staff` sender badge on web and mobile, including DMs;
-- audience selection for staff, parents, students, and tutors who can post;
+- safeguarding rules for who may address whom privately (staff → anyone; tutor → staff, tutors, parents, and students together with their parent; parent → staff and tutors; students cannot start private messages), with a student's guardian added automatically;
+- read-only staff review: owners, admins, and staff can read every restricted message but cannot reply, quote, or react;
 - no audience selector in DMs, group DMs, or support channels.
+
+The rules and their rationale are recorded in [ADR-006](../decisions/006-private-message-safeguarding.md).
 
 ## Test data
 
@@ -41,7 +44,33 @@ pnpm dev:api
 pnpm dev:web
 ```
 
-## Automated web suite
+## Self-contained local role matrix
+
+```bash
+supabase start
+pnpm build:packages
+pnpm --filter web exec playwright install chromium
+pnpm --filter web test:e2e:audiences
+```
+
+This command starts owned API/web processes on loopback ports 3101/3100. It refuses occupied ports or hosted Supabase URLs. It does not reset an existing database: apply the branch migrations first. Each scenario creates a fresh synthetic organization and nine disposable password-authenticated users, with separate child fixtures for family setup, then removes its own fixtures afterward. The runner stops only its own servers. No storage-state files or existing accounts are required. Do not run another Next.js development server in this workspace while the suite uses its build directory.
+
+`message-audience-roles.local.spec.ts` runs six sender roles: owner, admin, staff, parent (`guardian`), student (`child`), and tutor (`educator`). For each sender it sends to everyone and individually to every other member, including a second parent. Pairs the safeguarding rules block must return `403` and change no unread counts. Allowed pairs must be readable by the sender, the recipient, and every staff reviewer, and by nobody else (including a same-organization nonmember and a different-organization account). Only the selected recipient's unread count may increase. Six browser workflows select a permitted named person, verify the recipient/excluded account after reload, check the picker resets, then send to everyone; the student workflow verifies there is no audience picker. The regression workflow covers inherited private thread and quoted replies, read-only staff review (reading allowed, replying and quoting rejected), edit privacy, retry deduplication, deletion, forged sender identities, invalid/nonmember/cross-organization recipients, and attempted reply audience expansion.
+
+## Database unread-count suite
+
+`supabase/tests/staff_review_restricted_messages.test.sql` proves staff (including owners) can read restricted messages, their content, threads, and attachments, while reactions, thread creation, replies, and edits stay blocked and non-staff members outside the audience see nothing. The pgTAP suites `supabase/tests/visible_message_unread_counts.test.sql` and `supabase/tests/channel_message_audience_privacy.test.sql` prove the unread trigger and `recompute_unread_for_account_channel` follow message visibility: every visibility type, sender exclusion, thread replies, deleted messages, non-member audiences, cursors pointing at hidden or thread messages, and manual-unread reset. CI does not run `supabase/tests`, so run them against a local database with branch migrations applied:
+
+```bash
+supabase migration up --local --include-all
+supabase test db
+```
+
+Runtime unit tests also verify that presence updates and participant reordering do not repeatedly unsubscribe/rejoin live channels; membership, identity, and channel changes still clean up and reconnect.
+
+The GitHub **Message Audience E2E** workflow runs these cases against disposable local Supabase on pull requests and manual dispatch. It also runs API, mobile, and shared web audience unit tests. Local artifacts are private temporary files; do not commit or publish raw logs, traces, or sessions. Live push/email-provider delivery and native multi-device UI remain outside this browser/API suite.
+
+## Existing externally configured web smoke suite
 
 Create Playwright storage states for the synthetic staff, parent, and tutor. Storage-state files contain reusable sessions and must remain outside the repository.
 
@@ -101,7 +130,7 @@ For each restricted message, verify the excluded account cannot retrieve the mes
 6. inbox/activity feed, push, email, and unread counters;
 7. a forged API request containing a cross-organization or non-member profile ID.
 
-The API accepts audience requests from any channel member who can post. It must reject requests for DMs/group DMs, empty effective audiences, disabled-flag callers, and recipients without active channel membership. A thread reply with an audience payload must be rejected; the server and database copy the parent audience.
+The API accepts audience requests from any channel member who can post. It must reject requests for DMs/group DMs, empty effective audiences, disabled-flag callers, and recipients without active channel membership. A thread reply with explicit recipients must be rejected; the server and database copy the parent audience.
 
 ## Focused verification
 

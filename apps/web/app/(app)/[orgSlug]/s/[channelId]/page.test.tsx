@@ -90,6 +90,8 @@ describe('d/s/[channelId] page', () => {
           currentUserProfile: { ids: { id: 'profile-1', orgId: 'org-1' } },
           readOnly: false,
           showCreateMessageTypeButton: true,
+          enableMessageAudience: false,
+          enableStaffMessageReview: false,
         }),
       );
     });

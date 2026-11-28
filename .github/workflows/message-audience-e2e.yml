@@ -1,0 +1,60 @@
+name: Message Audience E2E
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/api/**'
+      - 'apps/mobile/src/components/messages/**'
+      - 'apps/web/**'
+      - 'packages/**'
+      - 'supabase/**'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/message-audience-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: message-audience-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  delivery:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      TURBO_TELEMETRY_DISABLED: '1'
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.122.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web exec playwright install --with-deps chromium
+      - name: Start disposable local database and apply migrations
+        run: |
+          umask 077
+          supabase start > /tmp/iconicedu-audience-supabase.log 2>&1
+          supabase db reset --local
+      - run: pnpm build:packages
+      - name: Unit tests for audience resolution and visibility
+        run: |
+          pnpm --filter api exec jest --runInBand src/modules/messages/message-audience.spec.ts src/lib/messages/message-visibility.spec.ts
+          pnpm --filter mobile exec jest --runInBand src/components/messages/message-visibility.test.ts src/__tests__/message-input.test.tsx
+          pnpm --filter web exec vitest run 'app/(app)/[orgSlug]/messages/messages-shell-client.presence.test.tsx'
+          pnpm --filter @iconicedu/ui-web test
+      - name: Send and verify messages across independent accounts
+        run: pnpm --filter web test:e2e:audiences
+      # Logs, sessions, traces and screenshots can contain synthetic auth tokens.
+      # Keep them on the ephemeral runner instead of uploading reusable sessions.
+      - name: Stop local services
+        if: always()
+        run: supabase stop --no-backup

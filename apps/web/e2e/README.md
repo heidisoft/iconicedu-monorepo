@@ -108,3 +108,7 @@ tablet Chromium profiles. It also covers portrait/landscape, narrow split-view
 widths, foreground/device-list refresh, offline/online transitions and identity
 recovery after the **Rejoin class** action. These are browser automation profiles,
 not physical tablet or Expo browser-surface tests.
+
+### Message delivery by role
+
+Run `pnpm --filter web test:e2e:audiences` for the self-contained local role matrix (owner/admin/staff/parent/student/tutor, each person and everyone). It provisions synthetic users, runs real browser/API delivery and exclusion checks, and cleans up. Start local Supabase with branch migrations applied and install Chromium first. See [the audience guide](../../../docs/getting-started/message-audience-testing.md#self-contained-local-role-matrix). The dedicated GitHub workflow runs this against an ephemeral database.

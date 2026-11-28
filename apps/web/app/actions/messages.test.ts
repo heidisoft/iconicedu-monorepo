@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   deleteMessageAction,
@@ -90,7 +90,9 @@ vi.mock('@iconicedu/web/lib/messages/mappers/message.mapper', () => ({
 vi.mock('@iconicedu/web/lib/activity-feed/publisher/activity-publisher', () => ({
   publishActivityEvent: (...args: unknown[]) => publishActivityEvent(...args),
 }));
-vi.mock('../../lib/api/http-client', () => ({
+vi.mock('../../lib/api/http-client', async (importOriginal) => ({
+  ApiHttpError: (await importOriginal<typeof import('../../lib/api/http-client')>())
+    .ApiHttpError,
   createApiClient: vi.fn(() => ({
     post: (...args: unknown[]) => apiPost(...args),
     delete: (...args: unknown[]) => apiDelete(...args),
@@ -3389,6 +3391,74 @@ describe('toggleSavedMessageAction', () => {
     expect(unsaveChain.eq).toHaveBeenCalledWith('message_id', 'message-1');
     expect(unsaveChain.eq).toHaveBeenCalledWith('profile_id', 'profile-1');
     expect(unsaveChain.is).toHaveBeenCalledWith('deleted_at', null);
+  });
+});
+
+describe('send actions surface API refusals', () => {
+  const originalApiUrl = process.env.API_URL;
+
+  beforeEach(async () => {
+    process.env.API_URL = 'http://127.0.0.1:3001';
+    apiPost.mockReset();
+    buildMessageById.mockReset();
+    const { createSupabaseServerClient } =
+      await import('@iconicedu/web/lib/supabase/server');
+    (
+      createSupabaseServerClient as unknown as { mockReturnValue: (value: any) => void }
+    ).mockReturnValue({
+      auth: { getUser: vi.fn(async () => ({ data: { user: { id: 'auth-user' } } })) },
+      from: vi.fn(() => ({})),
+    });
+  });
+
+  afterEach(() => {
+    if (originalApiUrl === undefined) delete process.env.API_URL;
+    else process.env.API_URL = originalApiUrl;
+  });
+
+  const textInput = {
+    orgId: 'org-1',
+    channelId: 'channel-1',
+    senderProfileId: 'profile-1',
+    content: 'Private note',
+    audience: { profileIds: ['student-1'] },
+  };
+
+  it('returns a 403 refusal with its message instead of throwing', async () => {
+    const { ApiHttpError } = await import('../../lib/api/http-client');
+    apiPost.mockRejectedValueOnce(
+      new ApiHttpError(
+        403,
+        'Students can only be messaged privately together with a parent in this channel',
+      ),
+    );
+
+    await expect(sendTextMessageAction(textInput as any)).resolves.toEqual({
+      rejected: true,
+      status: 403,
+      message:
+        'Students can only be messaged privately together with a parent in this channel',
+    });
+    expect(buildMessageById).not.toHaveBeenCalled();
+  });
+
+  it.each([400, 500])('still throws for a %s error', async (status) => {
+    const { ApiHttpError } = await import('../../lib/api/http-client');
+    apiPost.mockRejectedValueOnce(new ApiHttpError(status, 'boom'));
+    await expect(sendTextMessageAction(textInput as any)).rejects.toThrow('boom');
+  });
+
+  it('returns the refusal for file sends too', async () => {
+    const { ApiHttpError } = await import('../../lib/api/http-client');
+    apiPost.mockRejectedValueOnce(new ApiHttpError(403, 'Blocked'));
+    await expect(
+      sendFilesMessageAction({
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        senderProfileId: 'profile-1',
+        assets: [{ name: 'a.pdf', storagePath: 'org-1/channel-1/files/profile-1/a.pdf' }],
+      } as any),
+    ).resolves.toMatchObject({ rejected: true, message: 'Blocked' });
   });
 });
 

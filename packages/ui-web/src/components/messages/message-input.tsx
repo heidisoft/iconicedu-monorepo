@@ -110,6 +110,12 @@ import {
 import { useMessageDraft } from './use-message-draft';
 import type { MessageDraftScope } from './message-draft-store';
 import { generateClientMessageId } from './client-message-id';
+import { isMessageSendRejectedError } from './message-send-rejected-error';
+import {
+  canAddressPrivately,
+  canInitiateRestrictedMessage,
+  resolveMessageAudienceRole,
+} from '@iconicedu/utils';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -224,8 +230,12 @@ interface MessageInputProps {
   enableMessageReplyReference?: boolean;
   /** Eligible channel recipients for audience selection. Omit for DMs and managed support conversations. */
   audienceParticipants?: UserProfileVM[];
+  /** The sender's own profile kind; staff observers are not in the participant list. */
+  currentUserKind?: string | null;
   /** Fixed audience description for a private thread reply composer. */
   inheritedAudienceLabel?: string | null;
+  /** Profile ids of an inherited private audience; @mention suggestions are limited to them. */
+  inheritedAudienceProfileIds?: string[] | null;
   enableMessageListFormatting?: boolean;
   replyTarget?: { senderName: string; snippet: string } | null;
   onClearReply?: () => void;
@@ -358,7 +368,9 @@ export function MessageInput({
   onScheduleSend,
   enableMessageReplyReference = false,
   audienceParticipants,
+  currentUserKind,
   inheritedAudienceLabel,
+  inheritedAudienceProfileIds,
   enableMessageListFormatting = false,
   replyTarget = null,
   onClearReply,
@@ -449,10 +461,16 @@ export function MessageInput({
   const recordingChunksRef = React.useRef<Blob[]>([]);
   const recordingSessionRef = React.useRef<RecordingSession | null>(null);
   const recordingStopModeRef = React.useRef<'complete' | 'cancel'>('complete');
-  const mentionCandidates = React.useMemo(
-    () => getMentionCandidates(participants, currentUserId),
-    [participants, currentUserId],
-  );
+  // A private message only reaches its audience, so only suggest people in it.
+  const mentionAudienceIds = audienceProfileIds.length
+    ? audienceProfileIds
+    : (inheritedAudienceProfileIds ?? null);
+  const mentionCandidates = React.useMemo(() => {
+    const candidates = getMentionCandidates(participants, currentUserId);
+    if (!mentionAudienceIds) return candidates;
+    const audience = new Set(mentionAudienceIds);
+    return candidates.filter((candidate) => audience.has(candidate.id));
+  }, [participants, currentUserId, mentionAudienceIds]);
   const filteredMentionCandidates = React.useMemo(() => {
     if (!mentionState) return [];
     return mentionCandidates.filter((candidate) =>
@@ -812,14 +830,17 @@ export function MessageInput({
           }
           resetComposer();
           setAudienceProfileIds([]);
-        } catch {
+        } catch (error) {
           // Keep the attachments + content in the composer so nothing is
           // lost; the user can inspect/retry (Send reuses the same
           // clientMessageId above) or remove attachments to start over.
+          // A refused send (e.g. a disallowed private audience) explains why.
           setAttachmentError(
-            enableMessageSendReliability
-              ? 'Could not send. Your files are still attached — tap Send to retry.'
-              : 'Could not send attachment(s). Please try again.',
+            isMessageSendRejectedError(error)
+              ? error.message
+              : enableMessageSendReliability
+                ? 'Could not send. Your files are still attached — tap Send to retry.'
+                : 'Could not send attachment(s). Please try again.',
           );
         } finally {
           setIsAttachingFile(false);
@@ -1582,12 +1603,24 @@ export function MessageInput({
     [handleTyping, readOnly],
   );
 
-  const selectableAudienceParticipants = React.useMemo(
-    () =>
-      (audienceParticipants ?? []).filter(
-        (participant) => participant.ids.id !== currentUserId,
-      ),
-    [audienceParticipants, currentUserId],
+  // Safeguarding rules (enforced by the API): students cannot start private
+  // messages, parents may only address staff and tutors, and so on.
+  const selectableAudienceParticipants = React.useMemo(() => {
+    const candidates = audienceParticipants ?? [];
+    const senderRole = resolveMessageAudienceRole(
+      currentUserKind ??
+        candidates.find((participant) => participant.ids.id === currentUserId)?.kind,
+    );
+    if (!canInitiateRestrictedMessage(senderRole)) return [];
+    return candidates.filter(
+      (participant) =>
+        participant.ids.id !== currentUserId &&
+        canAddressPrivately(senderRole, resolveMessageAudienceRole(participant.kind)),
+    );
+  }, [audienceParticipants, currentUserId, currentUserKind]);
+  const includesSelectedStudent = selectableAudienceParticipants.some(
+    (participant) =>
+      participant.kind === 'child' && audienceProfileIds.includes(participant.ids.id),
   );
   const selectedAudienceNames = selectableAudienceParticipants
     .filter((participant) => audienceProfileIds.includes(participant.ids.id))
@@ -1685,6 +1718,9 @@ export function MessageInput({
             {audienceProfileIds.length ? (
               <span className="truncate text-xs text-muted-foreground">
                 Visible only to {selectedAudienceNames.join(', ')} and you
+                {includesSelectedStudent
+                  ? ' · their parent is included automatically'
+                  : ''}
               </span>
             ) : null}
           </div>

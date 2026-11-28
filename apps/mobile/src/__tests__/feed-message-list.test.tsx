@@ -201,6 +201,47 @@ describe('FeedMessageList', () => {
     );
   });
 
+  describe('staff review of private messages', () => {
+    const privateMessage = (): MessageVM => {
+      const message = makeTextMessage('private-1', 'He was unwell this week', {
+        senderId: 'tutor-1',
+        senderName: 'Taylor Tutor',
+      });
+      return {
+        ...message,
+        core: {
+          ...message.core,
+          visibility: { type: 'specific-users', userIds: ['tutor-1', 'parent-1'] },
+        },
+      } as MessageVM;
+    };
+    const reactionButtonState = () =>
+      screen.getByLabelText('Add emoji reaction').props.accessibilityState;
+
+    it('disables reactions for a viewer outside the audience', () => {
+      render(
+        <FeedMessageList
+          messages={[privateMessage()]}
+          currentProfileId="staff-1"
+          onReactionToggle={jest.fn()}
+        />,
+      );
+      expect(screen.getByText('He was unwell this week')).toBeTruthy();
+      expect(reactionButtonState()).toEqual(expect.objectContaining({ disabled: true }));
+    });
+
+    it.each(['parent-1', 'tutor-1'])('keeps reactions for audience member %s', (id) => {
+      render(
+        <FeedMessageList
+          messages={[privateMessage()]}
+          currentProfileId={id}
+          onReactionToggle={jest.fn()}
+        />,
+      );
+      expect(reactionButtonState()).toEqual(expect.objectContaining({ disabled: false }));
+    });
+  });
+
   it('renders feed posts instead of classic bubbles', () => {
     render(
       <FeedMessageList

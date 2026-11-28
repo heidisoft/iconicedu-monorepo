@@ -67,6 +67,7 @@ import {
 import { ChatPdfViewer } from '@/components/messages/chat-pdf-viewer';
 import { PendingMessageRow } from '@/components/messages/pending-message-row';
 import type { AttachmentPayload } from '@/components/messages/attachment-sheet';
+import type { MessageAudienceParticipant } from '@/components/messages/message-visibility';
 import { reportMobileObservedError } from '@/lib/analytics/report-error';
 import { openMessageLink, splitMessageTextByLinks } from '@/lib/messages/link-opening';
 import {
@@ -81,6 +82,7 @@ import { fetchThreadMessages } from '@/lib/api/queries';
 import { useMarkRead } from '@/hooks/use-mark-read';
 import { supabase } from '@/lib/supabase/client';
 import { ReplyReferenceBlock } from '@/components/messages/reply-reference-block';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
@@ -499,12 +501,16 @@ function FeedHeader({
   presenceStatus,
   onProfilePress,
   onMorePress,
+  currentProfileId,
+  audienceParticipants,
 }: {
   message: MessageVM;
   compact?: boolean;
   presenceStatus?: PresenceDisplayStatus | null;
   onProfilePress?: (user: MessageVM['core']['sender']) => void;
   onMorePress?: (message: MessageVM) => void;
+  currentProfileId?: string;
+  audienceParticipants?: MessageAudienceParticipant[];
 }) {
   const { colors, isDark } = useTheme();
   const styles = isDark ? stylesDark : stylesLight;
@@ -590,7 +596,12 @@ function FeedHeader({
             </View>
             {!compact ? (
               <View style={styles.visibilityBadgeSlot}>
-                <VisibilityBadge message={message} colors={colors} />
+                <VisibilityBadge
+                  message={message}
+                  colors={colors}
+                  currentProfileId={currentProfileId}
+                  audienceParticipants={audienceParticipants}
+                />
               </View>
             ) : null}
           </View>
@@ -1582,6 +1593,7 @@ function FeedPost({
   onSendAnnotation,
   isReadOnly,
   onReplyReferencePress,
+  audienceParticipants,
 }: {
   messages: MessageVM[];
   presenceByProfileId: Map<string, PresenceDisplayStatus>;
@@ -1596,6 +1608,7 @@ function FeedPost({
   onSendAnnotation?: (attachment: AttachmentPayload) => void;
   isReadOnly?: boolean;
   onReplyReferencePress?: (messageId: string) => void;
+  audienceParticipants?: MessageAudienceParticipant[];
 }) {
   const { colors, isDark } = useTheme();
   const styles = isDark ? stylesDark : stylesLight;
@@ -1621,6 +1634,8 @@ function FeedPost({
         presenceStatus={senderPresenceStatus}
         onProfilePress={onProfilePress}
         onMorePress={onLongPress}
+        currentProfileId={currentProfileId}
+        audienceParticipants={audienceParticipants}
       />
       <View style={styles.postBody}>
         {messages.map((message, index) => (
@@ -1637,7 +1652,15 @@ function FeedPost({
             onProfilePress={onProfilePress}
             onLongPress={onLongPress}
             onSendAnnotation={onSendAnnotation}
-            isReadOnly={isReadOnly}
+            // Staff can review private messages they are not part of, read-only.
+            isReadOnly={
+              isReadOnly ||
+              isOutsideMessageAudience({
+                visibility: message.core.visibility,
+                senderProfileId: message.core.sender.ids.id,
+                viewerProfileId: currentProfileId,
+              })
+            }
             onReplyReferencePress={onReplyReferencePress}
           />
         ))}
@@ -1651,6 +1674,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
   channelId,
   currentProfileId,
   currentAccountId,
+  audienceParticipants,
   onLoadMore,
   loading = false,
   refreshing = false,
@@ -1975,6 +1999,7 @@ export const FeedMessageList: React.FC<FeedMessageListProps> = ({
           channelId={channelId}
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
+          audienceParticipants={audienceParticipants}
           onReactionToggle={handleReactionToggle}
           onThreadOpen={onThreadOpen}
           onProfilePress={onProfilePress}
@@ -2026,6 +2051,7 @@ const makeStyles = (C: FeedColors) =>
       minWidth: 0,
     },
     headerRight: {
+      maxWidth: '58%',
       flexShrink: 0,
       alignItems: 'flex-end',
       gap: 4,
@@ -2036,6 +2062,7 @@ const makeStyles = (C: FeedColors) =>
       gap: 6,
     },
     visibilityBadgeSlot: {
+      maxWidth: '100%',
       minHeight: 18,
       alignItems: 'flex-end',
     },

@@ -41,6 +41,7 @@ import { getFeedRoleIcon, getFeedRoleLabel } from './feed-message-role';
 import { MessageManagementMenu } from './message-management-menu';
 import { MessageReplyQuote } from './message-reply-quote';
 import { useOptionalMessagesState } from './context/messages-state-provider';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 
 export interface MessageBaseProps {
   message: MessageVM;
@@ -128,7 +129,15 @@ export const MessageBase = memo(function MessageBase({
   );
   const feedRoleLabel = getFeedRoleLabel(message.core.sender.kind);
   const FeedRoleIcon = getFeedRoleIcon(message.core.sender.kind);
-  const isInteractionDisabled = Boolean(isReadOnly);
+  // Staff can review private messages they are not part of, read-only.
+  const isStaffReview =
+    Boolean(messagesState?.enableStaffMessageReview) &&
+    isOutsideMessageAudience({
+      visibility: message.core.visibility,
+      senderProfileId: message.core.sender.ids.id,
+      viewerProfileId: currentUserId,
+    });
+  const isInteractionDisabled = Boolean(isReadOnly) || isStaffReview;
   const shouldHideQuickActions = shouldHideMessageQuickActions(message);
   const pendingReactionEmojis = actionState?.pendingReactionEmojis ?? [];
   const isSaving = Boolean(actionState?.isSaving);
@@ -224,7 +233,7 @@ export const MessageBase = memo(function MessageBase({
     message,
     currentUserId,
     canDeleteAnyMessages,
-    isReadOnly,
+    isReadOnly: isInteractionDisabled,
     actionState,
     onToggleSaved,
     onToggleHidden,

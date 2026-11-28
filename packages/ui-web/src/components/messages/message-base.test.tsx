@@ -1,9 +1,18 @@
 /* @vitest-environment jsdom */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MessageBase } from '@iconicedu/ui-web/components/messages/message-base';
+
+const messagesState = vi.hoisted(() => ({ current: undefined as unknown }));
+vi.mock(
+  '@iconicedu/ui-web/components/messages/context/messages-state-provider',
+  async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    useOptionalMessagesState: () => messagesState.current,
+  }),
+);
 import type { MessageVM, ThreadVM } from '@iconicedu/shared-types';
 
 const baseMessage: MessageVM = {
@@ -144,5 +153,64 @@ describe('MessageBase chat bubbles', () => {
       'border',
       'bg-muted/45',
     );
+  });
+});
+
+describe('MessageBase staff review of private messages', () => {
+  beforeEach(() => {
+    messagesState.current = { enableStaffMessageReview: true };
+  });
+  afterEach(() => {
+    messagesState.current = undefined;
+  });
+
+  const privateMessage: MessageVM = {
+    ...baseMessage,
+    core: {
+      ...baseMessage.core,
+      visibility: { type: 'specific-users', userIds: ['profile-1', 'parent-1'] },
+    },
+  };
+
+  it('is read-only for a viewer outside the audience', () => {
+    renderMessageBase({
+      message: privateMessage,
+      currentUserId: 'staff-1',
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'single',
+    });
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add emoji' })).toBeDisabled();
+  });
+
+  it.each(['parent-1', 'profile-1'])('stays interactive for audience member %s', (id) => {
+    renderMessageBase({
+      message: privateMessage,
+      currentUserId: id,
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'single',
+    });
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add emoji' })).toBeEnabled();
+  });
+
+  it('leaves private messages interactive while staff review is flagged off', () => {
+    messagesState.current = { enableStaffMessageReview: false };
+    renderMessageBase({
+      message: privateMessage,
+      currentUserId: 'staff-1',
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'single',
+    });
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled();
+  });
+
+  it('keeps everyone messages interactive for staff', () => {
+    renderMessageBase({
+      currentUserId: 'staff-1',
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'single',
+    });
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled();
   });
 });

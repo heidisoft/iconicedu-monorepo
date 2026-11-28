@@ -108,6 +108,9 @@ export default async function Page({
         enableMessageListFormatting={listFormattingEnabled}
         enableMessageSendReliability={messageSendReliabilityEnabled}
         enableMessageAudience={messageAudienceEnabled}
+        // Staff review of private messages ships with channel audiences; the
+        // API applies the same enable-channel-communications flag.
+        enableStaffMessageReview={messageAudienceEnabled}
         sendTextMessage={sendTextMessageAction}
         sendFileMessage={sendFileMessageAction}
         sendFilesMessage={sendFilesMessageAction}

@@ -12,6 +12,7 @@ import type {
 } from '@iconicedu/shared-types';
 import { LearningSpaceInfoPanel } from '@iconicedu/ui-web';
 import { MessagesShellClient } from '@iconicedu/web/app/(app)/[orgSlug]/messages/messages-shell-client';
+import type { MessageSendRejection } from '@iconicedu/web/lib/messages/message-send-rejection';
 
 export function LearningSpaceShell({
   orgSlug,
@@ -30,6 +31,7 @@ export function LearningSpaceShell({
   enableMessageListFormatting = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
+  enableStaffMessageReview = false,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
@@ -55,9 +57,16 @@ export function LearningSpaceShell({
   enableMessageListFormatting?: boolean;
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
-  sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
-  sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
-  sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
+  enableStaffMessageReview?: boolean;
+  sendTextMessage: (
+    input: MessageSendTextInput,
+  ) => Promise<MessageVM | MessageSendRejection>;
+  sendFileMessage: (
+    input: MessageSendFileInput,
+  ) => Promise<MessageVM | MessageSendRejection>;
+  sendFilesMessage: (
+    input: MessageSendFilesInput,
+  ) => Promise<MessageVM | MessageSendRejection>;
   editTextMessage: (input: MessageEditTextInput) => Promise<MessageVM>;
   toggleReaction: (input: {
     orgId: string;
@@ -93,6 +102,7 @@ export function LearningSpaceShell({
       enableMessageListFormatting={enableMessageListFormatting}
       enableMessageSendReliability={enableMessageSendReliability}
       enableMessageAudience={enableMessageAudience}
+      enableStaffMessageReview={enableStaffMessageReview}
       panelRegistry={{
         channel_info: (props) => (
           <LearningSpaceInfoPanel {...props} learningSpace={learningSpace} />
