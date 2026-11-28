@@ -96,3 +96,38 @@ it('rejects photos outside the configured bucket/profile folder', async () => {
   ).rejects.toBeInstanceOf(BadRequestException);
   expect(serviceRpc).not.toHaveBeenCalled();
 });
+it('rejects storage paths outside the profile folder', async () => {
+  await expect(
+    service.save('session', 'profile', {
+      ...valid,
+      avatarUrl: 'org/another-profile/photo-1.jpg',
+    }),
+  ).rejects.toBeInstanceOf(BadRequestException);
+  expect(serviceRpc).not.toHaveBeenCalled();
+});
+it('stores an uploaded photo as its private storage path', async () => {
+  await service.save('session', 'profile', {
+    ...valid,
+    avatarUrl: 'org/profile/1700000000000-abc123.jpg',
+  });
+  expect(serviceRpc.mock.calls[0][1].changes).toMatchObject({
+    avatar_url: 'org/profile/1700000000000-abc123.jpg',
+    avatar_source: 'upload',
+  });
+});
+it('normalises a legacy public bucket URL to its storage path', async () => {
+  const previous = process.env.SUPABASE_URL;
+  process.env.SUPABASE_URL = 'https://project.example.invalid/';
+  try {
+    await service.save('session', 'profile', {
+      ...valid,
+      avatarUrl:
+        'https://project.example.invalid/storage/v1/object/public/public-avatars/org/profile/1700000000000-abc123.jpg',
+    });
+  } finally {
+    process.env.SUPABASE_URL = previous;
+  }
+  expect(serviceRpc.mock.calls[0][1].changes).toMatchObject({
+    avatar_url: 'org/profile/1700000000000-abc123.jpg',
+  });
+});

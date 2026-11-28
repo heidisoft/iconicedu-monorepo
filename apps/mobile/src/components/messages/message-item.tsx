@@ -90,6 +90,7 @@ import { ChatPdfViewer } from './chat-pdf-viewer';
 import type { AttachmentPayload } from './attachment-sheet';
 import { isOutsideMessageAudience } from '@iconicedu/utils';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 const CHANNEL_FILES_BUCKET = 'channel-files';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -219,8 +220,8 @@ export function MessageAvatar({
   if (src) {
     return (
       <View style={[avatarStyles.wrap, { width: size, height: size }]}>
-        <Image
-          source={{ uri: src }}
+        <AvatarImage
+          uri={src}
           style={{ width: size, height: size, borderRadius: radius }}
           accessibilityLabel={name}
         />
@@ -821,8 +822,8 @@ function ThreadPill({
                   position: 'relative',
                 }}
               >
-                <Image
-                  source={{ uri: src }}
+                <AvatarImage
+                  uri={src}
                   style={{
                     width: 20,
                     height: 20,

@@ -60,16 +60,27 @@ export class ProfileSettingsService {
         .eq('id', id)
         .single();
       if (error || !profile) throw new ForbiddenException();
+      // The avatar bucket is private, so store the storage object path (the same
+      // shape web writes) and let clients sign it for display. Older mobile builds
+      // send the bucket's public URL; accept it and keep only the path.
+      const folder = `${profile.org_id}/${id}/`;
       const base = process.env.SUPABASE_URL?.replace(/\/$/, '');
-      const prefix = `${base}/storage/v1/object/public/public-avatars/${profile.org_id}/${id}/`;
+      const legacyPrefix = base
+        ? `${base}/storage/v1/object/public/public-avatars/`
+        : null;
+      const path =
+        typeof avatarUrl === 'string' &&
+        legacyPrefix &&
+        avatarUrl.startsWith(legacyPrefix)
+          ? avatarUrl.slice(legacyPrefix.length)
+          : avatarUrl;
       if (
-        typeof avatarUrl !== 'string' ||
-        !base ||
-        !avatarUrl.startsWith(prefix) ||
-        !/^[a-zA-Z0-9-]+\.jpg$/.test(avatarUrl.slice(prefix.length))
+        typeof path !== 'string' ||
+        !path.startsWith(folder) ||
+        !/^[a-zA-Z0-9-]+\.jpg$/.test(path.slice(folder.length))
       )
         throw new BadRequestException('Invalid profile photo.');
-      values.avatar_url = avatarUrl;
+      values.avatar_url = path;
       values.avatar_source = 'upload';
       values.avatar_updated_at = new Date().toISOString();
     }

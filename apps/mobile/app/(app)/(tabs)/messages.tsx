@@ -2,7 +2,6 @@ import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  Image,
   FlatList,
   ScrollView,
   TouchableOpacity,
@@ -67,6 +66,7 @@ import { useMessageDraftPreviews } from '@/hooks/use-message-draft';
 import { useHiddenChannels } from '@/hooks/use-hidden-channels';
 import { EyeOff, Eye, ChevronDown, ChevronRight, Archive } from 'lucide-react-native';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 type Tab = 'all' | 'dms' | 'channels';
 type ClassroomStudentTab = 'all' | string;
 
@@ -655,8 +655,8 @@ function DmAvatar({
     return (
       <View style={s.groupWrap}>
         {back!.avatar_url ? (
-          <Image
-            source={{ uri: back!.avatar_url }}
+          <AvatarImage
+            uri={back!.avatar_url}
             style={s.groupBack}
             accessibilityLabel={participantName(back!)}
           />
@@ -689,8 +689,8 @@ function DmAvatar({
         )}
         <RoleAvatarBadge role={back?.kind} size={14} style={s.groupBadgeBack} />
         {front!.avatar_url ? (
-          <Image
-            source={{ uri: front!.avatar_url }}
+          <AvatarImage
+            uri={front!.avatar_url}
             style={s.groupFront}
             accessibilityLabel={participantName(front!)}
           />
@@ -737,8 +737,8 @@ function DmAvatar({
   return (
     <View style={s.avatarWrap}>
       {person?.avatar_url ? (
-        <Image
-          source={{ uri: person.avatar_url }}
+        <AvatarImage
+          uri={person.avatar_url}
           style={s.avatarCircle}
           accessibilityLabel={name ?? undefined}
         />

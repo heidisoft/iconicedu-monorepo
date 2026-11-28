@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, Pressable, TouchableOpacity, StyleSheet } from 'react-native';
 import {
   AlertCircle,
   AtSign,
@@ -36,6 +36,7 @@ import {
 import { ActivityCompletionCheck } from '@/components/activity/activity-completion-check';
 import { ActivityCompletionCheckBatch } from '@/components/activity/activity-completion-check-batch';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -696,8 +697,8 @@ function ActivityLeading({
       testID="activity-leading-avatar"
     >
       {avatar.url ? (
-        <Image
-          source={{ uri: avatar.url }}
+        <AvatarImage
+          uri={avatar.url}
           style={isSubActivity ? s.subAvatar : s.avatar}
           accessibilityLabel={avatar.name}
         />

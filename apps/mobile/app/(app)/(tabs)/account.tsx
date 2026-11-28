@@ -3,7 +3,6 @@ import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  Image,
   ScrollView,
   StyleSheet,
   Alert,
@@ -38,6 +37,7 @@ import { QueryError } from '@/components/errors/query-error';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 import { formatBuildFingerprint, getMobileBuildInfo } from '@/lib/build-info';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function resolveAvatarColor(
@@ -334,7 +334,7 @@ export default function AccountScreen() {
           <View style={s.profileRow}>
             {avatarUrl ? (
               <View style={s.avatarWrap}>
-                <Image source={{ uri: avatarUrl }} style={s.avatarWrap} />
+                <AvatarImage uri={avatarUrl} style={s.avatarWrap} />
               </View>
             ) : (
               <View style={[s.avatarWrap, { backgroundColor: avatarBg }]}>
@@ -525,8 +525,8 @@ export default function AccountScreen() {
                       ]}
                     >
                       {option.avatarUrl ? (
-                        <Image
-                          source={{ uri: option.avatarUrl }}
+                        <AvatarImage
+                          uri={option.avatarUrl}
                           style={{ width: 36, height: 36 }}
                         />
                       ) : (

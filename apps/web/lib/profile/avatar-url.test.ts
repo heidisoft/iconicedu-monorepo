@@ -63,6 +63,18 @@ describe('resolveProfileAvatarUrl', () => {
     expect(getPublicUrl).toHaveBeenCalledWith('org/p/avatar.jpg');
   });
 
+  it('signs the object path behind a legacy public bucket URL', async () => {
+    const { supabase, createSignedUrl } = makeSupabase({
+      signedUrl: 'https://example.com/signed-avatar.jpg',
+    });
+    const legacy =
+      'https://project.example.invalid/storage/v1/object/public/public-avatars/org/p/1700-abc.jpg';
+    expect(await resolveProfileAvatarUrl(supabase, 'upload', legacy)).toBe(
+      'https://example.com/signed-avatar.jpg',
+    );
+    expect(createSignedUrl).toHaveBeenCalledWith('org/p/1700-abc.jpg', 3600);
+  });
+
   it('returns raw value for non-upload sources', async () => {
     const { supabase, createSignedUrl } = makeSupabase({});
     expect(await resolveProfileAvatarUrl(supabase, 'seed', 'seed-value')).toBe(

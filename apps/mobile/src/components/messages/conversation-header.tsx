@@ -13,7 +13,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Image,
   Platform,
   Modal,
   Pressable,
@@ -56,6 +55,7 @@ import {
   resolveExternalJoinProviderLabel,
 } from '@/lib/messages/live-session-join';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 const THEME_KEY_COLORS: Record<string, { bg: string; fg: string }> = {
   slate: { bg: '#667487', fg: '#ffffff' },
   gray: { bg: '#6e737a', fg: '#ffffff' },
@@ -895,7 +895,7 @@ export function ConversationHeader({
               style={s.groupBadgeBack}
             />
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={s.groupFront} />
+              <AvatarImage uri={avatarUrl} style={s.groupFront} />
             ) : (
               <View style={[s.groupFront, { backgroundColor: avatarColors.bg }]}>
                 <Text style={[s.groupTxt, { color: avatarColors.fg }]}>
@@ -915,7 +915,7 @@ export function ConversationHeader({
             accessibilityLabel={identityPress ? identityLabel : undefined}
           >
             {avatarUrl ? (
-              <Image source={{ uri: avatarUrl }} style={s.avatarCircle} />
+              <AvatarImage uri={avatarUrl} style={s.avatarCircle} />
             ) : (
               <View style={[s.avatarCircle, { backgroundColor: avatarColors.bg }]}>
                 <Text style={[s.avatarTxt, { color: avatarColors.fg }]}>
