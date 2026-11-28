@@ -10,6 +10,7 @@ import {
   Image as RNImage,
   ScrollView,
   Keyboard,
+  LayoutAnimation,
   Platform,
   Alert,
 } from 'react-native';
@@ -41,6 +42,8 @@ import {
   Bold,
   Italic,
   Check,
+  ChevronDown,
+  ChevronLeft,
 } from 'lucide-react-native';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { useAiAssistEligibility } from '@/hooks/use-ai-assist-eligibility';
@@ -629,6 +632,8 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
       backgroundColor: C.card,
     },
     audienceChipActive: { backgroundColor: C.actionSubtle, borderColor: C.action },
+    audienceChipRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    audienceChipIcon: { paddingHorizontal: 6 },
     audienceChipText: { color: C.text, fontSize: 12, fontWeight: '600' },
     audienceChipRole: { color: C.textMuted, fontSize: 11, fontWeight: '500' },
   });
@@ -682,6 +687,19 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 }) => {
   const [text, setText] = useState('');
   const [audienceProfileIds, setAudienceProfileIds] = useState<string[]>([]);
+  // The picker starts as a single chip showing the current audience; tapping it
+  // reveals the group and person options.
+  const [isAudienceExpanded, setIsAudienceExpanded] = useState(false);
+  const setAudienceExpanded = useCallback((expanded: boolean) => {
+    LayoutAnimation.configureNext(
+      LayoutAnimation.create(
+        180,
+        LayoutAnimation.Types.easeInEaseOut,
+        LayoutAnimation.Properties.opacity,
+      ),
+    );
+    setIsAudienceExpanded(expanded);
+  }, []);
   // A private message only reaches its audience (a thread reply inherits the
   // parent's), so only suggest people in it.
   const mentionAudienceIds = audienceProfileIds.length
@@ -1070,6 +1088,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           await draft.clearDraft();
         }
         setAudienceProfileIds([]);
+        setIsAudienceExpanded(false);
       } catch {
         // Failure — leave any persisted draft caption in place, matching the
         // text-send failure path below.
@@ -1110,6 +1129,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         await draft.clearDraft();
       }
       setAudienceProfileIds([]);
+      setIsAudienceExpanded(false);
     } catch {
       // Failure — leave any persisted draft in place so the user's text isn't
       // lost. The parent screen (when send-reliability is on) is responsible
@@ -1314,6 +1334,21 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     .filter((participant) => audienceProfileIds.includes(participant.id))
     .map((participant) => participant.name);
   // Mirrors the web "Replying privately · names" label for private thread replies.
+  const audienceGroupOptions = [
+    { label: 'Everyone', ids: [] as string[] },
+    ...(parentAudienceIds.length ? [{ label: 'Parents', ids: parentAudienceIds }] : []),
+    ...(tutorAudienceIds.length ? [{ label: 'Tutors', ids: tutorAudienceIds }] : []),
+  ];
+  const matchedAudienceGroup = audienceGroupOptions.find(
+    (option) =>
+      option.ids.length === audienceProfileIds.length &&
+      option.ids.every((id) => audienceProfileIds.includes(id)),
+  );
+  const currentAudienceLabel =
+    matchedAudienceGroup?.label ??
+    (selectedAudienceNames.length > 1
+      ? `${selectedAudienceNames[0]} +${selectedAudienceNames.length - 1}`
+      : (selectedAudienceNames[0] ?? 'Everyone'));
   const inheritedAudienceNames =
     !quoteReplyTo && replyTo?.core.visibility.type === 'specific-users'
       ? replyTo.core.visibility.userIds
@@ -1335,60 +1370,81 @@ export const MessageInput: React.FC<MessageInputProps> = ({
             contentContainerStyle={s.audienceContent}
           >
             <Text style={s.audienceLabel}>To:</Text>
-            {[
-              { label: 'Everyone', ids: [] as string[] },
-              ...(parentAudienceIds.length
-                ? [{ label: 'Parents', ids: parentAudienceIds }]
-                : []),
-              ...(tutorAudienceIds.length
-                ? [{ label: 'Tutors', ids: tutorAudienceIds }]
-                : []),
-            ].map((option) => {
-              const active =
-                option.ids.length === audienceProfileIds.length &&
-                option.ids.every((id) => audienceProfileIds.includes(id));
-              return (
+            {!isAudienceExpanded ? (
+              <TouchableOpacity
+                style={[s.audienceChip, s.audienceChipRow, s.audienceChipActive]}
+                onPress={() => setAudienceExpanded(true)}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: false }}
+                accessibilityLabel={`Audience: ${currentAudienceLabel}. Show audience options`}
+                testID="message-audience-toggle"
+              >
+                <Text style={s.audienceChipText}>{currentAudienceLabel}</Text>
+                <ChevronDown size={14} color={colors.textMuted} />
+              </TouchableOpacity>
+            ) : (
+              <>
                 <TouchableOpacity
-                  key={`group:${option.label}`}
-                  style={[s.audienceChip, active && s.audienceChipActive]}
-                  onPress={() => setAudienceProfileIds(option.ids)}
+                  style={[s.audienceChip, s.audienceChipIcon]}
+                  onPress={() => setAudienceExpanded(false)}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  accessibilityLabel={`Message audience ${option.label}`}
+                  accessibilityState={{ expanded: true }}
+                  accessibilityLabel="Hide audience options"
+                  testID="message-audience-collapse"
                 >
-                  <Text style={s.audienceChipText}>{option.label}</Text>
+                  <ChevronLeft size={14} color={colors.textMuted} />
                 </TouchableOpacity>
-              );
-            })}
-            {/* Specific people toggle independently, like the web checkboxes. */}
-            {selectableAudienceParticipants.map((participant) => {
-              const selected = audienceProfileIds.includes(participant.id);
-              const roleLabel = getAudienceRoleLabel(participant.role);
-              return (
-                <TouchableOpacity
-                  key={`person:${participant.id}`}
-                  style={[s.audienceChip, selected && s.audienceChipActive]}
-                  onPress={() =>
-                    setAudienceProfileIds((current) =>
-                      current.includes(participant.id)
-                        ? current.filter((id) => id !== participant.id)
-                        : [...current, participant.id],
-                    )
-                  }
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: selected, selected }}
-                  accessibilityLabel={`Message audience ${participant.name}`}
-                  accessibilityHint={roleLabel ?? undefined}
-                >
-                  <Text style={s.audienceChipText}>
-                    {participant.name}
-                    {roleLabel ? (
-                      <Text style={s.audienceChipRole}>{` · ${roleLabel}`}</Text>
-                    ) : null}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+                {audienceGroupOptions.map((option) => {
+                  const active =
+                    option.ids.length === audienceProfileIds.length &&
+                    option.ids.every((id) => audienceProfileIds.includes(id));
+                  return (
+                    <TouchableOpacity
+                      key={`group:${option.label}`}
+                      style={[s.audienceChip, active && s.audienceChipActive]}
+                      onPress={() => {
+                        setAudienceProfileIds(option.ids);
+                        setAudienceExpanded(false);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={`Message audience ${option.label}`}
+                    >
+                      <Text style={s.audienceChipText}>{option.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+                {/* Specific people toggle independently, like the web checkboxes, so the options stay open. */}
+                {selectableAudienceParticipants.map((participant) => {
+                  const selected = audienceProfileIds.includes(participant.id);
+                  const roleLabel = getAudienceRoleLabel(participant.role);
+                  return (
+                    <TouchableOpacity
+                      key={`person:${participant.id}`}
+                      style={[s.audienceChip, selected && s.audienceChipActive]}
+                      onPress={() =>
+                        setAudienceProfileIds((current) =>
+                          current.includes(participant.id)
+                            ? current.filter((id) => id !== participant.id)
+                            : [...current, participant.id],
+                        )
+                      }
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: selected, selected }}
+                      accessibilityLabel={`Message audience ${participant.name}`}
+                      accessibilityHint={roleLabel ?? undefined}
+                    >
+                      <Text style={s.audienceChipText}>
+                        {participant.name}
+                        {roleLabel ? (
+                          <Text style={s.audienceChipRole}>{` · ${roleLabel}`}</Text>
+                        ) : null}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
+            )}
           </ScrollView>
           {selectedAudienceNames.length ? (
             <Text style={s.audienceHint} testID="message-audience-summary">

@@ -362,6 +362,7 @@ describe('MessageInput — mention suggestions in private messages', () => {
         ]}
       />,
     );
+    fireEvent.press(screen.getByTestId('message-audience-toggle'));
     fireEvent.press(screen.getByLabelText('Message audience Pat Parent'));
     typeAt();
     expect(screen.getByLabelText('Mention Pat Parent')).toBeTruthy();

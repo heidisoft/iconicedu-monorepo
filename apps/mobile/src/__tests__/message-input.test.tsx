@@ -19,6 +19,7 @@ describe('MessageInput', () => {
           ]}
         />,
       );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       expect(screen.queryByLabelText('Message audience Sender')).toBeNull();
       fireEvent.press(screen.getByLabelText('Message audience Parent Alpha'));
       fireEvent.changeText(screen.getByLabelText('Message input'), 'Private');
@@ -28,12 +29,13 @@ describe('MessageInput', () => {
           audienceProfileIds: ['parent-A'],
         }),
       );
+      // A confirmed send resets the audience and folds the picker back to one chip.
       await waitFor(() =>
         expect(
-          screen.getByLabelText('Message audience Everyone').props.accessibilityState
-            .selected,
-        ).toBe(true),
+          screen.getByLabelText('Audience: Everyone. Show audience options'),
+        ).toBeTruthy(),
       );
+      expect(screen.queryByLabelText('Message audience Parent Alpha')).toBeNull();
       fireEvent.changeText(screen.getByLabelText('Message input'), 'Public');
       fireEvent.press(screen.getByLabelText('Send message'));
       await waitFor(() => expect(onSend).toHaveBeenLastCalledWith('Public'));
@@ -54,6 +56,7 @@ describe('MessageInput', () => {
         ]}
       />,
     );
+    fireEvent.press(screen.getByTestId('message-audience-toggle'));
     fireEvent.press(screen.getByLabelText('Message audience Parent Alpha'));
     fireEvent.changeText(screen.getByLabelText('Message input'), 'Private failed');
     fireEvent.press(screen.getByLabelText('Send message'));
@@ -86,6 +89,7 @@ describe('MessageInput', () => {
       />,
     );
 
+    fireEvent.press(screen.getByTestId('message-audience-toggle'));
     fireEvent.press(screen.getByLabelText('Message audience Parents'));
     fireEvent.changeText(screen.getByLabelText('Message input'), 'Welcome');
     fireEvent.press(screen.getByLabelText('Send message'));
@@ -124,6 +128,7 @@ describe('MessageInput', () => {
         />,
       );
       expect(screen.getByTestId('message-audience-picker')).toBeTruthy();
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       expect(screen.getByLabelText('Message audience Casey Student')).toBeTruthy();
     });
 
@@ -146,6 +151,7 @@ describe('MessageInput', () => {
 
     it('lets parents address only staff and tutors', () => {
       renderAs('parent-1');
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       expect(screen.getByLabelText('Message audience Sam Staff')).toBeTruthy();
       expect(screen.getByLabelText('Message audience Taylor Tutor')).toBeTruthy();
       expect(screen.queryByLabelText('Message audience Blair Parent')).toBeNull();
@@ -156,12 +162,14 @@ describe('MessageInput', () => {
     it('lets tutors address students and says the parent is included', () => {
       renderAs('tutor-1');
       expect(screen.queryByTestId('message-audience-guardian-hint')).toBeNull();
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       fireEvent.press(screen.getByLabelText('Message audience Casey Student'));
       expect(screen.getByTestId('message-audience-guardian-hint')).toBeTruthy();
     });
 
     it('lets staff address everyone', () => {
       renderAs('staff-1');
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       for (const name of [
         'Taylor Tutor',
         'Alex Parent',
@@ -190,6 +198,7 @@ describe('MessageInput', () => {
           audienceParticipants={channel}
         />,
       );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
       fireEvent.press(screen.getByLabelText('Message audience Taylor Tutor'));
       expect(
@@ -217,6 +226,7 @@ describe('MessageInput', () => {
           audienceParticipants={channel}
         />,
       );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
       fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
       expect(screen.queryByTestId('message-audience-summary')).toBeNull();
@@ -224,6 +234,70 @@ describe('MessageInput', () => {
         screen.getByLabelText('Message audience Everyone').props.accessibilityState
           .selected,
       ).toBe(true);
+    });
+
+    it('starts collapsed to the current audience and reveals the options on tap', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={channel}
+        />,
+      );
+      const toggle = screen.getByTestId('message-audience-toggle');
+      expect(toggle.props.accessibilityLabel).toBe(
+        'Audience: Everyone. Show audience options',
+      );
+      expect(screen.queryByLabelText('Message audience Parents')).toBeNull();
+      expect(screen.queryByLabelText('Message audience Alex Parent')).toBeNull();
+
+      fireEvent.press(toggle);
+      expect(screen.queryByTestId('message-audience-toggle')).toBeNull();
+      expect(screen.getByLabelText('Message audience Everyone')).toBeTruthy();
+      expect(screen.getByLabelText('Message audience Parents')).toBeTruthy();
+      expect(screen.getByLabelText('Message audience Alex Parent')).toBeTruthy();
+
+      fireEvent.press(screen.getByLabelText('Hide audience options'));
+      expect(screen.getByTestId('message-audience-toggle')).toBeTruthy();
+      expect(screen.queryByLabelText('Message audience Parents')).toBeNull();
+    });
+
+    it('folds back after picking a group and shows it on the chip', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={channel}
+        />,
+      );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
+      fireEvent.press(screen.getByLabelText('Message audience Parents'));
+      expect(
+        screen.getByLabelText('Audience: Parents. Show audience options'),
+      ).toBeTruthy();
+      expect(screen.queryByLabelText('Message audience Alex Parent')).toBeNull();
+    });
+
+    it('stays open while picking people and summarises them when folded', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={channel}
+        />,
+      );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
+      fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
+      fireEvent.press(screen.getByLabelText('Message audience Taylor Tutor'));
+      expect(screen.getByLabelText('Message audience Blair Parent')).toBeTruthy();
+
+      fireEvent.press(screen.getByLabelText('Hide audience options'));
+      expect(
+        screen.getByLabelText('Audience: Alex Parent +1. Show audience options'),
+      ).toBeTruthy();
+      expect(screen.getByTestId('message-audience-summary').props.children).toBe(
+        'Visible only to Alex Parent, Taylor Tutor and you',
+      );
     });
 
     it('labels each person with their role', () => {
@@ -234,6 +308,7 @@ describe('MessageInput', () => {
           audienceParticipants={channel}
         />,
       );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
       expect(screen.getAllByText(' · Parent')).toHaveLength(2);
       expect(screen.getByText(' · Tutor')).toBeTruthy();
     });

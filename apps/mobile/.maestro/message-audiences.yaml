@@ -7,6 +7,8 @@ name: Channel member message audiences
 - assertVisible:
     id: message-audience-picker
 - assertVisible: 'Everyone'
+- tapOn:
+    id: message-audience-toggle
 - tapOn: 'Parents'
 - tapOn:
     id: message-input
@@ -19,6 +21,8 @@ name: Channel member message audiences
 - tapOn:
     point: '5%,5%'
 - assertNotVisible: 'Visible to'
+- tapOn:
+    id: message-audience-toggle
 - tapOn: 'Tutors'
 - tapOn:
     id: message-input
