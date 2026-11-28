@@ -1,3 +1,8 @@
+import { completePendingReferralSignup } from '@/lib/referrals/complete-referral-signup';
+import {
+  clearPendingParentReferral,
+  readPendingParentReferral,
+} from '@/lib/referrals/pending-referral';
 import { BirthYearSelect } from '@/components/auth/birth-year-select';
 import { GradeLevelSelect, type GradeOption } from '@/components/auth/grade-level-select';
 import { fetchTimezoneLocationHint } from '@/lib/api/onboarding/queries';
@@ -14,6 +19,7 @@ import {
   Platform,
   StyleSheet,
   ActivityIndicator,
+  Alert,
   ScrollView,
   Animated,
   Easing,
@@ -1646,6 +1652,7 @@ export default function ProfileSetupScreen() {
     () =>
       !onboardingStatusQueryKey || !queryClient.getQueryData(onboardingStatusQueryKey),
   );
+  const [hasPendingReferral, setHasPendingReferral] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const roleClaimedRef = useRef(false);
@@ -1657,6 +1664,30 @@ export default function ProfileSetupScreen() {
       setStatusError(null);
       if (!onboardingStatusQueryKey) return;
       try {
+        if (!roleClaimedRef.current && sessionUserId) {
+          setHasPendingReferral(Boolean(await readPendingParentReferral(sessionUserId)));
+          const referralStatus = await completePendingReferralSignup(sessionUserId);
+          if (referralStatus) setHasPendingReferral(false);
+          if (
+            referralStatus === 'pending_review' ||
+            referralStatus === 'already_recorded' ||
+            referralStatus === 'not_eligible'
+          ) {
+            roleClaimedRef.current = true;
+            queryClient.removeQueries({ queryKey: onboardingStatusQueryKey });
+            queryClient.invalidateQueries({ queryKey: ['account-base', sessionUserId] });
+          }
+          if (referralStatus === 'not_eligible')
+            Alert.alert(
+              'Invitation',
+              'Referral rewards apply to new parent accounts only. You can continue with your existing account.',
+            );
+          if (referralStatus === 'unavailable')
+            Alert.alert(
+              'Invitation unavailable',
+              'This invitation is no longer available. You can still create your parent account.',
+            );
+        }
         let data: OnboardingStatus;
         try {
           data = await queryClient.fetchQuery({
@@ -1672,6 +1703,19 @@ export default function ProfileSetupScreen() {
             queryClient.removeQueries({ queryKey: onboardingStatusQueryKey });
             queryClient.invalidateQueries({ queryKey: ['account-base', sessionUserId] });
           }
+          data = await queryClient.fetchQuery({
+            queryKey: onboardingStatusQueryKey,
+            queryFn: fetchOnboardingStatus,
+            staleTime: 0,
+          });
+        }
+        // A failed invitation write can leave the new account/profile created but
+        // its role unassigned. Removing the invitation must still allow normal signup.
+        if (!data.primaryRole && (!data.profileKind || data.profileKind === 'guardian')) {
+          await completeParentRole();
+          roleClaimedRef.current = true;
+          queryClient.removeQueries({ queryKey: onboardingStatusQueryKey });
+          queryClient.invalidateQueries({ queryKey: ['account-base', sessionUserId] });
           data = await queryClient.fetchQuery({
             queryKey: onboardingStatusQueryKey,
             queryFn: fetchOnboardingStatus,
@@ -2164,7 +2208,7 @@ export default function ProfileSetupScreen() {
                 textAlign: 'center',
               }}
             >
-              Unable to connect
+              Unable to continue
             </Text>
             <Text
               style={{
@@ -2198,6 +2242,42 @@ export default function ProfileSetupScreen() {
                 Try again
               </Text>
             </TouchableOpacity>
+            {hasPendingReferral ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={{ minHeight: 44, justifyContent: 'center' }}
+                onPress={() =>
+                  Alert.alert(
+                    'Remove invitation?',
+                    'Continue signup without attaching this referral?',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      {
+                        text: 'Remove invitation',
+                        style: 'destructive',
+                        onPress: () => {
+                          void clearPendingParentReferral()
+                            .then(() => {
+                              setStatusLoading(true);
+                              setRetryCount((value) => value + 1);
+                            })
+                            .catch(() =>
+                              Alert.alert(
+                                'Unable to remove invitation',
+                                'Please try again.',
+                              ),
+                            );
+                        },
+                      },
+                    ],
+                  )
+                }
+              >
+                <Text style={{ color: colors.textMuted }}>
+                  Continue without invitation
+                </Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
         ) : (
           <ActivityIndicator color={colors.teal} size="large" />

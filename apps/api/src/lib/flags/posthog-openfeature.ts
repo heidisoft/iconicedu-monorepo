@@ -17,6 +17,8 @@ type EvaluateApiBooleanFlagInput = {
   distinctId: string;
   personProperties?: Record<string, string | number | boolean | null>;
   timeoutMs?: number;
+  /** Set false for switches that must honor PostHog even in local/preview environments. */
+  allowLocalOverride?: boolean;
 };
 
 const DEFAULT_POSTHOG_HOST = 'https://t.iconicedu.lk';
@@ -24,10 +26,14 @@ const DEFAULT_TIMEOUT_MS = 2500;
 const PROVIDER_NAME = 'iconicedu-api-posthog-openfeature-provider';
 
 function getPosthogHost() {
+  if (process.env.NODE_ENV !== 'production' && process.env.POSTHOG_FLAGS_HOST?.trim())
+    return process.env.POSTHOG_FLAGS_HOST.trim();
   return (process.env.POSTHOG_HOST ?? DEFAULT_POSTHOG_HOST).trim();
 }
 
 function getPosthogKey() {
+  if (process.env.NODE_ENV !== 'production' && process.env.POSTHOG_FLAGS_KEY?.trim())
+    return process.env.POSTHOG_FLAGS_KEY.trim();
   return (process.env.POSTHOG_KEY ?? '').trim();
 }
 
@@ -182,7 +188,7 @@ export async function evaluateApiBooleanFlag(
 ): Promise<boolean> {
   const distinctId = input.distinctId.trim();
   if (!distinctId) return false;
-  if (isLocalOrPreviewApiEnvironment()) return true;
+  if (input.allowLocalOverride !== false && isLocalOrPreviewApiEnvironment()) return true;
 
   return getOpenFeatureClient().getBooleanValue(input.flagKey, false, {
     targetingKey: distinctId,

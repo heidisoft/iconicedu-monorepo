@@ -565,14 +565,6 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     },
     editBannerTxt: { fontSize: 12, fontWeight: '600', color: C.teal },
 
-    // Draft status hint ("Draft saved" / "Draft restored")
-    draftStatus: {
-      paddingHorizontal: 16,
-      paddingTop: 4,
-      backgroundColor: C.bg,
-    },
-    draftStatusTxt: { fontSize: 12, color: C.textFaint },
-
     // Formatting toolbar (Bold / Italic)
     formattingToolbar: {
       flexDirection: 'row',
@@ -1521,15 +1513,6 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       {isEditing && (
         <View style={s.editBanner}>
           <Text style={s.editBannerTxt}>Editing message</Text>
-        </View>
-      )}
-
-      {/* Draft status hint — only ever shown outside edit mode */}
-      {enableDrafts && !isEditing && draft.status !== 'idle' && (
-        <View style={s.draftStatus}>
-          <Text style={s.draftStatusTxt} accessibilityLabel={`Draft ${draft.status}`}>
-            {draft.status === 'restored' ? 'Draft restored' : 'Draft saved'}
-          </Text>
         </View>
       )}
 

@@ -91,3 +91,21 @@ Mobile onboarding uses `getCountryAddressFields` from `@iconicedu/shared-types` 
 Administrative-area lists in `country-regions.ts` use the same upstream metadata and include aliases for provider abbreviations and local names. Where available, mobile displays a searchable state/province/emirate picker; the API normalizes recognized region values to the displayed label and rejects unknown selections.
 
 `GET /profiles/location-hint?timezone=...` is authenticated and enriches a known timezone city through Nominatim. Requests contain the representative city/country, never device coordinates. Lookups are deduplicated, throttled, bounded, and cached; ambiguity, provider errors, and unsupported timezone IDs keep the offline city/country hint. Only returned, format-valid postal codes are suggested. Users must review these editable hints because a timezone covers more than one actual address. Device location continues to prefill native reverse-geocoding results. Country changes reset the previous country's region; asynchronous timezone hints preserve user edits and cannot supersede a newer device-location request.
+
+### Native popup spacing
+
+Keep existing section layouts when adding mobile editing. Page-sheet editors and
+selection lists use `SheetContent` from `@iconicedu/ui-native`: a sheet-local
+safe-area provider, 24-point top spacing, and left/right/bottom safe-area edges.
+Do not reuse the presenting screen’s top inset inside an iOS page sheet. Use
+20-point horizontal content gutters and at least 44-point action/close targets.
+Custom bottom sheets include home-indicator clearance plus 16 points of breathing
+room; centered dialogs include safe-area clearance and 20-point outer gutters.
+Keep system photo, camera, and confirmation dialogs native. Preserve edge-to-edge
+media viewers, applying safe areas to their controls rather than the media.
+
+Native popup headers place Close/Cancel on the left and Edit/Save/Done on the
+right. Center a sheet title between equally sized action areas. Keep section
+Edit actions at the right of their existing heading and the photo Edit action
+below the image. Do not move search-clear controls: they belong inside the
+search field. Use the system-provided action order for native alerts and pickers.

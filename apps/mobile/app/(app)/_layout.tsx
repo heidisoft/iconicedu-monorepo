@@ -1,3 +1,8 @@
+import { Alert } from 'react-native';
+import {
+  readPendingParentReferral,
+  clearPendingParentReferral,
+} from '@/lib/referrals/pending-referral';
 import React, { useEffect, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
@@ -39,11 +44,24 @@ export default function AppLayout() {
     let cancelled = false;
     const userId = session.user.id;
 
-    queryClient
-      .fetchQuery({
-        queryKey: queryKeys.onboardingStatus(userId),
-        queryFn: fetchOnboardingStatus,
-        staleTime: 5 * 60 * 1000,
+    Promise.resolve()
+      .then(async () => {
+        // Bind an accepted invitation to this login even when onboarding is already complete.
+        const pending = await readPendingParentReferral(userId).catch(() => null);
+        const status = await queryClient.fetchQuery({
+          queryKey: queryKeys.onboardingStatus(userId),
+          queryFn: fetchOnboardingStatus,
+          staleTime: 5 * 60 * 1000,
+        });
+        if (status.isComplete && pending) {
+          await clearPendingParentReferral({ code: pending.code, ownerId: userId });
+          if (!cancelled)
+            Alert.alert(
+              'Invitation',
+              'Referral rewards apply to new parent accounts only. You can continue with your existing account.',
+            );
+        }
+        return status;
       })
       .then((status) => {
         if (cancelled) return;

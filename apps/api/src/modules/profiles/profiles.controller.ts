@@ -1,10 +1,17 @@
+import type {
+  ProfileSettingsInput,
+  ProfileSettingsSectionInput,
+} from '@iconicedu/shared-types';
+import { ProfileSettingsService } from './profile-settings.service';
 import { TimezoneLocationService } from './timezone-location.service';
 import { UpdateProfileLocationDto } from './dto/update-profile-location.dto';
 import {
   Body,
+  Delete,
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -21,6 +28,7 @@ import {
 @Controller('profiles')
 export class ProfilesController {
   constructor(
+    private readonly profileSettingsService: ProfileSettingsService,
     private readonly profilesService: ProfilesService,
     private readonly timezoneLocationService: TimezoneLocationService,
   ) {}
@@ -80,6 +88,7 @@ export class ProfilesController {
       countryName?: string | null;
       postalCode?: string | null;
       themeKey?: string | null;
+      locale?: string | null;
     },
   ) {
     return this.profilesService.createChildProfile(
@@ -122,6 +131,38 @@ export class ProfilesController {
   @UseGuards(AuthGuard)
   get(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
     return this.profilesService.get(extractBearerToken(req.headers.authorization), id);
+  }
+
+  @Get(':id/settings')
+  @UseGuards(AuthGuard)
+  settings(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    return this.profileSettingsService.get(
+      extractBearerToken(req.headers.authorization),
+      id,
+    );
+  }
+
+  @Put(':id/settings')
+  @UseGuards(AuthGuard)
+  saveSettings(
+    @Req() req: AuthenticatedRequest,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ProfileSettingsInput | ProfileSettingsSectionInput,
+  ) {
+    return this.profileSettingsService.save(
+      extractBearerToken(req.headers.authorization),
+      id,
+      body,
+    );
+  }
+
+  @Delete(':id/family-child')
+  @UseGuards(AuthGuard)
+  removeChild(@Req() req: AuthenticatedRequest, @Param('id', ParseUUIDPipe) id: string) {
+    return this.profileSettingsService.remove(
+      extractBearerToken(req.headers.authorization),
+      id,
+    );
   }
 
   @Put(':id/location')

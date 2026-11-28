@@ -10,5 +10,6 @@ import { SpacesService } from '@iconicedu/api/modules/spaces/spaces.service';
   imports: [AuthModule, RemindersModule],
   controllers: [SpacesController, AdminLearningSpacesController],
   providers: [SpacesService, LearningSpaceLifecycleService],
+  exports: [LearningSpaceLifecycleService],
 })
 export class SpacesModule {}

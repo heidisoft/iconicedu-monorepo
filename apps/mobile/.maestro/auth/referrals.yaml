@@ -1,0 +1,137 @@
+appId: ${APP_ID}
+name: Invitation acceptance, cancellation, ordinary signup, and signed-in rejection
+---
+- launchApp:
+    stopApp: false
+    permissions:
+      location: never
+- openLink:
+    link: ${DEV_CLIENT_URL}
+    autoVerify: true
+- runFlow:
+    when:
+      visible: '^Open$'
+    commands:
+      - tapOn: '^Open$'
+- extendedWaitUntil:
+    visible: .*Got it.*|Email
+    timeout: 90000
+- tapOn:
+    id: whats-new-dismiss
+    optional: true
+- extendedWaitUntil:
+    visible:
+      id: auth-email-input
+    timeout: 90000
+- extendedWaitUntil:
+    visible:
+      id: auth-email-input
+    timeout: 30000
+- runScript: verify-runtime.js
+- runFlow:
+    when:
+      true: ${REFERRAL_MODE == 'cancel' || REFERRAL_MODE == 'accept'}
+    commands:
+      - openLink:
+          link: ${REFERRAL_URL}
+          autoVerify: true
+      - runFlow:
+          when:
+            visible: '^Open$'
+          commands:
+            - tapOn: '^Open$'
+      - extendedWaitUntil:
+          visible: Support your child’s next step
+          timeout: 30000
+      - tapOn: Close invitation
+      - extendedWaitUntil:
+          visible:
+            id: auth-email-input
+          timeout: 30000
+      - openLink:
+          link: ${REFERRAL_URL}
+          autoVerify: true
+      - runFlow:
+          when:
+            visible: '^Open$'
+          commands:
+            - tapOn: '^Open$'
+      - scrollUntilVisible:
+          element: Create your parent account
+          direction: DOWN
+      - tapOn: Create your parent account
+      - extendedWaitUntil:
+          visible:
+            id: auth-email-input
+          timeout: 30000
+- runFlow:
+    when:
+      true: ${REFERRAL_MODE == 'cancel'}
+    commands:
+      - tapOn:
+          id: auth-email-input
+      - inputText: ${TEST_CANCEL_EMAIL}
+      - hideKeyboard
+      - runFlow:
+          when:
+            visible:
+              id: auth-submit
+              enabled: true
+          commands:
+            - tapOn:
+                id: auth-submit
+      - extendedWaitUntil:
+          visible:
+            id: auth-otp-input
+          timeout: 30000
+      - tapOn: '.*Back.*'
+      - extendedWaitUntil:
+          visible:
+            id: auth-email-input
+          timeout: 30000
+      - tapOn:
+          id: auth-email-input
+      - tapOn: Clear email
+
+- tapOn:
+    id: auth-email-input
+- inputText: ${TEST_EMAIL}
+- hideKeyboard
+- runFlow:
+    when:
+      visible:
+        id: auth-submit
+        enabled: true
+    commands:
+      - tapOn:
+          id: auth-submit
+- extendedWaitUntil:
+    visible:
+      id: auth-otp-input
+    timeout: 30000
+- retry:
+    maxRetries: 5
+    commands:
+      - runScript: read-otp.js
+- tapOn:
+    id: auth-otp-input
+- inputText: ${output.otp}
+- extendedWaitUntil:
+    visible: Your name
+    timeout: 45000
+- openLink:
+    link: ${REFERRAL_URL}
+    autoVerify: true
+- runFlow:
+    when:
+      visible: '^Open$'
+    commands:
+      - tapOn: '^Open$'
+- extendedWaitUntil:
+    visible: Invitations are for new parents
+    timeout: 30000
+- assertNotVisible: Create your parent account
+- tapOn: Close invitation
+- extendedWaitUntil:
+    visible: Your name
+    timeout: 30000

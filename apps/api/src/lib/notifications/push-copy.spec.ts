@@ -90,3 +90,27 @@ describe('buildPersonalizedSessionCopy completion checks', () => {
     expect(copy?.summary).toContain("How did Priya's class with Ms. Chen go?");
   });
 });
+
+describe('buildPersonalizedSessionCopy dispute reports', () => {
+  it('words a wrongly-marked-complete report differently from a dispute', () => {
+    const payload = { title: 'Algebra', reportedByDisplayName: 'Priya' };
+
+    expect(
+      buildPersonalizedSessionCopy(
+        'session.completion.dispute_reported',
+        payload,
+        'staff-1',
+      )?.title,
+    ).toBe("Priya reported Algebra didn't happen");
+    expect(
+      buildPersonalizedSessionCopy(
+        'session.completion.dispute_reported',
+        { ...payload, reportKind: 'wrongly_completed' },
+        'staff-1',
+      ),
+    ).toEqual({
+      title: 'Priya reported Algebra was wrongly marked complete',
+      summary: 'Tap to review the completion',
+    });
+  });
+});

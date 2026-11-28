@@ -1,6 +1,11 @@
 import { supabase } from '@/lib/supabase/client';
 import { apiGet, apiPost, apiPut } from '@/lib/api/http-client';
-import type { ChildProfileVM, LocationSuggestion } from '@iconicedu/shared-types';
+import type {
+  ChildProfileVM,
+  LocationSuggestion,
+  ParentReferralInput,
+  ParentReferralSignupResult,
+} from '@iconicedu/shared-types';
 import type { DayAvailability, OnboardingStatus } from '@/lib/api/types';
 
 export function fetchOnboardingStatus(): Promise<OnboardingStatus> {
@@ -22,8 +27,13 @@ async function doFetchOnboardingStatus(): Promise<OnboardingStatus> {
   return apiGet<OnboardingStatus>('/onboarding/status');
 }
 
-export async function completeParentRole(): Promise<void> {
-  await apiPost('/onboarding/role', { role: 'parent' });
+export async function completeParentRole(
+  referral?: ParentReferralInput,
+): Promise<ParentReferralSignupResult> {
+  return apiPost<ParentReferralSignupResult>('/onboarding/role', {
+    role: 'parent',
+    ...referral,
+  });
 }
 
 export async function createChildProfile(input: {
@@ -33,6 +43,9 @@ export async function createChildProfile(input: {
   lastName: string;
   gradeLevel: string;
   birthYear: number;
+  email?: string;
+  themeKey?: string;
+  locale?: string;
   timezone?: string | null;
   city?: string | null;
   region?: string | null;

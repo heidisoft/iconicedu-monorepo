@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { notFound, redirect } from 'next/navigation';
 
 import OrgGetStartedClient from '@iconicedu/web/app/(auth)/[orgSlug]/get-started/org-get-started-client';
@@ -10,6 +10,12 @@ import { createSupabaseServerClient } from '@iconicedu/web/lib/supabase/server';
 import { createSupabaseServiceClient } from '@iconicedu/web/lib/supabase/service';
 import { buildOrgBySlug } from '@iconicedu/web/lib/org/builders/org.builder';
 import { enableMobileAppleSignIn, enableMobileGoogleSignIn } from '@iconicedu/web/flags';
+import { enableParentReferrals } from '@iconicedu/web/flags';
+import {
+  PARENT_REFERRAL_COOKIE,
+  PARENT_REFERRAL_CANCELLED_COOKIE,
+  isParentReferralCode,
+} from '@iconicedu/web/lib/referrals/referral-cookie';
 import { isMobileOrTablet } from '@iconicedu/web/lib/mobile/detect-mobile';
 
 export const metadata: Metadata = {
@@ -59,7 +65,15 @@ export default async function OrgGetStartedPage({
     );
   }
 
-  const isMobile = isMobileOrTablet(await headers());
+  const cookieStore = await cookies();
+  const rawReferralCode = cookieStore.get(PARENT_REFERRAL_COOKIE)?.value;
+  const referralCode =
+    cookieStore.get(PARENT_REFERRAL_CANCELLED_COOKIE)?.value === rawReferralCode
+      ? undefined
+      : rawReferralCode;
+  const referredSignup =
+    (await enableParentReferrals()) && isParentReferralCode(referralCode);
+  const isMobile = !referredSignup && isMobileOrTablet(await headers());
 
   const [showGoogleSignIn, showAppleSignIn] = await Promise.all([
     enableMobileGoogleSignIn(),
@@ -74,6 +88,7 @@ export default async function OrgGetStartedPage({
           orgSlug={org.slug}
           orgName={org.name}
           initialEmail={initialEmail}
+          initialReferralCode={referredSignup ? referralCode : undefined}
           enableGoogleSignIn={showGoogleSignIn}
           enableAppleSignIn={showAppleSignIn}
         />

@@ -1,4 +1,5 @@
 export const platformFeatureFlagKeys = {
+  enableParentReferrals: 'enable-parent-referrals',
   enableClassroomWhiteboard: 'classroom-whiteboard',
   enableClassroomMeetingSettings: 'classroom-meeting-settings',
   enableMobileOnboardingAddressSearch: 'enable-mobile-onboarding-address-search',
@@ -15,6 +16,8 @@ export const platformFeatureFlagKeys = {
   enableMobileMessageComposerParity: 'enable-mobile-message-composer-parity',
   enableMessageSendReliability: 'enable-message-send-reliability',
   enableChannelCommunications: 'enable-channel-communications',
+  enableMobileCompletedSessionsList: 'enable-mobile-completed-sessions-list',
+  enableSessionCompletionReports: 'enable-session-completion-reports',
   mobileMinAppVersion: 'mobile-min-app-version',
 } as const;
 

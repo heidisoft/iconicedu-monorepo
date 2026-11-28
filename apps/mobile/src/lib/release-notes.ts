@@ -15,12 +15,11 @@ export type ReleaseNotes = {
 };
 
 export const currentReleaseNotes: ReleaseNotes = {
-  id: '2026-09-29-ai-messaging',
-  title: 'Write messages faster with AI',
+  id: '2026-11-25-mobile-onboarding-updates',
+  title: "What's new in ICONIC Academy",
   items: [
-    '"Refine with AI" rewrites your draft — clearer, shorter, warmer, more professional, or translated — right from the composer.',
-    'AI-suggested replies offer 2–3 quick options above the composer for messages you receive.',
-    'Nothing is ever sent automatically — you always review and edit before sending.',
+    'Set up your profile with a display name and easier birth year and grade selection.',
+    'Find your country, region, and time zone with searchable options during setup.',
+    'App updates download quietly and apply the next time the app starts, without interrupting your current work.',
   ],
-  requiresAiAssistEligibility: true,
 };

@@ -7,12 +7,19 @@ import { findCountryRegion, getCountryRegions } from '@iconicedu/shared-types';
 import { useTheme } from '@/providers/theme-provider';
 
 type Props = {
+  disabled?: boolean;
   countryCode: string;
   value: string;
   label: string;
   onChange: (value: string) => void;
 };
-export function LocationRegionField({ countryCode, value, label, onChange }: Props) {
+export function LocationRegionField({
+  countryCode,
+  value,
+  label,
+  onChange,
+  disabled = false,
+}: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
@@ -34,7 +41,8 @@ export function LocationRegionField({ countryCode, value, label, onChange }: Pro
         accessibilityRole="button"
         accessibilityLabel={label}
         accessibilityValue={{ text: selected?.label ?? `Choose ${label.toLowerCase()}` }}
-        accessibilityState={{ expanded: open }}
+        accessibilityState={{ expanded: open, disabled }}
+        disabled={disabled}
         onPress={() => {
           Keyboard.dismiss();
           setOpen(true);

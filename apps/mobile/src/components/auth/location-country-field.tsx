@@ -6,6 +6,7 @@ import { SearchableSelectionSheet } from '@iconicedu/ui-native/components/search
 import type { AppColors } from '@/lib/theme';
 
 type Props = {
+  disabled?: boolean;
   countries: readonly { code: string; label: string }[];
   countryCode: string;
   onChange: (code: string) => void;
@@ -17,6 +18,7 @@ export function LocationCountryField({
   countryCode,
   onChange,
   colors,
+  disabled = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
@@ -36,7 +38,8 @@ export function LocationCountryField({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Country: ${selected?.label ?? 'Choose country'}. Change country`}
-        accessibilityState={{ expanded: open }}
+        accessibilityState={{ expanded: open, disabled }}
+        disabled={disabled}
         onPress={() => {
           Keyboard.dismiss();
           setOpen(true);

@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import DateTimePicker, {
@@ -41,7 +42,7 @@ function makeStyles(C: AppColors) {
       borderWidth: 1,
       borderColor: C.border,
       backgroundColor: C.card,
-      padding: 18,
+      padding: 24,
     },
     title: { fontSize: 17, fontWeight: '700', color: C.text },
     actions: {
@@ -51,6 +52,8 @@ function makeStyles(C: AppColors) {
       marginTop: 8,
     },
     btn: {
+      minHeight: 44,
+      justifyContent: 'center',
       paddingHorizontal: 16,
       paddingVertical: 10,
       borderRadius: 14,
@@ -71,6 +74,7 @@ export const ScheduleDateTimePicker: React.FC<ScheduleDateTimePickerProps> = ({
   title = 'Schedule send',
 }) => {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = useMemo(() => makeStyles(colors), [colors]);
   const [pickedDate, setPickedDate] = useState<Date>(initialDate ?? new Date());
   const [pickedTime, setPickedTime] = useState<Date>(initialDate ?? new Date());
@@ -122,7 +126,17 @@ export const ScheduleDateTimePicker: React.FC<ScheduleDateTimePickerProps> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
-      <View style={s.backdrop}>
+      <View
+        style={[
+          s.backdrop,
+          {
+            paddingTop: popupInsets.top + 24,
+            paddingBottom: popupInsets.bottom + 24,
+            paddingLeft: popupInsets.left + 20,
+            paddingRight: popupInsets.right + 20,
+          },
+        ]}
+      >
         <View style={s.card}>
           <Text style={s.title}>{title}</Text>
           <DateTimePicker

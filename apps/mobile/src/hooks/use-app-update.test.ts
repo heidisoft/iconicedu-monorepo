@@ -1,113 +1,116 @@
-import { renderHook, waitFor } from '@testing-library/react-native';
+import { act, renderHook, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { useAppUpdate } from './use-app-update';
 
 const mockCheckForUpdateAsync = jest.fn();
 const mockFetchUpdateAsync = jest.fn();
 const mockReloadAsync = jest.fn();
+let mockIsUpdatePending = false;
+let mockIsEnabled = true;
 
 jest.mock('expo-updates', () => ({
+  get isEnabled() {
+    return mockIsEnabled;
+  },
+  useUpdates: () => ({ isUpdatePending: mockIsUpdatePending }),
   checkForUpdateAsync: (...args: unknown[]) => mockCheckForUpdateAsync(...args),
   fetchUpdateAsync: (...args: unknown[]) => mockFetchUpdateAsync(...args),
   reloadAsync: (...args: unknown[]) => mockReloadAsync(...args),
 }));
 
-// __DEV__ is true by default in the jest/react-native environment.
-// Tests that exercise the non-dev path flip it to false before rendering.
 const setDev = (value: boolean) => {
   Object.defineProperty(global, '__DEV__', { value, writable: true, configurable: true });
 };
 
-const { useAppUpdate } = require('./use-app-update');
-
 describe('useAppUpdate', () => {
+  let alert: jest.SpyInstance;
+
   beforeEach(() => {
-    jest.clearAllMocks();
-    setDev(false); // default to production-like env for most tests
-  });
-
-  afterAll(() => {
-    setDev(true); // restore for any tests that run after this suite
-  });
-
-  it('fetches and reloads when an update is available', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true });
-    mockFetchUpdateAsync.mockResolvedValue(undefined);
+    jest.resetAllMocks();
+    setDev(false);
+    mockIsEnabled = true;
+    mockIsUpdatePending = false;
+    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: false });
+    mockFetchUpdateAsync.mockResolvedValue({ isNew: true });
     mockReloadAsync.mockResolvedValue(undefined);
-
-    renderHook(() => useAppUpdate());
-
-    await waitFor(() => {
-      expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1);
-      expect(mockFetchUpdateAsync).toHaveBeenCalledTimes(1);
-      expect(mockReloadAsync).toHaveBeenCalledTimes(1);
-    });
+    alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
-  it('does not fetch or reload when no update is available', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: false });
-
-    renderHook(() => useAppUpdate());
-
-    await waitFor(() => {
-      expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1);
-    });
-
-    expect(mockFetchUpdateAsync).not.toHaveBeenCalled();
-    expect(mockReloadAsync).not.toHaveBeenCalled();
-  });
-
-  it('silently swallows errors during the update check', async () => {
-    mockCheckForUpdateAsync.mockRejectedValue(new Error('network error'));
-
-    // Should not throw
-    const { result } = renderHook(() => useAppUpdate());
-
-    await waitFor(() => {
-      expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1);
-    });
-
-    expect(result.error).toBeUndefined();
-    expect(mockFetchUpdateAsync).not.toHaveBeenCalled();
-    expect(mockReloadAsync).not.toHaveBeenCalled();
-  });
-
-  it('silently swallows errors during fetch', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true });
-    mockFetchUpdateAsync.mockRejectedValue(new Error('fetch failed'));
-
-    const { result } = renderHook(() => useAppUpdate());
-
-    await waitFor(() => {
-      expect(mockFetchUpdateAsync).toHaveBeenCalledTimes(1);
-    });
-
-    expect(result.error).toBeUndefined();
-    expect(mockReloadAsync).not.toHaveBeenCalled();
-  });
-
-  it('skips the update check in dev mode (__DEV__ === true)', async () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
     setDev(true);
-
-    renderHook(() => useAppUpdate());
-
-    // Give the effect time to (not) fire
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(mockCheckForUpdateAsync).not.toHaveBeenCalled();
   });
 
-  it('only runs the check once even when the component re-renders', async () => {
-    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: false });
-
+  it('downloads silently and never prompts or restarts when an update becomes pending', async () => {
+    mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true });
     const { rerender } = renderHook(() => useAppUpdate());
+    await waitFor(() => expect(mockFetchUpdateAsync).toHaveBeenCalledTimes(1));
+    mockIsUpdatePending = true;
+    rerender({});
+    mockIsUpdatePending = false;
+    rerender({});
+    mockIsUpdatePending = true;
+    rerender({});
+    expect(alert).not.toHaveBeenCalled();
+    expect(mockReloadAsync).not.toHaveBeenCalled();
+  });
 
-    await waitFor(() => {
-      expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1);
-    });
+  it('does not prompt or restart for an update downloaded by the native launch check', async () => {
+    mockIsUpdatePending = true;
+    renderHook(() => useAppUpdate());
+    await act(async () => {});
+    expect(alert).not.toHaveBeenCalled();
+    expect(mockReloadAsync).not.toHaveBeenCalled();
+  });
 
+  it('does not download or prompt when no update is available', async () => {
+    renderHook(() => useAppUpdate());
+    await waitFor(() => expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1));
+    expect(mockFetchUpdateAsync).not.toHaveBeenCalled();
+    expect(mockReloadAsync).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
+  });
+
+  it.each(['check', 'download'])(
+    'keeps the session running after a %s failure',
+    async (stage) => {
+      mockCheckForUpdateAsync.mockResolvedValue({ isAvailable: true });
+      if (stage === 'check')
+        mockCheckForUpdateAsync.mockRejectedValue(new Error('offline'));
+      else mockFetchUpdateAsync.mockRejectedValue(new Error('offline'));
+      renderHook(() => useAppUpdate());
+      await act(async () => {});
+      expect(mockReloadAsync).not.toHaveBeenCalled();
+      expect(alert).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(['development', 'disabled'])('skips updates when %s', (mode) => {
+    setDev(mode === 'development');
+    mockIsEnabled = mode !== 'disabled';
+    mockIsUpdatePending = true;
+    renderHook(() => useAppUpdate());
+    expect(mockCheckForUpdateAsync).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
+  });
+
+  it('checks only once across rerenders', async () => {
+    const { rerender } = renderHook(() => useAppUpdate());
+    await waitFor(() => expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1));
     rerender({});
     rerender({});
-
-    // Still only one call
     expect(mockCheckForUpdateAsync).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not start a download after unmount', async () => {
+    let resolveCheck!: (value: { isAvailable: boolean }) => void;
+    mockCheckForUpdateAsync.mockReturnValue(
+      new Promise((resolve) => (resolveCheck = resolve)),
+    );
+    const { unmount } = renderHook(() => useAppUpdate());
+    unmount();
+    await act(async () => resolveCheck({ isAvailable: true }));
+    expect(mockFetchUpdateAsync).not.toHaveBeenCalled();
+    expect(alert).not.toHaveBeenCalled();
   });
 });

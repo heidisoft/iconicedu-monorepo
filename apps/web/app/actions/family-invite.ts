@@ -13,10 +13,8 @@ import {
   acceptFamilyInvite,
   createFamilyInvite,
   deleteFamilyInvite,
-  getFamilyInviteAdminClient,
   mapFamilyLinkInviteRowToVM,
 } from '@iconicedu/web/lib/family/queries/invite.query';
-import { reportWebObservedError } from '@iconicedu/web/lib/analytics/report-error';
 
 type ResolvedGuardianContext = {
   supabase: SupabaseClient;
@@ -106,33 +104,7 @@ export async function revokeFamilyInviteAction(input: { inviteId: string }) {
     orgId,
   });
 
-  if (inviteRow.status === 'pending' && inviteRow.invited_email) {
-    try {
-      const adminClient = getFamilyInviteAdminClient();
-      const { data: accountRow } = await adminClient
-        .from('accounts')
-        .select('auth_user_id')
-        .eq('org_id', orgId)
-        .eq('email', inviteRow.invited_email)
-        .limit(1)
-        .maybeSingle();
-
-      if (accountRow?.auth_user_id) {
-        await adminClient.auth.admin.deleteUser(accountRow.auth_user_id);
-      }
-    } catch (error) {
-      reportWebObservedError({
-        error,
-        source: 'web.actions.family_invite.cleanup_invited_user',
-        message: 'Failed to clean up invited user after invite removal',
-        context: {
-          inviteId: input.inviteId,
-          orgId,
-          invitedEmail: inviteRow.invited_email,
-        },
-      });
-    }
-  }
+  // flag-exempt: cancelling an invitation must never delete an authentication identity.
 }
 
 export async function acceptFamilyInviteAction(input: {

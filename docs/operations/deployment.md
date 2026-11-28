@@ -149,8 +149,37 @@ pnpm --filter mobile eas:submit:android
 For JavaScript-only changes (no native code changes), you can push an over-the-air update without a full store release:
 
 ```bash
-pnpm --filter mobile eas:update
+pnpm --filter mobile eas:update:preview
 ```
+
+For production, deploy the required API changes first, then manually run the
+**EAS Update** GitHub Actions workflow with branch **main** selected. The workflow
+rejects other branches, uses the EAS production environment, and publishes to the
+production channel. Merging to `main` alone does not publish an OTA update.
+The workflow uses the existing GitHub Actions `API_URL` and `WEB_URL` variables
+(or secrets) first. When either is absent, it discovers that origin from Railway
+or a ready Vercel production deployment on `main`. Discovery failures stop the
+publish and report provider/status information without printing response payloads.
+
+The app downloads available updates quietly without a restart prompt or automatic
+reload. Expo applies a downloaded update on the next cold launch, so an active
+class or unfinished form stays uninterrupted. This also applies to updates fetched
+by Expo's native launch check. Older installed JavaScript bundles retain their
+existing update behavior until this change has been downloaded and launched.
+The separate required app-store update notice remains available for unsupported
+native versions.
+
+The **What's new** popup remains a separate release announcement. For each
+release announcement, update `apps/mobile/src/lib/release-notes.ts` with a new
+unique ID and user-facing highlights. Users see it after running that release
+until they dismiss it; dismissal is saved by release ID. General release notes
+must not set `requiresAiAssistEligibility`, which is only for AI-specific notices.
+
+Test updates on an installed release build before production rollout. OTA updates
+must match the installed native runtime; native dependency, SDK, plugin, or
+permission changes require a new store build and a distinct runtime version.
+The current explicit runtime `1.0.0` does not automatically detect incompatibility.
+Do not change it for JavaScript-only releases intended for existing installations.
 
 ### Environment variables in EAS
 
@@ -275,6 +304,8 @@ Production GitHub Actions secrets:
 | Production values   | `EXPO_ACCESS_TOKEN` or `EXPO_TOKEN`                                | Required for authenticated Expo push sends                                                                                                                                                                                                                                                                                                                                        |
 | Optional telemetry  | `POSTHOG_KEY`                                                      | Optional PostHog key                                                                                                                                                                                                                                                                                                                                                              |
 | Optional telemetry  | `POSTHOG_HOST`                                                     | Optional PostHog host                                                                                                                                                                                                                                                                                                                                                             |
+| Optional app links  | `APPLE_APP_LINKS_TEAM_ID`                                          | Apple Developer Team ID for referral Universal Links. Public identifier, configured for web only.                                                                                                                                                                                                                                                                                 |
+| Optional app links  | `ANDROID_APP_LINKS_SHA256`                                         | Comma-separated Android release app-signing certificate SHA-256 fingerprints for referral App Links. Public identifiers, configured for web only.                                                                                                                                                                                                                                 |
 | Optional AI assist  | `AI_PROVIDER_KEY_ENCRYPTION_KEY`                                   | Encrypts each org's AI provider API key at rest (issue #264: refine + suggested replies). Each org now configures its own provider/key/model from the admin "Organization Settings" page — there is no global provider key; omit to leave AI assist unconfigurable and returning 503 for every org. Generate with `openssl rand -base64 32`; must match on apps/web and apps/api. |
 
 The Vercel user that created `VERCEL_TOKEN` must connect its GitHub account under
@@ -400,7 +431,7 @@ Confirm the production project's current backup and point-in-time recovery confi
 | `ZOOM_VIDEO_SDK_KEY`                   | ✅                                                      | —      | ✅  | Optional for External Zoom links. Video SDK classrooms require this key, the SDK secret, and API `WEB_URL`. CI supplies credentials to Railway and Vercel in preview and production.                                                                                                                                                 |
 | `ZOOM_VIDEO_SDK_SECRET`                | ✅                                                      | —      | ✅  | Signs Video SDK join tokens in the API. Configure together with `ZOOM_VIDEO_SDK_KEY` when enabling the SDK.                                                                                                                                                                                                                          |
 | `ZOOM_WEBHOOK_SECRET_TOKEN`            | ✅                                                      | —      | ✅  | Verifies Zoom webhook requests. Set when configuring Zoom webhooks; never expose it to client bundles.                                                                                                                                                                                                                               |
-| `WEB_URL`                              | —                                                       | —      | ✅  | Public HTTPS web origin. Set as a GitHub Actions variable or secret for production Video SDK classrooms. Preview uses its deployed Vercel URL before triggering the API deployment. External meeting links do not require SDK configuration.                                                                                         |
+| `WEB_URL`                              | —                                                       | —      | ✅  | Public HTTPS web origin for parent referral links, family invitation callbacks and Video SDK classrooms. Set as a GitHub Actions variable or secret for production. Preview uses its deployed Vercel URL before triggering the API deployment. External meeting links do not require SDK configuration.                              |
 
 Production migrations run before the workflow triggers the API deployment. Existing classrooms configured as External keep their stored Zoom URLs; deployment does not switch their provider.
 

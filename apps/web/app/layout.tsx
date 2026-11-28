@@ -1,3 +1,4 @@
+import { WebReferralFlowBoundary } from '@iconicedu/web/lib/referrals/referral-flow-boundary';
 import type { CSSProperties, ReactNode } from 'react';
 import { Suspense } from 'react';
 import '@iconicedu/ui-web/styles.css';
@@ -22,6 +23,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="bg-background text-foreground">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <Suspense fallback={null}>
+            <WebReferralFlowBoundary />
             <PostHogPageView />
           </Suspense>
           {children}

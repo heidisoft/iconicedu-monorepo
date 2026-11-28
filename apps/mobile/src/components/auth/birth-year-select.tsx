@@ -5,9 +5,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SearchableSelectionSheet } from '@iconicedu/ui-native/components/searchable-selection-sheet';
 import { useTheme } from '@/providers/theme-provider';
 
-type Props = { value: string; onChange: (value: string) => void };
+type Props = { disabled?: boolean; value: string; onChange: (value: string) => void };
 
-export function BirthYearSelect({ value, onChange }: Props) {
+export function BirthYearSelect({ value, onChange, disabled = false }: Props) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [open, setOpen] = useState(false);
@@ -34,7 +34,8 @@ export function BirthYearSelect({ value, onChange }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Year of birth"
         accessibilityValue={{ text: value || 'Select birth year' }}
-        accessibilityState={{ expanded: open }}
+        accessibilityState={{ expanded: open, disabled }}
+        disabled={disabled}
         onPress={() => {
           Keyboard.dismiss();
           setCurrentYear(new Date().getFullYear());

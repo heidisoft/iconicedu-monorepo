@@ -11,9 +11,6 @@ jest.mock('expo-location', () => ({
   reverseGeocodeAsync: jest.fn(),
   Accuracy: { Lowest: 1 },
 }));
-jest.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => ({ bottom: 0 }),
-}));
 jest.mock('./timezone-options', () => ({
   ...jest.requireActual('./timezone-options'),
   timezoneIds: () => ['UTC', 'America/New_York', 'Asia/Colombo'],

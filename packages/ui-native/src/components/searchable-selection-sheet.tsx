@@ -1,3 +1,4 @@
+import { SheetContent } from './sheet-content';
 import React, { useMemo, useState } from 'react';
 import {
   FlatList,
@@ -27,17 +28,22 @@ type Colors = {
   inputBg: string;
   action: string;
   actionSubtle: string;
+  actionForeground?: string;
 };
 
 type Props = {
   visible: boolean;
+  /** @deprecated The sheet now measures its own safe area. */
   bottomInset?: number;
   options: readonly SelectionOption[];
   title: string;
   searchPlaceholder: string;
   closeLabel: string;
   emptyMessage: string;
-  selectedId: string;
+  selectedId?: string;
+  /** Controlled multi-selection; caller owns the draft and its commit/cancel behavior. */
+  selectedIds?: readonly string[];
+  onDone?: () => void;
   preserveOrder?: boolean;
   colors: Colors;
   onSelect: (option: SelectionOption) => void;
@@ -46,9 +52,10 @@ type Props = {
 
 export function SearchableSelectionSheet({
   visible,
-  bottomInset = 0,
   options,
-  selectedId,
+  selectedId = '',
+  selectedIds,
+  onDone,
   preserveOrder = false,
   title,
   searchPlaceholder,
@@ -81,31 +88,31 @@ export function SearchableSelectionSheet({
       onRequestClose={onClose}
       onDismiss={() => setSearch('')}
     >
-      <View
-        style={[
-          styles.container,
-          { backgroundColor: colors.card, paddingBottom: bottomInset },
-        ]}
-      >
+      <SheetContent backgroundColor={colors.card}>
         <KeyboardAvoidingView
           style={styles.container}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.header}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={closeLabel}
+              onPress={onClose}
+              style={[styles.close, { backgroundColor: colors.inputBg }]}
+            >
+              <X size={22} color={colors.text} />
+            </Pressable>
             <Text
               accessibilityRole="header"
               style={[styles.title, { color: colors.text }]}
             >
               {title}
             </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={closeLabel}
-              onPress={onClose}
-              style={styles.close}
-            >
-              <X size={22} color={colors.text} />
-            </Pressable>
+            <View
+              style={{ width: 44 }}
+              accessibilityElementsHidden
+              importantForAccessibility="no-hide-descendants"
+            />
           </View>
           <View
             style={[
@@ -141,15 +148,17 @@ export function SearchableSelectionSheet({
               </Text>
             }
             renderItem={({ item }) => {
-              const selected = item.id === selectedId;
+              const selected = selectedIds
+                ? selectedIds.includes(item.id)
+                : item.id === selectedId;
               return (
                 <Pressable
                   testID={`selection-option-${item.id}`}
-                  accessibilityRole="button"
+                  accessibilityRole={selectedIds ? 'checkbox' : 'button'}
                   accessibilityLabel={[item.label, item.subtitle, item.detail]
                     .filter(Boolean)
                     .join(', ')}
-                  accessibilityState={{ selected }}
+                  accessibilityState={selectedIds ? { checked: selected } : { selected }}
                   onPress={() => onSelect(item)}
                   style={[
                     styles.row,
@@ -181,8 +190,42 @@ export function SearchableSelectionSheet({
               );
             }}
           />
+          {onDone && (
+            <View
+              style={{
+                paddingHorizontal: 20,
+                paddingTop: 12,
+                paddingBottom: 16,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+              }}
+            >
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Done selecting"
+                onPress={onDone}
+                style={{
+                  minHeight: 52,
+                  borderRadius: 18,
+                  backgroundColor: colors.action,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.actionForeground ?? colors.card,
+                    fontSize: 17,
+                    fontWeight: '600',
+                  }}
+                >
+                  Done{selectedIds ? ` (${selectedIds.length})` : ''}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </KeyboardAvoidingView>
-      </View>
+      </SheetContent>
     </Modal>
   );
 }
@@ -193,12 +236,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: 28,
+    paddingTop: 0,
     paddingBottom: 12,
     gap: 12,
   },
-  title: { flex: 1, fontSize: 22, lineHeight: 28, fontWeight: '600' },
-  close: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  title: {
+    textAlign: 'center',
+    flex: 1,
+    fontSize: 22,
+    lineHeight: 28,
+    fontWeight: '600',
+  },
+  close: {
+    borderRadius: 22,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   search: {
     marginHorizontal: 20,
     marginBottom: 12,

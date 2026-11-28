@@ -1,8 +1,13 @@
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { PinnedMessagesSheet } from '@/components/messages/pinned-messages-sheet';
 import type { MessageVM } from '@iconicedu/shared-types';
+
+let mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => mockInsets,
+}));
 
 const mockFetchPinnedMessages = jest.fn();
 const mockToggleMessagePin = jest.fn();
@@ -34,11 +39,36 @@ function makeMessage(id: string, text: string): MessageVM {
 describe('PinnedMessagesSheet (issue #264 P2)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockInsets = { top: 0, bottom: 0, left: 0, right: 0 };
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
+  });
+
+  it.each([0, 34])('keeps 16 points above a %i-point home indicator', async (bottom) => {
+    mockInsets = { top: 59, bottom, left: 12, right: 12 };
+    mockFetchPinnedMessages.mockResolvedValue([]);
+    render(
+      <PinnedMessagesSheet
+        visible
+        orgId="org-1"
+        channelId="chan-1"
+        profileId="prof-1"
+        accountId="acc-1"
+        onClose={jest.fn()}
+      />,
+    );
+    await screen.findByText('No pinned messages');
+    expect(
+      StyleSheet.flatten(screen.getByTestId('pinned-messages-sheet-content').props.style),
+    ).toMatchObject({ paddingBottom: bottom + 16, paddingLeft: 12, paddingRight: 12 });
+    const close = screen.getByLabelText('Close pinned messages');
+    expect(StyleSheet.flatten(close.props.style)).toMatchObject({
+      minWidth: 44,
+      minHeight: 44,
+    });
   });
 
   it('loads and renders pinned messages with who pinned them and when', async () => {

@@ -11,7 +11,10 @@ import { useProfile } from '@/hooks/use-profile';
 
 // An org admin is a role grant (owner/admin/staff) or a staff/system profile
 // kind — either one sees org-wide "Sessions completed" totals, matching web.
-function resolveIsOrgAdminView(profileKind: unknown, primaryRole: unknown): boolean {
+export function resolveIsOrgAdminView(
+  profileKind: unknown,
+  primaryRole: unknown,
+): boolean {
   const kind = typeof profileKind === 'string' ? profileKind : null;
   const role = typeof primaryRole === 'string' ? primaryRole : null;
   return (

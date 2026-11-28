@@ -423,7 +423,8 @@ export async function acceptFamilyInvite(options: AcceptFamilyInviteOptions) {
   }
 
   const now = new Date().toISOString();
-  const { error: updateError } = await adminClient
+  // flag-exempt: reject revoked or concurrently consumed invitation acceptance.
+  const { data: acceptedRow, error: updateError } = await adminClient
     .from('family_link_invites')
     .update({
       status: 'accepted',
@@ -433,10 +434,12 @@ export async function acceptFamilyInvite(options: AcceptFamilyInviteOptions) {
       updated_by: options.account.id,
     })
     .eq('id', inviteRow.id)
-    .eq('status', 'pending');
+    .eq('status', 'pending')
+    .select('id')
+    .maybeSingle();
 
-  if (updateError) {
-    throw updateError;
+  if (updateError || !acceptedRow) {
+    throw updateError ?? new Error('Invitation is no longer available.');
   }
 
   if (inviteRow.invited_role === 'child') {

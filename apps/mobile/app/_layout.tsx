@@ -1,9 +1,11 @@
+import { ReferralFlowBoundary } from '@/components/home/referral-flow-boundary';
 import '../global.css';
 import React from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { Slot } from 'expo-router';
 import { PortalHost } from '@rn-primitives/portal';
 import { SystemBars } from 'react-native-edge-to-edge';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppProviders } from '@/providers/app-providers';
 import { useTheme } from '@/providers/theme-provider';
@@ -69,6 +71,7 @@ function RootContent() {
         rendered behind it (the tab bar's tabBarBackground), not from this component.
       */}
       <SystemBars style={isDark ? 'light' : 'dark'} />
+      <ReferralFlowBoundary />
       <ScreenTracker />
       <AppLifecycleTracker />
       <PresenceTracker />
@@ -91,10 +94,12 @@ function RootContent() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider>
-      <AppProviders>
-        <RootContent />
-      </AppProviders>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <AppProviders>
+          <RootContent />
+        </AppProviders>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }

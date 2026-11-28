@@ -1051,6 +1051,8 @@ jobs:
             --arg zoom_sdk_key "${{ secrets.ZOOM_VIDEO_SDK_KEY }}" \
             --arg zoom_sdk_secret "${{ secrets.ZOOM_VIDEO_SDK_SECRET }}" \
             --arg zoom_webhook_token "${{ secrets.ZOOM_WEBHOOK_SECRET_TOKEN }}" \
+            --arg apple_app_team "${{ vars.APPLE_APP_LINKS_TEAM_ID }}" \
+            --arg android_app_sha "${{ vars.ANDROID_APP_LINKS_SHA256 }}" \
             '[
               {key:"API_URL", value:$api_url},
               {key:"NEXT_PUBLIC_API_URL", value:$api_url},
@@ -1073,6 +1075,12 @@ jobs:
             ] else [] end)
             + (if ($zoom_webhook_token | length) > 0 then [
               {key:"ZOOM_WEBHOOK_SECRET_TOKEN", value:$zoom_webhook_token}
+            ] else [] end)
+            + (if ($apple_app_team | length) > 0 then [
+              {key:"APPLE_APP_LINKS_TEAM_ID", value:$apple_app_team}
+            ] else [] end)
+            + (if ($android_app_sha | length) > 0 then [
+              {key:"ANDROID_APP_LINKS_SHA256", value:$android_app_sha}
             ] else [] end)
             | map(. + {target:["preview"], gitBranch:$branch, type:"encrypted"})')
 

@@ -1,3 +1,4 @@
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -109,6 +110,7 @@ export function NotificationModeSection({
   scopeId: string;
 }) {
   const { colors } = useTheme();
+  const popupInsets = useSafeAreaInsets();
   const s = useMemo(() => makeStyles(colors), [colors]);
 
   const [mode, setMode] = useState<NotificationConversationMode>('normal');
@@ -248,9 +250,21 @@ export function NotificationModeSection({
         statusBarTranslucent
         onRequestClose={() => setPickerVisible(false)}
       >
-        <Pressable style={s.overlay} onPress={() => setPickerVisible(false)}>
+        <Pressable
+          style={[s.overlay, { paddingTop: popupInsets.top + 16 }]}
+          onPress={() => setPickerVisible(false)}
+        >
           <Pressable>
-            <View style={s.sheet}>
+            <View
+              style={[
+                s.sheet,
+                {
+                  paddingBottom: 16 + popupInsets.bottom,
+                  paddingLeft: popupInsets.left,
+                  paddingRight: popupInsets.right,
+                },
+              ]}
+            >
               <View style={s.handle} />
               <Text style={s.sheetTitle}>Notifications</Text>
               {NOTIFICATION_MODE_OPTIONS.map((option) => {
@@ -322,8 +336,8 @@ function makeStyles(C: AppColors) {
     overlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: C.modalOverlay },
     sheet: {
       backgroundColor: C.pageBg,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderTopLeftRadius: 32,
+      borderTopRightRadius: 32,
       paddingBottom: 40,
     },
     handle: {

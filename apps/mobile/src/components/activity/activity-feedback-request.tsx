@@ -38,6 +38,12 @@ type ActivityFeedbackRequestProps = {
    * of the completion flow, not a throwaway prompt.
    */
   autoDismiss?: boolean;
+  /**
+   * Drop the card chrome (border, fill, padding) when nested inside another
+   * panel — e.g. ActivityCompletionCheck's "confirmed" step — so it does not
+   * render as a card inside a card.
+   */
+  bare?: boolean;
 };
 
 type FeedbackMetadata = {
@@ -134,6 +140,7 @@ export function ActivityFeedbackRequest({
   colors,
   onRatingSubmit,
   autoDismiss = true,
+  bare = false,
 }: ActivityFeedbackRequestProps) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const initialFeedback = useMemo(() => getInitialFeedback(activity), [activity]);
@@ -417,7 +424,7 @@ export function ActivityFeedbackRequest({
   }
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, bare && styles.cardBare]}>
       <View style={styles.cardHeader}>
         <Text style={styles.kicker}>Rate your session</Text>
         {isSubmitted && isEditWindowOpen && showConfirmation ? (
@@ -450,16 +457,16 @@ export function ActivityFeedbackRequest({
               accessibilityState={{ disabled: !canSubmit || isSubmitting || isSubmitted }}
               disabled={!canSubmit || isSubmitting || isSubmitted}
               onPress={() => void handleSelectRating(value)}
-              style={({ pressed }) => [
-                styles.starButton,
-                { borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
-              ]}
             >
-              <Star
-                size={22}
-                color={isActive ? colors.warning : colors.textMuted}
-                fill={isActive ? colors.warning : 'transparent'}
-              />
+              {/* Static style on an inner View — NativeWind's interop drops
+                  Pressable's function-form style. */}
+              <View style={[styles.starButton, { borderColor: colors.border }]}>
+                <Star
+                  size={22}
+                  color={isActive ? colors.warning : colors.textMuted}
+                  fill={isActive ? colors.warning : 'transparent'}
+                />
+              </View>
             </Pressable>
           );
         })}
@@ -529,8 +536,8 @@ export function ActivityFeedbackRequest({
 
 function makeStyles(colors: AppColors) {
   return StyleSheet.create({
+    // Parent owns the spacing above (row widget margin / panel gap).
     card: {
-      marginTop: 10,
       borderRadius: 12,
       borderWidth: 1,
       borderColor: colors.border,
@@ -539,6 +546,11 @@ function makeStyles(colors: AppColors) {
       width: '100%',
       padding: 14,
       gap: 10,
+    },
+    cardBare: {
+      borderWidth: 0,
+      backgroundColor: 'transparent',
+      padding: 0,
     },
     cardHeader: {
       flexDirection: 'row',

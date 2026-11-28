@@ -3,9 +3,9 @@ import { act, renderHook, waitFor } from '@testing-library/react-native';
 import {
   clearAllMessageDrafts,
   clearMessageDraftsForProfile,
-  listMessageDraftChannelIds,
+  listMessageDraftPreviews,
   useMessageDraft,
-  useMessageDraftChannelIds,
+  useMessageDraftPreviews,
   type MessageDraftScope,
 } from '@/hooks/use-message-draft';
 import { MESSAGE_DRAFT_STORAGE_VERSION } from '@iconicedu/shared-types';
@@ -72,6 +72,46 @@ describe('useMessageDraft', () => {
     expect(parsed.content).toBe('Hello world');
     expect(parsed.version).toBe(MESSAGE_DRAFT_STORAGE_VERSION);
     await waitFor(() => expect(result.current.status).toBe('saved'));
+  });
+
+  it('flushes a pending autosave when the composer unmounts mid-debounce', async () => {
+    const { result, unmount } = renderHook(() => useMessageDraft(SCOPE, true));
+    await waitFor(() => expect(result.current.isRestored).toBe(true));
+
+    act(() => {
+      result.current.notifyContentChanged('Typed then left');
+    });
+    await act(async () => {
+      unmount();
+      await Promise.resolve();
+    });
+
+    const raw = await AsyncStorage.getItem(
+      'message-draft:account-1:profile-1:org-1:channel-1:main',
+    );
+    expect(JSON.parse(raw!).content).toBe('Typed then left');
+  });
+
+  it('does not resurrect a draft cleared by a confirmed send on unmount', async () => {
+    const { result, unmount } = renderHook(() => useMessageDraft(SCOPE, true));
+    await waitFor(() => expect(result.current.isRestored).toBe(true));
+
+    act(() => {
+      result.current.notifyContentChanged('Sent message');
+    });
+    await act(async () => {
+      await result.current.clearDraft();
+    });
+    await act(async () => {
+      unmount();
+      await Promise.resolve();
+    });
+
+    expect(
+      await AsyncStorage.getItem(
+        'message-draft:account-1:profile-1:org-1:channel-1:main',
+      ),
+    ).toBeNull();
   });
 
   it('restores a non-expired draft on mount', async () => {
@@ -180,7 +220,7 @@ describe('useMessageDraft', () => {
   });
 });
 
-describe('listMessageDraftChannelIds / useMessageDraftChannelIds', () => {
+describe('listMessageDraftPreviews / useMessageDraftPreviews', () => {
   it('lists only main-composer drafts scoped to the given account/profile/org', async () => {
     const now = new Date().toISOString();
     await AsyncStorage.multiSet([
@@ -222,13 +262,13 @@ describe('listMessageDraftChannelIds / useMessageDraftChannelIds', () => {
       ],
     ]);
 
-    const ids = await listMessageDraftChannelIds({
+    const drafts = await listMessageDraftPreviews({
       accountId: 'account-1',
       profileId: 'profile-1',
       orgId: 'org-1',
     });
 
-    expect(ids).toEqual(new Set(['channel-1']));
+    expect(drafts).toEqual(new Map([['channel-1', 'has content']]));
   });
 
   it('exposes the same result reactively via the hook', async () => {
@@ -246,13 +286,13 @@ describe('listMessageDraftChannelIds / useMessageDraftChannelIds', () => {
     );
 
     const { result } = renderHook(() =>
-      useMessageDraftChannelIds(
+      useMessageDraftPreviews(
         { accountId: 'account-1', profileId: 'profile-1', orgId: 'org-1' },
         true,
       ),
     );
 
-    await waitFor(() => expect(result.current.channelIds.has('channel-1')).toBe(true));
+    await waitFor(() => expect(result.current.drafts.get('channel-1')).toBe('draft'));
   });
 });
 

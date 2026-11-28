@@ -318,6 +318,26 @@ export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | nu
   },
 });
 
+export const enableSessionCompletionReports = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableSessionCompletionReports,
+  description:
+    'Shows participant reports of sessions wrongly marked complete on the admin completed-sessions page (and the Report action on mobile).',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableSessionCompletionReports,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableClassroomWhiteboard,
   enableClassroomMeetingSettings,
@@ -335,14 +355,23 @@ export const webFlags = {
   enableMobileGoogleSignIn,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
+  enableSessionCompletionReports,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;
 
 export function isVercelFlagsSdkConfigured() {
   const posthogKey =
-    process.env.POSTHOG_KEY?.trim() ?? process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ?? '';
+    (process.env.NODE_ENV !== 'production'
+      ? process.env.POSTHOG_FLAGS_KEY?.trim() || undefined
+      : undefined) ??
+    process.env.POSTHOG_KEY?.trim() ??
+    process.env.NEXT_PUBLIC_POSTHOG_KEY?.trim() ??
+    '';
   const posthogHost =
+    (process.env.NODE_ENV !== 'production'
+      ? process.env.POSTHOG_FLAGS_HOST?.trim() || undefined
+      : undefined) ??
     process.env.POSTHOG_HOST?.trim() ??
     process.env.NEXT_PUBLIC_POSTHOG_HOST?.trim() ??
     '';
@@ -352,3 +381,19 @@ export function isVercelFlagsSdkConfigured() {
 export async function getFlagsProviderData() {
   return getCodeProviderData(webFlags);
 }
+
+export const enableParentReferrals = flag<boolean>({
+  key: platformFeatureFlagKeys.enableParentReferrals,
+  description:
+    'Enables parent referral sharing, landing pages and onboarding attribution.',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide() {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableParentReferrals,
+    });
+  },
+});

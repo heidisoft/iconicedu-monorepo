@@ -91,5 +91,17 @@ export function getLocalMobileFeatureFlagFallback(key: MobileFeatureFlagKey): bo
     return parseBooleanFeatureFlag(process.env.EXPO_PUBLIC_ENABLE_CHANNEL_COMMUNICATIONS);
   }
 
+  if (key === mobileFeatureFlagKeys.enableSessionCompletionReports) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_SESSION_COMPLETION_REPORTS,
+    );
+  }
+
+  if (key === mobileFeatureFlagKeys.enableMobileCompletedSessionsList) {
+    return parseBooleanFeatureFlag(
+      process.env.EXPO_PUBLIC_ENABLE_MOBILE_COMPLETED_SESSIONS_LIST,
+    );
+  }
+
   return false;
 }

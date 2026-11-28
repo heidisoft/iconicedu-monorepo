@@ -1,4 +1,5 @@
 export const queryKeys = {
+  parentReferralOffer: () => ['parent-referral-offer'] as const,
   onboardingStatus: (userId: string) => ['onboarding-status', userId] as const,
   profile: (profileId: string) => ['profile', profileId] as const,
   channels: (orgId: string) => ['channels', orgId] as const,
@@ -38,6 +39,14 @@ export const queryKeys = {
     ['session-completions', 'org-summary', orgId, monthKey] as const,
   sessionCompletionSummary: (orgId: string, profileId: string, monthKey: string) =>
     ['session-completions', 'summary', orgId, profileId, monthKey] as const,
+  sessionCompletionHistory: (
+    orgId: string,
+    profileId: string,
+    status: 'completed' | 'pending',
+    monthKey: string,
+  ) => ['session-completions', 'history', orgId, profileId, status, monthKey] as const,
+  adminSessionCompletions: (orgId: string, monthKey: string) =>
+    ['session-completions', 'admin', orgId, monthKey] as const,
   supervisedDirectMessages: (orgId: string, accountId: string) =>
     ['supervisedDirectMessages', orgId, accountId] as const,
 } as const;

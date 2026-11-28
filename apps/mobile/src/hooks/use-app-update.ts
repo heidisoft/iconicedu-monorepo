@@ -1,29 +1,27 @@
 import { useEffect, useRef } from 'react';
 import * as Updates from 'expo-updates';
 
-/**
- * Checks for and silently applies an EAS OTA update on first mount.
- * Skipped in development builds where expo-updates is inactive.
- * Errors are swallowed — update failure must never interrupt the user session.
- */
+/** Download OTA updates quietly; Expo applies them on the next cold launch. */
 export function useAppUpdate() {
   const hasChecked = useRef(false);
 
   useEffect(() => {
-    if (__DEV__ || hasChecked.current) return;
+    if (__DEV__ || !Updates.isEnabled || hasChecked.current) return;
     hasChecked.current = true;
+    let active = true;
 
-    async function applyUpdateIfAvailable() {
+    async function downloadUpdateIfAvailable() {
       try {
         const result = await Updates.checkForUpdateAsync();
-        if (!result.isAvailable) return;
-        await Updates.fetchUpdateAsync();
-        await Updates.reloadAsync();
+        if (active && result.isAvailable) await Updates.fetchUpdateAsync();
       } catch {
-        // Silent — never surface update errors to the user
+        // Offline/check/download failures must not interrupt the user's session.
       }
     }
 
-    applyUpdateIfAvailable();
+    void downloadUpdateIfAvailable();
+    return () => {
+      active = false;
+    };
   }, []);
 }
