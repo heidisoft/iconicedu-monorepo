@@ -52,6 +52,8 @@ describe('SessionCompletedCarousel', () => {
     jest.useRealTimers();
   });
 
+  // The full confirm → rate → remove flow can exceed Jest's 5s default when
+  // every package's suite runs in parallel (e.g. the pre-push hook).
   it('keeps a confirmed card for rating, then removes it after rating', async () => {
     render(<SessionCompletedCarousel sessions={[completion]} colors={lightColors} />);
 
@@ -82,7 +84,7 @@ describe('SessionCompletedCarousel', () => {
       rating: 5,
       comment: null,
     });
-  });
+  }, 15000);
 
   it('rotates a bare-confirmed card to the back of the deck after the vote grace window', async () => {
     jest.useFakeTimers();
