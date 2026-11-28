@@ -16,6 +16,7 @@ The coverage and manual parity matrix below covers:
 - a clear `Staff` sender badge on web and mobile, including DMs;
 - safeguarding rules for who may address whom privately (staff → anyone; tutor → staff, tutors, parents, and students together with their parent; parent → staff and tutors; students cannot start private messages), with a student's guardian added automatically;
 - read-only staff review: owners, admins, and staff can read every restricted message but cannot reply, quote, or react;
+- picker options for whole groups (**Parent(s)**, **Tutor(s)**, **Student(s)**) and for any single parent, tutor, or student by name, plus a single **Staff** option in place of individual staff names that addresses and notifies every staff member in the channel;
 - no audience selector in DMs, group DMs, or support channels.
 
 The rules and their rationale are recorded in [ADR-006](../decisions/006-private-message-safeguarding.md).
@@ -101,7 +102,7 @@ maestro test \
   .maestro/message-audiences.yaml
 ```
 
-This smoke flow can run under any channel member account. It verifies that the audience picker appears and can send parent and tutor messages. Run the web multi-persona suite for authoritative cross-user privacy checks because one Maestro device holds one signed-in persona.
+This smoke flow can run under any channel member account. It opens the folded audience chip and sends to the **Parents** and **Tutors** groups. Run the web multi-persona suite for authoritative cross-user privacy checks because one Maestro device holds one signed-in persona.
 
 ## Manual web and mobile parity matrix
 

@@ -67,9 +67,9 @@ import {
 } from '@/lib/messages/message-mentions';
 import type { MessageAudienceParticipant } from './message-visibility';
 import {
-  canAddressPrivately,
-  canInitiateRestrictedMessage,
-  resolveMessageAudienceRole,
+  getMessageAudienceGroupOptions,
+  groupMessageAudienceCandidates,
+  isExactAudienceSelection,
 } from '@iconicedu/utils';
 
 // Minimum non-whitespace characters typed before "Refine with AI" appears —
@@ -1306,49 +1306,56 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const canSaveEdit = text.trim().length > 0 && !savingEdit;
   // Safeguarding rules (enforced by the API): students cannot start private
   // messages, parents may only address staff and tutors, and so on.
-  const audienceSenderRole = resolveMessageAudienceRole(
-    currentProfileKind ??
-      audienceParticipants.find((participant) => participant.id === profileId)?.role,
+  // Staff (owners, admins, staff) are offered as one "Staff" option, never by
+  // name; parents, tutors and students are listed by name.
+  const audienceGroups = groupMessageAudienceCandidates(
+    audienceParticipants.map((participant) => ({
+      id: participant.id,
+      kind: participant.role,
+      participant,
+    })),
+    { senderId: profileId, senderKind: currentProfileKind },
   );
-  const selectableAudienceParticipants = canInitiateRestrictedMessage(audienceSenderRole)
-    ? audienceParticipants.filter(
-        (participant) =>
-          participant.id !== profileId &&
-          canAddressPrivately(
-            audienceSenderRole,
-            resolveMessageAudienceRole(participant.role),
-          ),
-      )
-    : [];
-  const includesSelectedStudent = selectableAudienceParticipants.some(
-    (participant) =>
-      participant.role === 'child' && audienceProfileIds.includes(participant.id),
+  const hasAudienceOptions =
+    audienceGroups.staffIds.length > 0 || audienceGroups.namedPeople.length > 0;
+  const staffSelected = isExactAudienceSelection(
+    audienceProfileIds.filter((id) => audienceGroups.staffIds.includes(id)),
+    audienceGroups.staffIds,
   );
-  const parentAudienceIds = selectableAudienceParticipants
-    .filter((participant) => participant.role === 'guardian')
-    .map((participant) => participant.id);
-  const tutorAudienceIds = selectableAudienceParticipants
-    .filter((participant) => participant.role === 'educator')
-    .map((participant) => participant.id);
-  const selectedAudienceNames = selectableAudienceParticipants
-    .filter((participant) => audienceProfileIds.includes(participant.id))
-    .map((participant) => participant.name);
-  // Mirrors the web "Replying privately · names" label for private thread replies.
-  const audienceGroupOptions = [
-    { label: 'Everyone', ids: [] as string[] },
-    ...(parentAudienceIds.length ? [{ label: 'Parents', ids: parentAudienceIds }] : []),
-    ...(tutorAudienceIds.length ? [{ label: 'Tutors', ids: tutorAudienceIds }] : []),
-  ];
-  const matchedAudienceGroup = audienceGroupOptions.find(
+  const includesSelectedStudent = audienceGroups.students.some((student) =>
+    audienceProfileIds.includes(student.id),
+  );
+  const audienceGroupOptions = getMessageAudienceGroupOptions(audienceGroups);
+  // A one-member group is just that person, so the chip shows their name.
+  const selectedAudienceGroup = audienceGroupOptions.find(
     (option) =>
-      option.ids.length === audienceProfileIds.length &&
-      option.ids.every((id) => audienceProfileIds.includes(id)),
+      option.ids.length > 1 && isExactAudienceSelection(audienceProfileIds, option.ids),
   );
-  const currentAudienceLabel =
-    matchedAudienceGroup?.label ??
-    (selectedAudienceNames.length > 1
-      ? `${selectedAudienceNames[0]} +${selectedAudienceNames.length - 1}`
-      : (selectedAudienceNames[0] ?? 'Everyone'));
+  const selectedAudienceNames = audienceGroups.namedPeople
+    .filter((person) => audienceProfileIds.includes(person.id))
+    .map((person) => person.participant.name);
+  const selectedAudienceParts = [
+    ...(staffSelected ? ['Staff'] : []),
+    ...selectedAudienceNames,
+  ];
+  const audienceSummaryNames = [
+    ...(staffSelected ? ['staff'] : []),
+    ...selectedAudienceNames,
+  ];
+  const currentAudienceLabel = !audienceProfileIds.length
+    ? 'Everyone'
+    : selectedAudienceGroup
+      ? selectedAudienceGroup.label
+      : selectedAudienceParts.length > 1
+        ? `${selectedAudienceParts[0]} +${selectedAudienceParts.length - 1}`
+        : (selectedAudienceParts[0] ?? 'Everyone');
+  const toggleAudienceIds = (ids: string[]) =>
+    setAudienceProfileIds((current) =>
+      ids.every((id) => current.includes(id))
+        ? current.filter((id) => !ids.includes(id))
+        : Array.from(new Set([...current, ...ids])),
+    );
+  // Mirrors the web "Replying privately · names" label for private thread replies.
   const inheritedAudienceNames =
     !quoteReplyTo && replyTo?.core.visibility.type === 'specific-users'
       ? replyTo.core.visibility.userIds
@@ -1362,7 +1369,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
   return (
     <>
-      {selectableAudienceParticipants.length > 0 && !replyTo && !quoteReplyTo && (
+      {hasAudienceOptions && !replyTo && !quoteReplyTo && (
         <View style={s.audienceBar} testID="message-audience-picker">
           <ScrollView
             horizontal
@@ -1394,13 +1401,41 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 >
                   <ChevronLeft size={14} color={colors.textMuted} />
                 </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    s.audienceChip,
+                    !audienceProfileIds.length && s.audienceChipActive,
+                  ]}
+                  onPress={() => {
+                    setAudienceProfileIds([]);
+                    setAudienceExpanded(false);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: !audienceProfileIds.length }}
+                  accessibilityLabel="Message audience Everyone"
+                >
+                  <Text style={s.audienceChipText}>Everyone</Text>
+                </TouchableOpacity>
+                {audienceGroups.staffIds.length ? (
+                  <TouchableOpacity
+                    style={[s.audienceChip, staffSelected && s.audienceChipActive]}
+                    onPress={() => toggleAudienceIds(audienceGroups.staffIds)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{
+                      checked: staffSelected,
+                      selected: staffSelected,
+                    }}
+                    accessibilityLabel="Message audience Staff"
+                    accessibilityHint="Alert the staff team"
+                  >
+                    <Text style={s.audienceChipText}>Staff</Text>
+                  </TouchableOpacity>
+                ) : null}
                 {audienceGroupOptions.map((option) => {
-                  const active =
-                    option.ids.length === audienceProfileIds.length &&
-                    option.ids.every((id) => audienceProfileIds.includes(id));
+                  const active = isExactAudienceSelection(audienceProfileIds, option.ids);
                   return (
                     <TouchableOpacity
-                      key={`group:${option.label}`}
+                      key={option.key}
                       style={[s.audienceChip, active && s.audienceChipActive]}
                       onPress={() => {
                         setAudienceProfileIds(option.ids);
@@ -1415,20 +1450,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                   );
                 })}
                 {/* Specific people toggle independently, like the web checkboxes, so the options stay open. */}
-                {selectableAudienceParticipants.map((participant) => {
+                {audienceGroups.namedPeople.map(({ participant }) => {
                   const selected = audienceProfileIds.includes(participant.id);
                   const roleLabel = getAudienceRoleLabel(participant.role);
                   return (
                     <TouchableOpacity
                       key={`person:${participant.id}`}
                       style={[s.audienceChip, selected && s.audienceChipActive]}
-                      onPress={() =>
-                        setAudienceProfileIds((current) =>
-                          current.includes(participant.id)
-                            ? current.filter((id) => id !== participant.id)
-                            : [...current, participant.id],
-                        )
-                      }
+                      onPress={() => toggleAudienceIds([participant.id])}
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked: selected, selected }}
                       accessibilityLabel={`Message audience ${participant.name}`}
@@ -1446,9 +1475,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               </>
             )}
           </ScrollView>
-          {selectedAudienceNames.length ? (
+          {audienceSummaryNames.length ? (
             <Text style={s.audienceHint} testID="message-audience-summary">
-              {`Visible only to ${selectedAudienceNames.join(', ')} and you`}
+              {`Visible only to ${audienceSummaryNames.join(', ')} and you`}
             </Text>
           ) : null}
           {includesSelectedStudent ? (
