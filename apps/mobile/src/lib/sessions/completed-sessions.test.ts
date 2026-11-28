@@ -41,6 +41,7 @@ function adminItem(
     confirmedBy: [],
     guardians: [],
     averageRating: 4.5,
+    reports: [],
   };
 }
 
@@ -62,18 +63,57 @@ describe('monthRange', () => {
 });
 
 describe('fromProfileCompletion', () => {
-  it('labels confirmed and auto-confirmed rows and keeps no confirm tile', () => {
-    expect(fromProfileCompletion(completion({ rating: 5 }))).toMatchObject({
+  it('labels a self-confirmed row and only lets it be rated when unrated', () => {
+    expect(
+      fromProfileCompletion(completion({ rating: 5, confirmedBy: 'self' })),
+    ).toMatchObject({
       title: 'Algebra',
       subtitle: 'Sam',
       statusLabel: 'Confirmed',
       awaitingConfirmation: false,
       rating: 5,
-      completion: null,
+      confirmedBy: 'self',
+      reportable: false,
+      ratable: false,
     });
-    expect(
-      fromProfileCompletion(completion({ status: 'auto_confirmed' })).statusLabel,
-    ).toBe('Auto-confirmed');
+    expect(fromProfileCompletion(completion({ confirmedBy: 'self' })).ratable).toBe(true);
+  });
+
+  it('lets staff-marked and auto-confirmed rows be reported until they are', () => {
+    const staff = fromProfileCompletion(completion({ confirmedBy: 'staff' }));
+    expect(staff).toMatchObject({
+      statusLabel: 'Marked by staff',
+      reportable: true,
+      ratable: true,
+      reportCount: 0,
+    });
+
+    const auto = fromProfileCompletion(
+      completion({ status: 'auto_confirmed', confirmedBy: 'system' }),
+    );
+    expect(auto).toMatchObject({ statusLabel: 'Auto-confirmed', reportable: true });
+
+    const reported = fromProfileCompletion(
+      completion({
+        confirmedBy: 'staff',
+        report: {
+          category: 'did_not_happen',
+          reason: null,
+          reportedAt: '2026-11-04T10:00:00.000Z',
+        },
+      }),
+    );
+    expect(reported).toMatchObject({ reportable: false, reportCount: 1 });
+  });
+
+  it('falls back to the status when an older API omits confirmedBy', () => {
+    expect(fromProfileCompletion(completion({ status: 'auto_confirmed' }))).toMatchObject(
+      {
+        confirmedBy: 'system',
+        statusLabel: 'Auto-confirmed',
+      },
+    );
+    expect(fromProfileCompletion(completion()).confirmedBy).toBe('self');
   });
 
   it('keeps the completion on pending rows so the confirm tile can render', () => {
@@ -82,6 +122,7 @@ describe('fromProfileCompletion', () => {
     expect(row.title).toBe('Session');
     expect(row.awaitingConfirmation).toBe(true);
     expect(row.completion).toBe(pending);
+    expect(row).toMatchObject({ confirmedBy: null, reportable: false, ratable: false });
   });
 });
 
@@ -105,6 +146,25 @@ describe('adminRowsForTab', () => {
       completion: null,
     });
     expect(rows[1].statusLabel).toBe('Auto-confirmed');
+  });
+
+  it('counts reports on admin rows but never offers rating or reporting', () => {
+    const reported = adminItem('r', 'confirmed', '2026-11-06T10:00:00.000Z');
+    reported.reports = [
+      {
+        profileId: 'p1',
+        displayName: 'Ava',
+        role: 'child' as AdminSessionCompletionVM['confirmedBy'][number]['role'],
+        category: 'did_not_happen',
+        reason: null,
+        reportedAt: '2026-11-07T10:00:00.000Z',
+      },
+    ];
+    expect(adminRowsForTab([reported], 'completed')[0]).toMatchObject({
+      reportCount: 1,
+      reportable: false,
+      ratable: false,
+    });
   });
 
   it('puts only pending occurrences on the Awaiting tab and drops disputed ones', () => {

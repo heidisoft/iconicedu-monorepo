@@ -8,6 +8,16 @@ import type {
 // One VM, consumed by both the notifications hydration and the homepage carousel
 // endpoint — the whole point of consolidation is that both surfaces read this same
 // shape instead of each reconstructing it from separate tables.
+/** Who marked a completed session as complete, from the viewer's own row. */
+export type SessionCompletionConfirmedBy = 'self' | 'staff' | 'system';
+
+/** A participant's report that their session was wrongly marked complete. */
+export interface SessionCompletionReportVM {
+  category: ClassSessionCompletionDisputeCategory;
+  reason: string | null;
+  reportedAt: ISODateTime;
+}
+
 export interface SessionCompletionVM {
   id: UUID;
   orgId: UUID;
@@ -32,6 +42,9 @@ export interface SessionCompletionVM {
   ratedAt?: ISODateTime | null;
   resolvedAt?: ISODateTime | null;
   expiresAt: ISODateTime;
+  /** Set for confirmed / auto_confirmed rows; absent from older API deployments. */
+  confirmedBy?: SessionCompletionConfirmedBy | null;
+  report?: SessionCompletionReportVM | null;
 }
 
 // One schedule occurrence that at least one participant (educator/teacher,
@@ -101,6 +114,13 @@ export interface AdminSessionCompletionParticipantVM {
   } | null;
 }
 
+/** A participant's "wrongly marked complete" report, surfaced to staff. */
+export interface AdminSessionCompletionReportVM extends SessionCompletionReportVM {
+  profileId: UUID;
+  displayName: string;
+  role: ParticipantRoleVM;
+}
+
 /** One schedule occurrence within the admin reporting window, whether completed,
  * still pending confirmation, or under dispute — grouped across all participant
  * confirmations. */
@@ -121,6 +141,9 @@ export interface AdminSessionCompletionVM {
   guardians: AdminSessionCompletionGuardianVM[];
   /** Optional while older API deployments are being replaced. */
   participants?: AdminSessionCompletionParticipantVM[];
+  /** Every participant (any role, students included) who reported the session
+   * as wrongly marked complete. Optional while older API deployments roll out. */
+  reports?: AdminSessionCompletionReportVM[];
   averageRating?: number | null;
   /**
    * Actual session length in minutes as confirmed by staff, when it differs from

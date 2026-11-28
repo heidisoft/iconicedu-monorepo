@@ -7,6 +7,7 @@ const mockBack = jest.fn();
 const mockFetchNextPage = jest.fn();
 const mockRefetch = jest.fn(() => Promise.resolve());
 const mockHookCalls: Array<{ tab: string; monthKey: string }> = [];
+let mockReportsEnabled = true;
 
 let mockState: {
   rows: CompletedSessionRow[];
@@ -28,6 +29,60 @@ jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children }: { children: React.ReactNode }) => {
     const { View } = require('react-native');
     return <View>{children}</View>;
+  },
+}));
+
+jest.mock('@/hooks/use-mobile-feature-flag', () => ({
+  useMobileFeatureFlag: () => mockReportsEnabled,
+}));
+
+// The row and the report sheet have their own component tests; here they only
+// expose the props the screen hands them.
+jest.mock('@/components/sessions/completed-session-row', () => ({
+  CompletedSessionRow: ({
+    row,
+    reportsEnabled,
+    reportedLocally,
+    onReport,
+  }: {
+    row: CompletedSessionRow;
+    reportsEnabled: boolean;
+    reportedLocally: boolean;
+    onReport: (row: CompletedSessionRow) => void;
+  }) => {
+    const { Pressable, Text, View } = require('react-native');
+    return (
+      <View>
+        <Text>{row.title}</Text>
+        <Text>{`status:${row.statusLabel}`}</Text>
+        <Text>{`reports-enabled:${String(reportsEnabled)}`}</Text>
+        {reportedLocally ? <Text>{`reported:${row.id}`}</Text> : null}
+        <Pressable
+          accessibilityLabel={`Report ${row.id}`}
+          onPress={() => onReport(row)}
+        />
+      </View>
+    );
+  },
+}));
+
+jest.mock('@/components/sessions/report-completion-sheet', () => ({
+  ReportCompletionSheet: ({
+    completion,
+    onReported,
+  }: {
+    completion: { id: string } | null;
+    onReported: (id: string) => void;
+  }) => {
+    const { Pressable, Text } = require('react-native');
+    return completion ? (
+      <Pressable
+        accessibilityLabel="Submit mock report"
+        onPress={() => onReported(completion.id)}
+      >
+        <Text>{`report-sheet:${completion.id}`}</Text>
+      </Pressable>
+    ) : null;
   },
 }));
 
@@ -93,6 +148,10 @@ function row(overrides: Partial<CompletedSessionRow> = {}): CompletedSessionRow 
     awaitingConfirmation: false,
     rating: 4,
     completion: null,
+    confirmedBy: 'self',
+    reportCount: 0,
+    reportable: false,
+    ratable: false,
     ...overrides,
   };
 }
@@ -100,6 +159,7 @@ function row(overrides: Partial<CompletedSessionRow> = {}): CompletedSessionRow 
 beforeEach(() => {
   jest.clearAllMocks();
   mockHookCalls.length = 0;
+  mockReportsEnabled = true;
   mockState = {
     rows: [row()],
     counts: { completed: 7, pending: 2 },
@@ -114,8 +174,7 @@ it('lists completed sessions with the month counts on the tabs', () => {
 
   expect(screen.getByText('Sessions completed')).toBeTruthy();
   expect(screen.getByText('Algebra')).toBeTruthy();
-  expect(screen.getByText('Sam')).toBeTruthy();
-  expect(screen.getByLabelText('Rated 4 out of 5')).toBeTruthy();
+  expect(screen.getByText('status:Confirmed')).toBeTruthy();
   expect(screen.getByText('Completed (7)')).toBeTruthy();
   expect(screen.getByText('Awaiting confirmation (2)')).toBeTruthy();
   expect(mockHookCalls.at(-1)?.tab).toBe('completed');
@@ -214,4 +273,37 @@ it('offers a retry when the list fails to load', () => {
   fireEvent.press(screen.getByText('Try again'));
 
   expect(mockRefetch).toHaveBeenCalled();
+});
+
+it('opens the report sheet from a row and marks the row reported once submitted', () => {
+  mockState.rows = [
+    row({
+      id: 'staff-1',
+      statusLabel: 'Marked by staff',
+      confirmedBy: 'staff',
+      reportable: true,
+      completion: { id: 'staff-1' } as CompletedSessionRow['completion'],
+    }),
+  ];
+  const screen = render(<CompletedSessionsScreen />);
+
+  fireEvent.press(screen.getByLabelText('Report staff-1'));
+  expect(screen.getByText('report-sheet:staff-1')).toBeTruthy();
+
+  fireEvent.press(screen.getByLabelText('Submit mock report'));
+  expect(screen.queryByText('report-sheet:staff-1')).toBeNull();
+  expect(screen.getByText('reported:staff-1')).toBeTruthy();
+
+  // The full refresh waits for the next tab change, like a confirm.
+  fireEvent.press(screen.getByRole('tab', { name: 'Awaiting confirmation (2)' }));
+  expect(mockInvalidateQueries).toHaveBeenCalledWith({
+    queryKey: ['session-completions'],
+  });
+});
+
+it('passes the reports flag through to the rows', () => {
+  mockReportsEnabled = false;
+  const screen = render(<CompletedSessionsScreen />);
+
+  expect(screen.getByText('reports-enabled:false')).toBeTruthy();
 });

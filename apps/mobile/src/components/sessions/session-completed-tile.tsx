@@ -8,7 +8,11 @@ import type {
 import type { AppColors } from '@/lib/theme';
 import { ActivityCompletionCheck } from '@/components/activity/activity-completion-check';
 
-function toActivity(completion: SessionCompletionVM): ActivityFeedLeafItemVM {
+/**
+ * Wraps a completion as the activity item the shared completion/feedback widgets
+ * read. Exported so the completed-sessions list can reuse the rating widget.
+ */
+export function toActivity(completion: SessionCompletionVM): ActivityFeedLeafItemVM {
   const title = completion.sessionTitle?.trim() || 'Session';
   return {
     kind: 'leaf',

@@ -18,6 +18,7 @@ import type {
   ConfirmSessionCompletionInput,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
+  ReportSessionCompletionInput,
   SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
@@ -168,6 +169,19 @@ export class SessionCompletionsController {
     @Body() body: DisputeSessionCompletionInput,
   ) {
     return this.sessionCompletionsService.dispute(req.user.id, {
+      ...body,
+      sessionCompletionId: id,
+    });
+  }
+
+  @Post(':id/report')
+  @UseGuards(AuthGuard)
+  report(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: ReportSessionCompletionInput,
+  ) {
+    return this.sessionCompletionsService.report(req.user.id, {
       ...body,
       sessionCompletionId: id,
     });

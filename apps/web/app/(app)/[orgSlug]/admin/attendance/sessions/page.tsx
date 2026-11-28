@@ -12,6 +12,7 @@ import {
   buildRecentCompletionMonthKeys,
   completionMonthKeyToUtcRange,
 } from '@iconicedu/web/app/(app)/[orgSlug]/admin/attendance/sessions/session-attendance-analytics';
+import { enableSessionCompletionReports } from '@iconicedu/web/flags';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
 import {
   listAdminSessionCompletions,
@@ -73,6 +74,12 @@ export default async function AdminCompletedSessionsPage({
     );
   }
 
+  // Participant "wrongly marked complete" reports are admin review data, rolled
+  // out behind their own flag.
+  const showCompletionReports = await enableSessionCompletionReports.run({
+    identify: { profileId: adminContext.actorProfileId },
+  });
+
   const range = completionMonthKeyToUtcRange(selectedMonth);
   // Each promise is kicked off here (not awaited) and handed straight to the
   // client dashboard, which unwraps it per-section with `use()` inside its own
@@ -109,6 +116,7 @@ export default async function AdminCompletedSessionsPage({
         orgId={org.id}
         allowVerifiedDurationOverride={isAdmin}
         showDisputeDetails={isAdmin}
+        showCompletionReports={showCompletionReports}
       />
     </AdminPageShell>
   );

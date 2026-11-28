@@ -3,6 +3,11 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import Page from './page';
 import { listAdminSessionCompletions } from '@iconicedu/web/lib/api/session-completions';
 import { requireAdminOrgContext } from '@iconicedu/web/lib/admin/require-admin-org-context';
+import { enableSessionCompletionReports } from '@iconicedu/web/flags';
+
+vi.mock('@iconicedu/web/flags', () => ({
+  enableSessionCompletionReports: { run: vi.fn(async () => false) },
+}));
 
 vi.mock('@iconicedu/web/lib/api/session-completions', () => ({
   listAdminSessionCompletions: vi.fn(async () => []),
@@ -26,16 +31,19 @@ vi.mock('./session-attendance-dashboard', () => ({
     monthOptions,
     allowVerifiedDurationOverride,
     showDisputeDetails,
+    showCompletionReports,
   }: {
     selectedMonth: string;
     monthOptions: string[];
     allowVerifiedDurationOverride: boolean;
     showDisputeDetails: boolean;
+    showCompletionReports?: boolean;
   }) => (
     <div
       data-testid="dashboard"
       data-verified-duration={String(allowVerifiedDurationOverride)}
       data-dispute-details={String(showDisputeDetails)}
+      data-completion-reports={String(Boolean(showCompletionReports))}
     >
       {selectedMonth}|{monthOptions.join(',')}
     </div>
@@ -116,7 +124,24 @@ describe('completed sessions date selection', () => {
     const dashboard = screen.getByTestId('dashboard');
     expect(dashboard).toHaveAttribute('data-verified-duration', 'true');
     expect(dashboard).toHaveAttribute('data-dispute-details', 'true');
+    expect(dashboard).toHaveAttribute('data-completion-reports', 'false');
     expect(screen.queryByTestId('table')).not.toBeInTheDocument();
+  });
+  it('shows completion reports to admins when the flag is on', async () => {
+    vi.mocked(enableSessionCompletionReports.run).mockResolvedValueOnce(true);
+    render(
+      await Page({
+        params: Promise.resolve({ orgSlug: 'i' }),
+        searchParams: Promise.resolve({}),
+      }),
+    );
+    expect(screen.getByTestId('dashboard')).toHaveAttribute(
+      'data-completion-reports',
+      'true',
+    );
+    expect(enableSessionCompletionReports.run).toHaveBeenCalledWith({
+      identify: { profileId: 'admin' },
+    });
   });
   it('keeps non-admins on the table view with the bounded API default', async () => {
     vi.mocked(requireAdminOrgContext).mockResolvedValue({

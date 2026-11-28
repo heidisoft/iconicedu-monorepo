@@ -20,6 +20,15 @@ export type DisputeSessionCompletionInput = {
   rescheduleRequested?: boolean;
 };
 
+// Reports a session that was marked complete without the viewer — auto-confirmed
+// or confirmed by staff — as wrong. Flags it for staff review; status is unchanged.
+export type ReportSessionCompletionInput = {
+  orgId: UUID;
+  sessionCompletionId: UUID;
+  reportCategory: ClassSessionCompletionDisputeCategory;
+  reportReason?: string | null;
+};
+
 export type RateSessionCompletionInput = {
   orgId: UUID;
   sessionCompletionId: UUID;

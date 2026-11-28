@@ -53,6 +53,10 @@ model ClassSessionCompletion {
   verificationNote    String?                      @map("verification_note")
   rating              Int?                         @db.SmallInt
   ratingComment       String?                      @map("rating_comment")
+  confirmedBy         String?                      @map("confirmed_by") @db.Uuid
+  reportedAt          DateTime?                    @map("reported_at") @db.Timestamptz(6)
+  reportCategory      String?                      @map("report_category")
+  reportReason        String?                      @map("report_reason")
   channelId           String?                      @map("channel_id") @db.Uuid
   learningSpaceId     String?                      @map("learning_space_id") @db.Uuid
   sessionTitle        String?                      @map("session_title")

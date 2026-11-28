@@ -1051,9 +1051,19 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         teacher_absent: 'Teacher absent',
         student_absent: 'Student absent',
         technical_issue: 'Technical issue',
+        did_not_happen: 'Did not happen',
         other: 'Other issue',
       };
       const categoryText = categoryLabel[disputeCategory] ?? disputeCategory;
+      // A completed session reported as wrongly marked complete (auto-confirmed or
+      // staff-confirmed) rides the same event, with its own wording.
+      const isWronglyCompleted = payload.reportKind === 'wrongly_completed';
+      const headlineText = isWronglyCompleted
+        ? `${reportedByName} reported ${classTitle} was wrongly marked complete`
+        : `${reportedByName} reported ${classTitle} didn't happen`;
+      const summaryText = isWronglyCompleted
+        ? `${reportedByName} reported that ${classTitle} was marked complete without them`
+        : `${reportedByName} reported that ${classTitle} did not take place`;
 
       const secondaryParts = [
         sessionLabel ? `${sessionLabel}` : undefined,
@@ -1069,13 +1079,13 @@ export const ACTIVITY_EVENT_DEFINITIONS: Record<string, ActivityEventDefinition>
         verb: 'session.completion.dispute_reported',
         leading: { kind: 'icon', iconKey: 'AlertCircle', tone: 'warning' },
         headline: {
-          primary: `${reportedByName} reported ${classTitle} didn't happen`,
+          primary: headlineText,
           secondary: secondaryParts || undefined,
           secondaryHref: buildInboxSourceHref(event, payload),
         },
-        summary: `${reportedByName} reported that ${classTitle} did not take place · ${categoryText}`,
+        summary: `${summaryText} · ${categoryText}`,
         preview: {
-          text: `${reportedByName} reported that ${classTitle} did not take place`,
+          text: summaryText,
         },
         actionButton: sourceAction(event, payload, 'outline', actionLabel),
         metadata: {

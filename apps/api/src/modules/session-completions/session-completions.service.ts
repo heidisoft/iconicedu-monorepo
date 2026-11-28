@@ -16,6 +16,7 @@ import type {
   AdminSessionCompletionActorVM,
   AdminSessionCompletionGuardianVM,
   AdminSessionCompletionParticipantVM,
+  AdminSessionCompletionReportVM,
   AdminSessionCompletionVM,
   AdminUndoSessionCompletionInput,
   ChannelSessionCompletionVM,
@@ -24,6 +25,8 @@ import type {
   ConnectionVM,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
+  ReportSessionCompletionInput,
+  SessionCompletionConfirmedBy,
   SessionCompletionVM,
   SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
@@ -98,7 +101,29 @@ function toVM(row: ClassSessionCompletionRow): SessionCompletionVM {
     ratedAt: row.rated_at ?? null,
     resolvedAt: row.resolved_at ?? null,
     expiresAt: row.expires_at,
+    confirmedBy: resolveConfirmedBy(row),
+    report:
+      row.reported_at && row.report_category
+        ? {
+            category: row.report_category,
+            reason: row.report_reason ?? null,
+            reportedAt: row.reported_at,
+          }
+        : null,
   };
+}
+
+/**
+ * Who marked the viewer's row complete. A 'confirmed' row with no `confirmed_by`
+ * predates that column and was not staff-confirmed per the migration backfill,
+ * so it counts as the participant's own confirmation.
+ */
+function resolveConfirmedBy(
+  row: ClassSessionCompletionRow,
+): SessionCompletionConfirmedBy | null {
+  if (row.status === 'auto_confirmed') return 'system';
+  if (row.status !== 'confirmed') return null;
+  return row.confirmed_by && row.confirmed_by !== row.profile_id ? 'staff' : 'self';
 }
 
 @Injectable()
@@ -453,6 +478,7 @@ export class SessionCompletionsService {
       .update({
         status: 'confirmed',
         confirmed_at: now,
+        confirmed_by: row.profile_id,
         resolved_at: now,
         updated_at: now,
         updated_by: row.profile_id,
@@ -563,6 +589,77 @@ export class SessionCompletionsService {
   }
 
   /**
+   * Reports a session that was marked complete without the viewer — auto-confirmed
+   * after the confirmation deadline, or confirmed by staff on their behalf — as
+   * wrong. Unlike dispute() this never changes `status`: the row keeps counting as
+   * completed and is flagged for staff, who correct it with adminDispute /
+   * adminUndoConfirm. A participant's own confirmation can't be reported here
+   * (they can undo it within the undo window, or ask an admin).
+   */
+  async report(authUserId: string, body: ReportSessionCompletionInput) {
+    if (!DISPUTE_CATEGORIES.includes(body.reportCategory)) {
+      throw new BadRequestException('Invalid reportCategory');
+    }
+    const reportReason = normalizeText(body.reportReason, 500);
+
+    const row = await this.loadOwnedRow(authUserId, body.orgId, body.sessionCompletionId);
+    const confirmedBy = resolveConfirmedBy(row);
+    if (confirmedBy !== 'staff' && confirmedBy !== 'system') {
+      throw new ConflictException(
+        confirmedBy === 'self'
+          ? 'You confirmed this session yourself, so it can’t be reported here. ' +
+              'Ask an admin if you need to change that.'
+          : 'Only sessions marked complete for you can be reported.',
+      );
+    }
+    if (row.reported_at) {
+      throw new ConflictException("You've already reported this session.");
+    }
+
+    const supabase = createSupabaseServiceClient();
+    const now = new Date().toISOString();
+    const { data: updated, error } = await supabase
+      .from('class_session_completions')
+      .update({
+        reported_at: now,
+        report_category: body.reportCategory,
+        report_reason: reportReason,
+        updated_at: now,
+        updated_by: row.profile_id,
+      })
+      .eq('id', row.id)
+      .eq('org_id', body.orgId)
+      .eq('status', row.status)
+      .is('reported_at', null)
+      .select('id')
+      .maybeSingle<{ id: string }>();
+
+    if (error) throw new InternalServerErrorException(error.message);
+    if (!updated) {
+      throw new ConflictException(
+        'This session was just updated from another device — refresh to see its ' +
+          'current status.',
+      );
+    }
+
+    this.logger.log(
+      `session completion reported id=${row.id} profileId=${row.profile_id} ` +
+        `confirmedBy=${confirmedBy}`,
+    );
+
+    await this.publishDisputeNotifications({
+      supabase,
+      row,
+      disputeCategory: body.reportCategory,
+      disputeReason: reportReason,
+      rescheduleRequested: false,
+      reportKind: 'wrongly_completed',
+    });
+
+    return { success: true };
+  }
+
+  /**
    * Reverts a just-confirmed or just-disputed row back to 'pending', mirroring the
    * short "Edit rating" window ActivityFeedbackRequest already offers after a rating
    * — same idea, applied to confirm/dispute. Enforced server-side (not just a hidden
@@ -595,6 +692,7 @@ export class SessionCompletionsService {
       .update({
         status: 'pending',
         confirmed_at: null,
+        confirmed_by: null,
         disputed_at: null,
         resolved_at: null,
         dispute_category: null,
@@ -959,6 +1057,8 @@ export class SessionCompletionsService {
     disputeCategory: string;
     disputeReason: string | null;
     rescheduleRequested: boolean;
+    /** Set when a completed session is reported as wrongly marked complete. */
+    reportKind?: 'wrongly_completed';
   }) {
     const { supabase, row, disputeCategory, disputeReason, rescheduleRequested } = input;
 
@@ -1015,12 +1115,13 @@ export class SessionCompletionsService {
         disputeCategory,
         disputeReason,
         rescheduleRequested,
+        ...(input.reportKind ? { reportKind: input.reportKind } : {}),
         recipientRole: 'staff',
         educatorNames: (educators ?? [])
           .map((e) => e.display_name ?? 'Unknown')
           .join(', '),
       },
-      dedupeKey: `dispute:${row.schedule_id}:${row.occurrence_key}:staff:${row.profile_id}`,
+      dedupeKey: `${input.reportKind ? 'completion-report' : 'dispute'}:${row.schedule_id}:${row.occurrence_key}:staff:${row.profile_id}`,
       refreshOnDedupe: true,
     });
   }
@@ -1143,6 +1244,7 @@ export class SessionCompletionsService {
       .update({
         status: 'confirmed',
         confirmed_at: now,
+        confirmed_by: staffProfile?.id ?? account.id,
         resolved_at: now,
         verified_minutes: verifiedMinutes,
         verification_note: verificationNote,
@@ -1244,6 +1346,7 @@ export class SessionCompletionsService {
       .from('class_session_completions')
       .update({
         status: 'disputed',
+        confirmed_by: null,
         dispute_category: body.disputeCategory,
         dispute_reason: disputeReason,
         reschedule_requested: body.rescheduleRequested ?? false,
@@ -1366,6 +1469,7 @@ export class SessionCompletionsService {
         .update({
           status: 'pending',
           confirmed_at: null,
+          confirmed_by: null,
           resolved_at: null,
           verified_minutes: null,
           verification_note: null,
@@ -1395,6 +1499,7 @@ export class SessionCompletionsService {
             .update({
               status: 'disputed',
               confirmed_at: null,
+              confirmed_by: null,
               resolved_at: row.disputed_at,
               verified_minutes: null,
               verification_note: null,
@@ -1733,7 +1838,9 @@ export class SessionCompletionsService {
     const profileIds = [
       ...new Set(
         completionRows.flatMap((row) =>
-          [row.profile_id, row.updated_by].filter((id): id is string => Boolean(id)),
+          [row.profile_id, row.updated_by, row.confirmed_by].filter((id): id is string =>
+            Boolean(id),
+          ),
         ),
       ),
     ];
@@ -2030,16 +2137,17 @@ export class SessionCompletionsService {
       rows.forEach((row) => {
         if (row.role !== 'educator' && row.role !== 'guardian') return;
         const key = `${row.role}|${row.profile_id}`;
-        // A 'confirmed' row whose updated_by differs from its own profile_id was
+        // A 'confirmed' row whose confirmer differs from its own profile_id was
         // settled by a staff override (adminConfirm), not by the person
         // themselves — surface who did it and when for the admin session list.
+        // `confirmed_by` survives the participant's later writes (rating);
+        // `updated_by` is only the fallback for rows written before it existed.
+        const confirmer = row.confirmed_by ?? row.updated_by;
         const confirmedByStaff =
-          row.status === 'confirmed' &&
-          row.updated_by &&
-          row.updated_by !== row.profile_id
+          row.status === 'confirmed' && confirmer && confirmer !== row.profile_id
             ? {
-                profileId: row.updated_by,
-                displayName: names.get(row.updated_by) ?? 'Staff',
+                profileId: confirmer,
+                displayName: names.get(confirmer) ?? 'Staff',
                 confirmedAt: row.resolved_at ?? row.confirmed_at ?? row.updated_at,
               }
             : null;
@@ -2091,6 +2199,26 @@ export class SessionCompletionsService {
         confirmedBy: confirmedActors,
         guardians,
         participants: [...participants.values()],
+        reports: rows
+          .filter(
+            (
+              row,
+            ): row is ClassSessionCompletionRow & {
+              reported_at: string;
+              report_category: NonNullable<ClassSessionCompletionRow['report_category']>;
+            } => Boolean(row.reported_at && row.report_category),
+          )
+          .map(
+            (row): AdminSessionCompletionReportVM => ({
+              profileId: row.profile_id,
+              displayName: names.get(row.profile_id) ?? 'Unknown user',
+              role: row.role,
+              category: row.report_category,
+              reason: row.report_reason ?? null,
+              reportedAt: row.reported_at,
+            }),
+          )
+          .sort((left, right) => right.reportedAt.localeCompare(left.reportedAt)),
         averageRating: ratings.length
           ? ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length
           : null,

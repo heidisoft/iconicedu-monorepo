@@ -9,6 +9,7 @@ import {
   CircleAlert,
   ChevronLeft,
   ChevronRight,
+  Flag,
   Loader2,
   Plus,
   Trash2,
@@ -80,6 +81,14 @@ const DISPUTE_CATEGORIES: {
 const DISPUTE_CATEGORY_LABELS = new Map(
   DISPUTE_CATEGORIES.map((option) => [option.key, option.label]),
 );
+
+const REPORTER_ROLE_LABELS: Record<string, string> = {
+  educator: 'Tutor',
+  guardian: 'Parent',
+  child: 'Student',
+  staff: 'Staff',
+  observer: 'Observer',
+};
 
 // Scheduled length of the occurrence: end minus its start (occurrenceKey). Returns
 // null when either bound is unparseable or non-positive — some backfilled rows
@@ -615,12 +624,15 @@ export function CompletedSessionsTable({
   orgId,
   allowVerifiedDurationOverride = false,
   showDisputeDetails = false,
+  showCompletionReports = false,
 }: {
   rows: AdminSessionCompletionVM[];
   schedules: ScheduleOptionRow[];
   orgId: string;
   allowVerifiedDurationOverride?: boolean;
   showDisputeDetails?: boolean;
+  /** `enable-session-completion-reports`: participant "wrongly marked complete" reports. */
+  showCompletionReports?: boolean;
 }) {
   const router = useRouter();
   const [page, setPage] = React.useState(1);
@@ -902,6 +914,30 @@ export function CompletedSessionsTable({
                     })}
                   </ul>
                   {participants.length === 0 && '—'}
+                  {showCompletionReports && (row.reports?.length ?? 0) > 0 && (
+                    <ul
+                      className="mt-3 space-y-1 border-t pt-2"
+                      aria-label="Reported as wrongly marked complete"
+                    >
+                      {row.reports!.map((report) => (
+                        <li
+                          key={`report|${report.profileId}`}
+                          className="flex items-start gap-2 text-xs text-warning"
+                        >
+                          <Flag aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+                          <span>
+                            {report.displayName} (
+                            {REPORTER_ROLE_LABELS[report.role] ?? report.role}) reported
+                            this as wrongly marked complete ·{' '}
+                            {DISPUTE_CATEGORY_LABELS.get(report.category) ??
+                              report.category}
+                            {report.reason ? `: ${report.reason}` : ''} ·{' '}
+                            {formatAttendanceDateTime(report.reportedAt)}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-wrap items-center gap-2">
