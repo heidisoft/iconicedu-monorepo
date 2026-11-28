@@ -958,10 +958,26 @@ export function VisibilityBadge({
   currentProfileId?: string;
   audienceParticipants?: MessageAudienceParticipant[];
 }) {
+  const sender = message.core.sender;
   const copy = getMessageVisibilityCopy({
     visibility: message.core.visibility,
     currentProfileId,
-    participants: audienceParticipants,
+    // The sender may not be a channel member (e.g. staff posting as an observer).
+    participants: [
+      ...(audienceParticipants ?? []),
+      ...(sender?.ids.id &&
+      !(audienceParticipants ?? []).some(
+        (participant) => participant.id === sender.ids.id,
+      )
+        ? [
+            {
+              id: sender.ids.id,
+              name: sender.profile.displayName,
+              role: sender.kind ?? null,
+            },
+          ]
+        : []),
+    ],
   });
   if (!copy) return null;
   // Staff can review private messages they are not part of, read-only.

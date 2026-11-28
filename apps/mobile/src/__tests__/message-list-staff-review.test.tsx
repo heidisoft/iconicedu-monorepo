@@ -122,4 +122,17 @@ describe('MessageList staff review: threads and labelling (classic theme)', () =
     render(<MessageList messages={[privateMessage]} currentProfileId="parent-1" />);
     expect(screen.queryByLabelText(/Staff view/)).toBeNull();
   });
+
+  it('names a sender who is not in the member list', () => {
+    render(
+      <MessageList
+        messages={[privateMessage]}
+        currentProfileId="staff-1"
+        audienceParticipants={[{ id: 'parent-1', name: 'Pat Parent', role: 'guardian' }]}
+      />,
+    );
+    expect(
+      screen.getByLabelText(/^Only visible to Taylor Tutor \+ 1 other/),
+    ).toBeTruthy();
+  });
 });

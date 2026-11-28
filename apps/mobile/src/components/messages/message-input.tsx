@@ -199,6 +199,8 @@ type MessageInputProps = {
   enableSendReliability?: boolean;
   /** Eligible channel recipients for audience selection; omitted in DMs and managed support conversations. */
   audienceParticipants?: MessageAudienceParticipant[];
+  /** The sender's own profile kind; staff observers are not in the member list. */
+  currentProfileKind?: string | null;
 };
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -628,10 +630,26 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     },
     audienceChipActive: { backgroundColor: C.actionSubtle, borderColor: C.action },
     audienceChipText: { color: C.text, fontSize: 12, fontWeight: '600' },
+    audienceChipRole: { color: C.textMuted, fontSize: 11, fontWeight: '500' },
   });
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+function getAudienceRoleLabel(role: string | null): string | null {
+  switch (role) {
+    case 'guardian':
+      return 'Parent';
+    case 'educator':
+      return 'Tutor';
+    case 'child':
+      return 'Student';
+    case 'staff':
+      return 'Staff';
+    default:
+      return null;
+  }
+}
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
@@ -660,6 +678,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   enableFormatting = false,
   enableSendReliability = false,
   audienceParticipants = [],
+  currentProfileKind,
 }) => {
   const [text, setText] = useState('');
   const [audienceProfileIds, setAudienceProfileIds] = useState<string[]>([]);
@@ -1268,7 +1287,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   // Safeguarding rules (enforced by the API): students cannot start private
   // messages, parents may only address staff and tutors, and so on.
   const audienceSenderRole = resolveMessageAudienceRole(
-    audienceParticipants.find((participant) => participant.id === profileId)?.role,
+    currentProfileKind ??
+      audienceParticipants.find((participant) => participant.id === profileId)?.role,
   );
   const selectableAudienceParticipants = canInitiateRestrictedMessage(audienceSenderRole)
     ? audienceParticipants.filter(
@@ -1290,6 +1310,20 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const tutorAudienceIds = selectableAudienceParticipants
     .filter((participant) => participant.role === 'educator')
     .map((participant) => participant.id);
+  const selectedAudienceNames = selectableAudienceParticipants
+    .filter((participant) => audienceProfileIds.includes(participant.id))
+    .map((participant) => participant.name);
+  // Mirrors the web "Replying privately · names" label for private thread replies.
+  const inheritedAudienceNames =
+    !quoteReplyTo && replyTo?.core.visibility.type === 'specific-users'
+      ? replyTo.core.visibility.userIds
+          .map((id) =>
+            id === profileId
+              ? 'You'
+              : audienceParticipants.find((participant) => participant.id === id)?.name,
+          )
+          .filter((name): name is string => Boolean(name))
+      : [];
 
   return (
     <>
@@ -1309,17 +1343,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               ...(tutorAudienceIds.length
                 ? [{ label: 'Tutors', ids: tutorAudienceIds }]
                 : []),
-              ...selectableAudienceParticipants.map((participant) => ({
-                label: participant.name,
-                ids: [participant.id],
-              })),
             ].map((option) => {
               const active =
                 option.ids.length === audienceProfileIds.length &&
                 option.ids.every((id) => audienceProfileIds.includes(id));
               return (
                 <TouchableOpacity
-                  key={`${option.label}:${option.ids.join(',')}`}
+                  key={`group:${option.label}`}
                   style={[s.audienceChip, active && s.audienceChipActive]}
                   onPress={() => setAudienceProfileIds(option.ids)}
                   accessibilityRole="button"
@@ -1330,7 +1360,41 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 </TouchableOpacity>
               );
             })}
+            {/* Specific people toggle independently, like the web checkboxes. */}
+            {selectableAudienceParticipants.map((participant) => {
+              const selected = audienceProfileIds.includes(participant.id);
+              const roleLabel = getAudienceRoleLabel(participant.role);
+              return (
+                <TouchableOpacity
+                  key={`person:${participant.id}`}
+                  style={[s.audienceChip, selected && s.audienceChipActive]}
+                  onPress={() =>
+                    setAudienceProfileIds((current) =>
+                      current.includes(participant.id)
+                        ? current.filter((id) => id !== participant.id)
+                        : [...current, participant.id],
+                    )
+                  }
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: selected, selected }}
+                  accessibilityLabel={`Message audience ${participant.name}`}
+                  accessibilityHint={roleLabel ?? undefined}
+                >
+                  <Text style={s.audienceChipText}>
+                    {participant.name}
+                    {roleLabel ? (
+                      <Text style={s.audienceChipRole}>{` · ${roleLabel}`}</Text>
+                    ) : null}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </ScrollView>
+          {selectedAudienceNames.length ? (
+            <Text style={s.audienceHint} testID="message-audience-summary">
+              {`Visible only to ${selectedAudienceNames.join(', ')} and you`}
+            </Text>
+          ) : null}
           {includesSelectedStudent ? (
             <Text style={s.audienceHint} testID="message-audience-guardian-hint">
               Their parent is included automatically
@@ -1348,7 +1412,15 @@ export const MessageInput: React.FC<MessageInputProps> = ({
                 {quoteReplyTo ? 'Replying to' : 'Reply in thread'}
               </Text>
               {!quoteReplyTo && replyTo?.core.visibility.type === 'specific-users' ? (
-                <Text style={s.replyAudience}>· Private audience</Text>
+                <Text
+                  style={s.replyAudience}
+                  numberOfLines={1}
+                  testID="reply-private-audience"
+                >
+                  {inheritedAudienceNames.length
+                    ? `· Private · ${inheritedAudienceNames.join(', ')}`
+                    : '· Private audience'}
+                </Text>
               ) : null}
             </View>
             <View style={s.replyMessageRow}>

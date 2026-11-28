@@ -11,7 +11,7 @@ import {
 import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
-import { isOutsideMessageAudience } from '@iconicedu/utils';
+import { useChannelMessageAudience } from '@/hooks/use-channel-message-audience';
 import { getMessageSendRefusal } from '@/components/messages/message-send-refusal';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,7 +29,6 @@ import {
   buildMessageStoragePath,
   deleteMessage,
   fetchChannelMetaByChannelId,
-  fetchChannelMembers,
   fetchChannelReadState,
   ensureDirectMessageChannelForProfiles,
   markChannelUnread,
@@ -58,7 +57,6 @@ import { useJoinLiveSession } from '@/hooks/use-join-live-session';
 import { applyOptimisticChannelManualUnread } from '@/lib/messages/apply-optimistic-channel-read-state';
 import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
 import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
-import { getMentionCandidates } from '@/lib/messages/message-mentions';
 import { usePushNudge } from '@/hooks/use-push-nudge';
 import { PushNudgeSheet } from '@/components/notifications/push-nudge-sheet';
 import { usePushConsent } from '@/providers/push-consent-provider';
@@ -90,9 +88,6 @@ export default function ChannelConversationScreen() {
   );
   const enableMessageSendReliability = useMobileFeatureFlag(
     mobileFeatureFlagKeys.enableMessageSendReliability,
-  );
-  const enableChannelCommunications = useMobileFeatureFlag(
-    mobileFeatureFlagKeys.enableChannelCommunications,
   );
 
   const orgId = account?.org_id ?? '';
@@ -133,22 +128,18 @@ export default function ChannelConversationScreen() {
   const resolvedThemeKey = channelMeta?.themeKey ?? null;
   const resolvedMessageUiThemeKey = channelMeta?.messageUiThemeKey ?? 'feed';
 
-  const canChooseMessageAudience = enableChannelCommunications && !isSupportChannel;
-  // Channel members power mention autocomplete and audience selection.
-  const { data: channelMembers } = useQuery({
-    queryKey: ['channelMembers', orgId, channelId, profileId] as const,
-    queryFn: () => fetchChannelMembers(orgId, channelId ?? '', profileId),
-    enabled:
-      (enableMobileMessageComposerParity || canChooseMessageAudience) &&
-      !!orgId &&
-      !!channelId &&
-      !!profileId,
-    staleTime: 60_000,
+  // Channel members power mention autocomplete, audience selection, and badge names.
+  const {
+    canChooseMessageAudience,
+    channelMembers,
+    mentionCandidates,
+    isStaffReviewMessage,
+  } = useChannelMessageAudience({
+    orgId,
+    channelId: channelId ?? '',
+    profileId,
+    isSupportChannel,
   });
-  const mentionCandidates = useMemo(
-    () => getMentionCandidates(channelMembers ?? [], profileId),
-    [channelMembers, profileId],
-  );
 
   const {
     data: messages,
@@ -251,17 +242,6 @@ export default function ChannelConversationScreen() {
   const [threadReplyTarget, setThreadReplyTarget] = useState<MessageVM | null>(null);
   // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
   const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
-
-  // Staff can review private messages they are not part of, read-only.
-  const isStaffReviewMessage = useCallback(
-    (msg: MessageVM) =>
-      isOutsideMessageAudience({
-        visibility: msg.core.visibility,
-        senderProfileId: msg.core.sender.ids.id,
-        viewerProfileId: profileId,
-      }),
-    [profileId],
-  );
 
   const handleThreadOpen = useCallback(
     (msg: MessageVM) => {
@@ -1048,6 +1028,7 @@ export default function ChannelConversationScreen() {
             enableFormatting={enableMobileMessageComposerParity}
             enableSendReliability={enableMessageSendReliability}
             audienceParticipants={canChooseMessageAudience ? channelMembers : undefined}
+            currentProfileKind={profileKind}
           />
         </KeyboardAvoidingView>
       )}

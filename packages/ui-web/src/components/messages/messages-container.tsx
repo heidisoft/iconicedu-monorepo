@@ -2362,6 +2362,7 @@ export function MessagesContainer({
                   ? participants
                   : undefined
               }
+              currentUserKind={currentUserProfile?.kind ?? null}
               currentUserId={resolvedCurrentUserId}
               channelId={channel.ids.id}
               showCreateMessageTypeButton={showCreateMessageTypeButton}

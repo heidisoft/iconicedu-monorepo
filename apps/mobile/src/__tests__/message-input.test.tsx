@@ -114,6 +114,31 @@ describe('MessageInput', () => {
         />,
       );
 
+    it('shows the picker to a staff observer who is not in the member list', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="observer-1"
+          currentProfileKind="staff"
+          audienceParticipants={channel}
+        />,
+      );
+      expect(screen.getByTestId('message-audience-picker')).toBeTruthy();
+      expect(screen.getByLabelText('Message audience Casey Student')).toBeTruthy();
+    });
+
+    it("uses the sender's own kind over the member list", () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          currentProfileKind="child"
+          audienceParticipants={channel}
+        />,
+      );
+      expect(screen.queryByTestId('message-audience-picker')).toBeNull();
+    });
+
     it.each(['student-1', 'unknown-profile'])('hides the picker for %s', (profileId) => {
       renderAs(profileId);
       expect(screen.queryByTestId('message-audience-picker')).toBeNull();
@@ -145,6 +170,97 @@ describe('MessageInput', () => {
       ]) {
         expect(screen.getByLabelText(`Message audience ${name}`)).toBeTruthy();
       }
+    });
+  });
+
+  describe('audience picker parity with web', () => {
+    const channel = [
+      { id: 'staff-1', name: 'Sam Staff', role: 'staff' },
+      { id: 'parent-1', name: 'Alex Parent', role: 'guardian' },
+      { id: 'parent-2', name: 'Blair Parent', role: 'guardian' },
+      { id: 'tutor-1', name: 'Taylor Tutor', role: 'educator' },
+    ];
+
+    it('selects several specific people and sends to all of them', async () => {
+      const onSend = jest.fn().mockResolvedValue(undefined);
+      render(
+        <MessageInput
+          onSend={onSend}
+          profileId="staff-1"
+          audienceParticipants={channel}
+        />,
+      );
+      fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
+      fireEvent.press(screen.getByLabelText('Message audience Taylor Tutor'));
+      expect(
+        screen.getByLabelText('Message audience Alex Parent').props.accessibilityState
+          .checked,
+      ).toBe(true);
+      expect(screen.getByTestId('message-audience-summary').props.children).toBe(
+        'Visible only to Alex Parent, Taylor Tutor and you',
+      );
+
+      fireEvent.changeText(screen.getByLabelText('Message input'), 'Hello both');
+      fireEvent.press(screen.getByLabelText('Send message'));
+      await waitFor(() =>
+        expect(onSend).toHaveBeenCalledWith('Hello both', {
+          audienceProfileIds: ['parent-1', 'tutor-1'],
+        }),
+      );
+    });
+
+    it('toggles a person off again', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={channel}
+        />,
+      );
+      fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
+      fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
+      expect(screen.queryByTestId('message-audience-summary')).toBeNull();
+      expect(
+        screen.getByLabelText('Message audience Everyone').props.accessibilityState
+          .selected,
+      ).toBe(true);
+    });
+
+    it('labels each person with their role', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={channel}
+        />,
+      );
+      expect(screen.getAllByText(' · Parent')).toHaveLength(2);
+      expect(screen.getByText(' · Tutor')).toBeTruthy();
+    });
+
+    it('names the inherited audience on a private thread reply', () => {
+      const replyTo = {
+        ids: { id: 'private-1', orgId: 'org-1' },
+        core: {
+          type: 'text',
+          sender: { ids: { id: 'tutor-1' }, profile: { displayName: 'Taylor Tutor' } },
+          createdAt: '2026-01-01T00:00:00Z',
+          visibility: { type: 'specific-users', userIds: ['tutor-1', 'staff-1'] },
+        },
+        social: { reactions: [] },
+        content: { text: 'Private' },
+      } as never;
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={channel}
+          replyTo={replyTo}
+        />,
+      );
+      expect(screen.getByTestId('reply-private-audience').props.children).toBe(
+        '· Private · Taylor Tutor, You',
+      );
     });
   });
 

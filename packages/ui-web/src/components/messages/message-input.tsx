@@ -230,6 +230,8 @@ interface MessageInputProps {
   enableMessageReplyReference?: boolean;
   /** Eligible channel recipients for audience selection. Omit for DMs and managed support conversations. */
   audienceParticipants?: UserProfileVM[];
+  /** The sender's own profile kind; staff observers are not in the participant list. */
+  currentUserKind?: string | null;
   /** Fixed audience description for a private thread reply composer. */
   inheritedAudienceLabel?: string | null;
   /** Profile ids of an inherited private audience; @mention suggestions are limited to them. */
@@ -366,6 +368,7 @@ export function MessageInput({
   onScheduleSend,
   enableMessageReplyReference = false,
   audienceParticipants,
+  currentUserKind,
   inheritedAudienceLabel,
   inheritedAudienceProfileIds,
   enableMessageListFormatting = false,
@@ -1605,7 +1608,8 @@ export function MessageInput({
   const selectableAudienceParticipants = React.useMemo(() => {
     const candidates = audienceParticipants ?? [];
     const senderRole = resolveMessageAudienceRole(
-      candidates.find((participant) => participant.ids.id === currentUserId)?.kind,
+      currentUserKind ??
+        candidates.find((participant) => participant.ids.id === currentUserId)?.kind,
     );
     if (!canInitiateRestrictedMessage(senderRole)) return [];
     return candidates.filter(
@@ -1613,7 +1617,7 @@ export function MessageInput({
         participant.ids.id !== currentUserId &&
         canAddressPrivately(senderRole, resolveMessageAudienceRole(participant.kind)),
     );
-  }, [audienceParticipants, currentUserId]);
+  }, [audienceParticipants, currentUserId, currentUserKind]);
   const includesSelectedStudent = selectableAudienceParticipants.some(
     (participant) =>
       participant.kind === 'child' && audienceProfileIds.includes(participant.ids.id),

@@ -218,6 +218,24 @@ describe('VisibilityBadge', () => {
     expect(screen.queryByText(/Staff view/)).toBeNull();
   });
 
+  it('names a sender who is not a channel member', () => {
+    render(
+      <VisibilityBadge
+        message={
+          {
+            core: {
+              visibility: { type: 'specific-users', userIds: ['observer-1', 'p1'] },
+              sender: { ids: { id: 'observer-1' }, profile: { displayName: 'Marc F' } },
+            },
+          } as unknown as MessageVM
+        }
+      />,
+    );
+    expect(screen.getByTestId('message-visibility-badge')).toHaveAccessibleName(
+      'Only visible to Marc F + 1 other. Show audience',
+    );
+  });
+
   it('works without a messages state provider', () => {
     messagesState.current = undefined;
     render(

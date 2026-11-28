@@ -582,6 +582,34 @@ describe('MessageInput audience safeguarding', () => {
     expect(trigger).toBeNull();
   });
 
+  it('shows the picker to a staff observer who is not in the participant list', async () => {
+    const user = userEvent.setup();
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel.filter((person) => person.ids.id !== 'staff-1')}
+        currentUserId="staff-1"
+        currentUserKind="staff"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+    expect(screen.getAllByRole('menuitemcheckbox').length).toBeGreaterThan(0);
+  });
+
+  it("uses the sender's own kind over the participant list", async () => {
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel}
+        currentUserId="staff-1"
+        currentUserKind="child"
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /Message audience:/i })).toBeNull();
+  });
+
   it('hides the audience picker when the sender is unknown', async () => {
     const { trigger } = await openPicker('not-in-channel');
     expect(trigger).toBeNull();

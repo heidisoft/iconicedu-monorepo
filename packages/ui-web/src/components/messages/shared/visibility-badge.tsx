@@ -71,6 +71,15 @@ export const VisibilityBadge = memo(function VisibilityBadge({
       participant.profile.displayName,
     ]),
   );
+  // The sender may not be a channel member (e.g. staff posting as an observer).
+  const sender = message.core.sender;
+  if (
+    sender?.ids.id &&
+    sender.profile?.displayName &&
+    !participantNames.has(sender.ids.id)
+  ) {
+    participantNames.set(sender.ids.id, sender.profile.displayName);
+  }
   const copy = getVisibilityCopy(
     message.core.visibility,
     participantNames,
