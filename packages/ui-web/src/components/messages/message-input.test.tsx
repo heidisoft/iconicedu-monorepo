@@ -618,7 +618,8 @@ describe('MessageInput audience safeguarding', () => {
   it('lets parents choose only staff and tutors', async () => {
     await openPicker('parent-1');
     const visible = options();
-    expect(visible.some((text) => text.includes('staff-1'))).toBe(true);
+    expect(visible.some((text) => text.includes('staff-1'))).toBe(false);
+    expect(screen.getByRole('menuitemcheckbox', { name: /^Staff/ })).toBeTruthy();
     expect(visible.some((text) => text.includes('tutor-1'))).toBe(true);
     expect(visible.some((text) => /parent-2|student-/.test(text))).toBe(false);
     expect(screen.queryByRole('menuitem', { name: /^Parents?$/ })).toBeNull();
@@ -635,6 +636,90 @@ describe('MessageInput audience safeguarding', () => {
   it('lets staff choose anyone', async () => {
     await openPicker('staff-1');
     expect(options()).toHaveLength(5);
+  });
+
+  it('offers staff as one option and never lists them by name', async () => {
+    const owner = member('owner-1', 'staff');
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MessageInput
+        onSend={onSend}
+        participants={[...channel, owner]}
+        audienceParticipants={[...channel, owner]}
+        currentUserId="parent-1"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+    expect(options().some((text) => /staff-1|owner-1/.test(text))).toBe(false);
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /^Staff/ }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('button', { name: 'Message audience: Staff' })).toBeTruthy();
+    expect(screen.getByText(/Visible only to staff and you/)).toBeTruthy();
+
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Heads up');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() =>
+      expect(onSend).toHaveBeenLastCalledWith('Heads up', [], null, undefined, [
+        'staff-1',
+        'owner-1',
+      ]),
+    );
+  });
+
+  it('combines staff with a named tutor', async () => {
+    const { user } = await openPicker('parent-1');
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /^Staff/ }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /tutor-1/ }));
+    await user.keyboard('{Escape}');
+    expect(
+      screen.getByRole('button', { name: 'Message audience: Staff, educator tutor-1' }),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/Visible only to staff, educator tutor-1 and you/),
+    ).toBeTruthy();
+  });
+
+  it('offers whole groups and single people side by side', async () => {
+    const { user } = await openPicker('staff-1');
+    // Two parents and two students: plural; one tutor: singular.
+    expect(screen.getByRole('menuitem', { name: 'Parents' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Tutor' })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Students' })).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Specific people' })).toBeTruthy();
+    // No other staff in the channel, so no Staff option for this sender.
+    expect(screen.queryByRole('menuitemcheckbox', { name: /^Staff/ })).toBeNull();
+
+    await user.click(screen.getByRole('menuitem', { name: 'Students' }));
+    expect(
+      screen.getByRole('button', { name: 'Message audience: Students' }),
+    ).toBeTruthy();
+  });
+
+  it('targets one person from the specific people list', async () => {
+    const user = userEvent.setup();
+    const onSend = vi.fn().mockResolvedValue(undefined);
+    render(
+      <MessageInput
+        onSend={onSend}
+        participants={channel}
+        audienceParticipants={channel}
+        currentUserId="staff-1"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: /Message audience:/i }));
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /guardian parent-2/ }));
+    await user.keyboard('{Escape}');
+    expect(
+      screen.getByRole('button', { name: 'Message audience: guardian parent-2' }),
+    ).toBeTruthy();
+    await user.type(screen.getByPlaceholderText('Write a message...'), 'Just you');
+    await user.click(screen.getByRole('button', { name: 'Send' }));
+    await waitFor(() =>
+      expect(onSend).toHaveBeenLastCalledWith('Just you', [], null, undefined, [
+        'parent-2',
+      ]),
+    );
   });
 });
 

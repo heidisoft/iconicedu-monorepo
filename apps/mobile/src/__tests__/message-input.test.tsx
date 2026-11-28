@@ -90,7 +90,7 @@ describe('MessageInput', () => {
     );
 
     fireEvent.press(screen.getByTestId('message-audience-toggle'));
-    fireEvent.press(screen.getByLabelText('Message audience Parents'));
+    fireEvent.press(screen.getByLabelText('Message audience Alex Parent'));
     fireEvent.changeText(screen.getByLabelText('Message input'), 'Welcome');
     fireEvent.press(screen.getByLabelText('Send message'));
 
@@ -152,7 +152,8 @@ describe('MessageInput', () => {
     it('lets parents address only staff and tutors', () => {
       renderAs('parent-1');
       fireEvent.press(screen.getByTestId('message-audience-toggle'));
-      expect(screen.getByLabelText('Message audience Sam Staff')).toBeTruthy();
+      expect(screen.queryByLabelText('Message audience Sam Staff')).toBeNull();
+      expect(screen.getByLabelText('Message audience Staff')).toBeTruthy();
       expect(screen.getByLabelText('Message audience Taylor Tutor')).toBeTruthy();
       expect(screen.queryByLabelText('Message audience Blair Parent')).toBeNull();
       expect(screen.queryByLabelText('Message audience Casey Student')).toBeNull();
@@ -298,6 +299,98 @@ describe('MessageInput', () => {
       expect(screen.getByTestId('message-audience-summary').props.children).toBe(
         'Visible only to Alex Parent, Taylor Tutor and you',
       );
+    });
+
+    it('offers staff as one Staff option, never by name, and sends to all of them', async () => {
+      const onSend = jest.fn().mockResolvedValue(undefined);
+      render(
+        <MessageInput
+          onSend={onSend}
+          profileId="parent-1"
+          audienceParticipants={[
+            ...channel,
+            { id: 'owner-1', name: 'Olive Owner', role: 'staff' },
+          ]}
+        />,
+      );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
+      expect(screen.queryByLabelText('Message audience Sam Staff')).toBeNull();
+      expect(screen.queryByLabelText('Message audience Olive Owner')).toBeNull();
+      fireEvent.press(screen.getByLabelText('Message audience Staff'));
+      expect(screen.getByTestId('message-audience-summary').props.children).toBe(
+        'Visible only to staff and you',
+      );
+      fireEvent.press(screen.getByLabelText('Hide audience options'));
+      expect(
+        screen.getByLabelText('Audience: Staff. Show audience options'),
+      ).toBeTruthy();
+
+      fireEvent.changeText(screen.getByLabelText('Message input'), 'Heads up');
+      fireEvent.press(screen.getByLabelText('Send message'));
+      await waitFor(() =>
+        expect(onSend).toHaveBeenCalledWith('Heads up', {
+          audienceProfileIds: ['staff-1', 'owner-1'],
+        }),
+      );
+    });
+
+    it('combines Staff with a named tutor and toggles Staff off again', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="parent-1"
+          audienceParticipants={channel}
+        />,
+      );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
+      fireEvent.press(screen.getByLabelText('Message audience Staff'));
+      fireEvent.press(screen.getByLabelText('Message audience Taylor Tutor'));
+      expect(screen.getByTestId('message-audience-summary').props.children).toBe(
+        'Visible only to staff, Taylor Tutor and you',
+      );
+      fireEvent.press(screen.getByLabelText('Message audience Staff'));
+      expect(screen.getByTestId('message-audience-summary').props.children).toBe(
+        'Visible only to Taylor Tutor and you',
+      );
+    });
+
+    it('has no Staff option when the sender is the only staff member', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={channel}
+        />,
+      );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
+      expect(screen.queryByLabelText('Message audience Staff')).toBeNull();
+      // One tutor: a singular "Tutor" group as well as their name.
+      expect(screen.getByLabelText('Message audience Tutor')).toBeTruthy();
+      expect(screen.getByLabelText('Message audience Taylor Tutor')).toBeTruthy();
+    });
+
+    it('offers parent, tutor and student groups alongside single people', () => {
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId="staff-1"
+          audienceParticipants={[
+            ...channel,
+            { id: 'student-1', name: 'Casey Student', role: 'child' },
+          ]}
+        />,
+      );
+      fireEvent.press(screen.getByTestId('message-audience-toggle'));
+      expect(screen.getByLabelText('Message audience Parents')).toBeTruthy();
+      expect(screen.getByLabelText('Message audience Tutor')).toBeTruthy();
+      expect(screen.getByLabelText('Message audience Student')).toBeTruthy();
+
+      // Picking one person shows their name, even when they are the whole group.
+      fireEvent.press(screen.getByLabelText('Message audience Taylor Tutor'));
+      fireEvent.press(screen.getByLabelText('Hide audience options'));
+      expect(
+        screen.getByLabelText('Audience: Taylor Tutor. Show audience options'),
+      ).toBeTruthy();
     });
 
     it('labels each person with their role', () => {

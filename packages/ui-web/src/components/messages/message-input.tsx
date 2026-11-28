@@ -25,6 +25,7 @@ import {
   DropdownMenuContent,
   DropdownMenuCheckboxItem,
   DropdownMenuItem,
+  DropdownMenuGroup,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -112,10 +113,23 @@ import type { MessageDraftScope } from './message-draft-store';
 import { generateClientMessageId } from './client-message-id';
 import { isMessageSendRejectedError } from './message-send-rejected-error';
 import {
-  canAddressPrivately,
-  canInitiateRestrictedMessage,
-  resolveMessageAudienceRole,
+  getMessageAudienceGroupOptions,
+  groupMessageAudienceCandidates,
+  isExactAudienceSelection,
 } from '@iconicedu/utils';
+
+function getAudienceRoleTag(kind: string | null | undefined): string {
+  switch (kind) {
+    case 'guardian':
+      return 'Parent';
+    case 'educator':
+      return 'Tutor';
+    case 'child':
+      return 'Student';
+    default:
+      return kind ?? '';
+  }
+}
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -1604,38 +1618,72 @@ export function MessageInput({
   );
 
   // Safeguarding rules (enforced by the API): students cannot start private
-  // messages, parents may only address staff and tutors, and so on.
-  const selectableAudienceParticipants = React.useMemo(() => {
-    const candidates = audienceParticipants ?? [];
-    const senderRole = resolveMessageAudienceRole(
-      currentUserKind ??
-        candidates.find((participant) => participant.ids.id === currentUserId)?.kind,
-    );
-    if (!canInitiateRestrictedMessage(senderRole)) return [];
-    return candidates.filter(
-      (participant) =>
-        participant.ids.id !== currentUserId &&
-        canAddressPrivately(senderRole, resolveMessageAudienceRole(participant.kind)),
-    );
-  }, [audienceParticipants, currentUserId, currentUserKind]);
-  const includesSelectedStudent = selectableAudienceParticipants.some(
-    (participant) =>
-      participant.kind === 'child' && audienceProfileIds.includes(participant.ids.id),
+  // messages, parents may only address staff and tutors, and so on. Staff are
+  // offered as one "Staff" option rather than by name.
+  const audienceGroups = React.useMemo(
+    () =>
+      groupMessageAudienceCandidates(
+        (audienceParticipants ?? []).map((participant) => ({
+          id: participant.ids.id,
+          kind: participant.kind,
+          participant,
+        })),
+        { senderId: currentUserId, senderKind: currentUserKind },
+      ),
+    [audienceParticipants, currentUserId, currentUserKind],
   );
-  const selectedAudienceNames = selectableAudienceParticipants
-    .filter((participant) => audienceProfileIds.includes(participant.ids.id))
-    .map((participant) => participant.profile.displayName);
-  const parentAudienceIds = selectableAudienceParticipants
-    .filter((participant) => participant.kind === 'guardian')
-    .map((participant) => participant.ids.id);
-  const tutorAudienceIds = selectableAudienceParticipants
-    .filter((participant) => participant.kind === 'educator')
-    .map((participant) => participant.ids.id);
-  const audienceButtonLabel = audienceProfileIds.length
-    ? selectedAudienceNames.length <= 2
-      ? selectedAudienceNames.join(', ')
-      : `${selectedAudienceNames.length} people`
-    : 'Everyone in this channel';
+  const hasAudienceOptions =
+    audienceGroups.staffIds.length > 0 || audienceGroups.namedPeople.length > 0;
+  const staffSelected = isExactAudienceSelection(
+    audienceProfileIds.filter((id) => audienceGroups.staffIds.includes(id)),
+    audienceGroups.staffIds,
+  );
+  const includesSelectedStudent = audienceGroups.students.some((student) =>
+    audienceProfileIds.includes(student.id),
+  );
+  const selectedAudienceNames = audienceGroups.namedPeople
+    .filter((person) => audienceProfileIds.includes(person.id))
+    .map((person) => person.participant.profile.displayName);
+  const selectedAudienceParts = [
+    ...(staffSelected ? ['Staff'] : []),
+    ...selectedAudienceNames,
+  ];
+  const audienceGroupOptions = getMessageAudienceGroupOptions(audienceGroups);
+  // A one-member group is just that person, so the button shows their name.
+  const selectedAudienceGroup = audienceGroupOptions.find(
+    (option) =>
+      option.ids.length > 1 && isExactAudienceSelection(audienceProfileIds, option.ids),
+  );
+  const audienceButtonLabel = selectedAudienceGroup
+    ? selectedAudienceGroup.label
+    : audienceProfileIds.length
+      ? selectedAudienceParts.length <= 2
+        ? selectedAudienceParts.join(', ')
+        : `${selectedAudienceParts[0]} + ${selectedAudienceParts.length - 1} more`
+      : 'Everyone in this channel';
+  const audienceSummaryNames = [
+    ...(staffSelected ? ['staff'] : []),
+    ...selectedAudienceNames,
+  ];
+  const togglePersonAudience = (id: string, checked: boolean) =>
+    setAudienceProfileIds((current) =>
+      checked
+        ? Array.from(new Set([...current, id]))
+        : current.filter((currentId) => currentId !== id),
+    );
+  const renderPersonOption = (person: (typeof audienceGroups.namedPeople)[number]) => (
+    <DropdownMenuCheckboxItem
+      key={person.id}
+      checked={audienceProfileIds.includes(person.id)}
+      onSelect={(event) => event.preventDefault()}
+      onCheckedChange={(checked) => togglePersonAudience(person.id, checked === true)}
+    >
+      <span className="truncate">{person.participant.profile.displayName}</span>
+      <span className="ml-auto pl-2 text-[10px] uppercase text-muted-foreground">
+        {getAudienceRoleTag(person.kind)}
+      </span>
+    </DropdownMenuCheckboxItem>
+  );
 
   return (
     <div
@@ -1651,7 +1699,7 @@ export function MessageInput({
             <LockKeyhole className="h-3.5 w-3.5" aria-hidden="true" />
             Replying privately · {inheritedAudienceLabel}
           </div>
-        ) : selectableAudienceParticipants.length ? (
+        ) : hasAudienceOptions ? (
           <div className="mb-2 flex items-center gap-2">
             <span className="text-xs font-medium text-muted-foreground">To:</span>
             <DropdownMenu>
@@ -1669,55 +1717,56 @@ export function MessageInput({
                   <span className="truncate">{audienceButtonLabel}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-72">
+              <DropdownMenuContent
+                align="start"
+                className="max-h-96 w-72 overflow-y-auto"
+              >
                 <DropdownMenuLabel>Who can see this message?</DropdownMenuLabel>
                 <DropdownMenuItem onSelect={() => setAudienceProfileIds([])}>
                   Everyone in this channel
                 </DropdownMenuItem>
-                {parentAudienceIds.length ? (
-                  <DropdownMenuItem
-                    onSelect={() => setAudienceProfileIds(parentAudienceIds)}
-                  >
-                    Parent{parentAudienceIds.length === 1 ? '' : 's'}
-                  </DropdownMenuItem>
-                ) : null}
-                {tutorAudienceIds.length ? (
-                  <DropdownMenuItem
-                    onSelect={() => setAudienceProfileIds(tutorAudienceIds)}
-                  >
-                    Tutor{tutorAudienceIds.length === 1 ? '' : 's'}
-                  </DropdownMenuItem>
-                ) : null}
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel>Specific people</DropdownMenuLabel>
-                {selectableAudienceParticipants.map((participant) => (
+                {audienceGroups.staffIds.length ? (
                   <DropdownMenuCheckboxItem
-                    key={participant.ids.id}
-                    checked={audienceProfileIds.includes(participant.ids.id)}
+                    checked={staffSelected}
                     onSelect={(event) => event.preventDefault()}
                     onCheckedChange={(checked) =>
                       setAudienceProfileIds((current) =>
-                        checked
-                          ? Array.from(new Set([...current, participant.ids.id]))
-                          : current.filter((id) => id !== participant.ids.id),
+                        checked === true
+                          ? Array.from(new Set([...current, ...audienceGroups.staffIds]))
+                          : current.filter((id) => !audienceGroups.staffIds.includes(id)),
                       )
                     }
                   >
-                    <span className="truncate">{participant.profile.displayName}</span>
-                    <span className="ml-auto text-[10px] uppercase text-muted-foreground">
-                      {participant.kind === 'guardian'
-                        ? 'Parent'
-                        : participant.kind === 'educator'
-                          ? 'Tutor'
-                          : participant.kind}
+                    <span className="flex flex-col">
+                      <span>Staff</span>
+                      <span className="text-[11px] text-muted-foreground">
+                        Alert the staff team
+                      </span>
                     </span>
                   </DropdownMenuCheckboxItem>
+                ) : null}
+                {audienceGroupOptions.map((option) => (
+                  <DropdownMenuItem
+                    key={option.key}
+                    onSelect={() => setAudienceProfileIds(option.ids)}
+                  >
+                    {option.label}
+                  </DropdownMenuItem>
                 ))}
+                {audienceGroups.namedPeople.length ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuGroup aria-label="Specific people">
+                      <DropdownMenuLabel>Specific people</DropdownMenuLabel>
+                      {audienceGroups.namedPeople.map(renderPersonOption)}
+                    </DropdownMenuGroup>
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
             {audienceProfileIds.length ? (
               <span className="truncate text-xs text-muted-foreground">
-                Visible only to {selectedAudienceNames.join(', ')} and you
+                Visible only to {audienceSummaryNames.join(', ')} and you
                 {includesSelectedStudent
                   ? ' · their parent is included automatically'
                   : ''}

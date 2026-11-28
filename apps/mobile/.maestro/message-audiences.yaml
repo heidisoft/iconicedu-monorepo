@@ -9,7 +9,7 @@ name: Channel member message audiences
 - assertVisible: 'Everyone'
 - tapOn:
     id: message-audience-toggle
-- tapOn: 'Parents'
+- tapOn: 'Parents?'
 - tapOn:
     id: message-input
 - inputText: 'Maestro parent-only welcome'
@@ -23,7 +23,7 @@ name: Channel member message audiences
 - assertNotVisible: 'Visible to'
 - tapOn:
     id: message-audience-toggle
-- tapOn: 'Tutors'
+- tapOn: 'Tutors?'
 - tapOn:
     id: message-input
 - inputText: 'Maestro tutor-only handover'

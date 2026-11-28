@@ -1,5 +1,11 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
+/** Picks a whole group: "Parent"/"Parents" or "Tutor"/"Tutors". */
+async function chooseAudienceGroup(page: Page, group: 'Parents' | 'Tutors') {
+  const singular = group.slice(0, -1);
+  await page.getByRole('menuitem', { name: new RegExp(`^${singular}s?$`) }).click();
+}
+
 const classroomPath = process.env.PLAYWRIGHT_MESSAGE_AUDIENCE_PATH;
 const staffAuth = process.env.PLAYWRIGHT_STAFF_AUTH_STATE;
 const parentAuth = process.env.PLAYWRIGHT_PARENT_AUTH_STATE;
@@ -45,7 +51,7 @@ test.describe('channel message audiences', () => {
       await send(staff.page, publicText);
 
       await staff.page.getByRole('button', { name: /Message audience:/i }).click();
-      await staff.page.getByText(/^Parent(s)?$/).click();
+      await chooseAudienceGroup(staff.page, 'Parents');
       await send(staff.page, parentText);
       await expect(staff.page.getByText(/Only visible to/).last()).toBeVisible();
       await staff.page.getByTestId('message-visibility-badge').last().click();
@@ -76,7 +82,7 @@ test.describe('channel message audiences', () => {
       await expect(tutor.page.getByText(parentReply, { exact: true })).toHaveCount(0);
 
       await staff.page.getByRole('button', { name: /Message audience:/i }).click();
-      await staff.page.getByText(/^Tutor(s)?$/).click();
+      await chooseAudienceGroup(staff.page, 'Tutors');
       await send(staff.page, tutorText);
       await tutor.page.reload();
       await expect(tutor.page.getByText(tutorText, { exact: true })).toBeVisible();
@@ -88,7 +94,7 @@ test.describe('channel message audiences', () => {
         parent.page.getByRole('button', { name: /Message audience: Everyone/i }),
       ).toBeVisible();
       await parent.page.getByRole('button', { name: /Message audience:/i }).click();
-      await parent.page.getByText(/^Tutor(s)?$/).click();
+      await chooseAudienceGroup(parent.page, 'Tutors');
       await send(parent.page, parentToTutorText);
       await tutor.page.reload();
       await expect(

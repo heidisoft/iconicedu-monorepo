@@ -24,6 +24,8 @@ Classroom channels mix children, their guardians, tutors, and staff. With open t
 
    Students can still reply inside a private thread they are already part of; replies inherit the parent audience.
 
+   Pickers offer whole groups (parents, tutors, students) and any single parent, tutor, or student by name, but offer staff (owners, admins, and staff) only as a single **Staff** option. Choosing it addresses every staff member in the channel, so families and tutors can raise a concern with the staff team and those staff are notified. Staff who are not channel members are not notified, but can still read the message through staff review (rule 3).
+
 2. **Guardian auto-include.** When a student is in the audience, their guardians who are members of the channel are added automatically. A tutor cannot send to a student who has no guardian in the channel. Staff are exempt from that requirement because of rule 3.
 
 3. **Staff review, read-only.** Owners, admins, and staff can read every restricted message, with its content, attachments, reactions, and threads, in channels they can already see (as members or staff observers). They cannot reply, quote, react, or create threads on messages whose audience they are not part of. They do not receive unread counts or notifications for those messages. Support channels keep their own audience model.
