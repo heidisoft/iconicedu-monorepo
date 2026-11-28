@@ -560,6 +560,12 @@ export function buildPersonalizedSessionCopy(
       typeof payload.reportedByDisplayName === 'string'
         ? payload.reportedByDisplayName
         : 'Someone';
+    if (payload.reportKind === 'wrongly_completed') {
+      return {
+        title: `${reportedByName} reported ${classTitle} was wrongly marked complete`,
+        summary: 'Tap to review the completion',
+      };
+    }
     return {
       title: `${reportedByName} reported ${classTitle} didn't happen`,
       summary: 'Tap to review and reschedule if needed',

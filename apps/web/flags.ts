@@ -318,6 +318,26 @@ export const enableClassroomWhiteboard = flag<boolean, { profileId?: string | nu
   },
 });
 
+export const enableSessionCompletionReports = flag<
+  boolean,
+  { profileId?: string | null }
+>({
+  key: platformFeatureFlagKeys.enableSessionCompletionReports,
+  description:
+    'Shows participant reports of sessions wrongly marked complete on the admin completed-sessions page (and the Report action on mobile).',
+  options: [
+    { label: 'Off', value: false },
+    { label: 'On', value: true },
+  ],
+  defaultValue: false,
+  async decide({ entities }) {
+    return evaluateWebBooleanFlag({
+      flagKey: platformFeatureFlagKeys.enableSessionCompletionReports,
+      profileId: entities?.profileId,
+    });
+  },
+});
+
 export const webFlags = {
   enableClassroomWhiteboard,
   enableClassroomMeetingSettings,
@@ -335,6 +355,7 @@ export const webFlags = {
   enableMobileGoogleSignIn,
   enableMobileMessageComposerParity,
   enableMessageSendReliability,
+  enableSessionCompletionReports,
 } as const;
 
 export type WebFlagKey = keyof typeof webFlags;

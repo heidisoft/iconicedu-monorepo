@@ -17,6 +17,7 @@ export const platformFeatureFlagKeys = {
   enableMessageSendReliability: 'enable-message-send-reliability',
   enableChannelCommunications: 'enable-channel-communications',
   enableMobileCompletedSessionsList: 'enable-mobile-completed-sessions-list',
+  enableSessionCompletionReports: 'enable-session-completion-reports',
   mobileMinAppVersion: 'mobile-min-app-version',
 } as const;
 

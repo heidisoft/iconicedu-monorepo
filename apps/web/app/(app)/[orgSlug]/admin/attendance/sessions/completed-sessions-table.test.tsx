@@ -131,6 +131,43 @@ describe('CompletedSessionsTable', () => {
     ).toBeInTheDocument();
   });
 
+  const rowWithReport: AdminSessionCompletionVM = {
+    ...row,
+    reports: [
+      {
+        profileId: 'student-1',
+        displayName: 'Jamie Lee',
+        role: 'child',
+        category: 'did_not_happen',
+        reason: 'Tutor never joined',
+        reportedAt: '2026-09-02T09:00:00Z',
+      },
+    ],
+  };
+
+  it('hides wrongly-marked-complete reports while the reports flag is off', () => {
+    render(<CompletedSessionsTable rows={[rowWithReport]} schedules={[]} orgId="org" />);
+    expect(
+      screen.queryByLabelText('Reported as wrongly marked complete'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('lists who reported the session as wrongly marked complete when the flag is on', () => {
+    render(
+      <CompletedSessionsTable
+        rows={[rowWithReport]}
+        schedules={[]}
+        orgId="org"
+        showCompletionReports
+      />,
+    );
+    expect(
+      screen.getByLabelText('Reported as wrongly marked complete'),
+    ).toHaveTextContent(
+      /Jamie Lee \(Student\) reported this as wrongly marked complete · Session did not happen: Tutor never joined/,
+    );
+  });
+
   it('lets staff resolve a dispute with a verified duration when the flag is on', () => {
     render(
       <CompletedSessionsTable

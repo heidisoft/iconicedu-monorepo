@@ -11,19 +11,17 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  CalendarCheck,
-  ChevronLeft,
-  ChevronRight,
-  Clock3,
-  Star,
-} from 'lucide-react-native';
+import { CalendarCheck, ChevronLeft, ChevronRight } from 'lucide-react-native';
+import { CompletedSessionRow } from '@/components/sessions/completed-session-row';
+import { ReportCompletionSheet } from '@/components/sessions/report-completion-sheet';
 import { SessionCompletedTile } from '@/components/sessions/session-completed-tile';
 import { useCompletedSessionsHistory } from '@/hooks/use-completed-sessions-history';
+import { useMobileFeatureFlag } from '@/hooks/use-mobile-feature-flag';
+import { mobileFeatureFlagKeys } from '@/lib/feature-flags';
 import {
   ADMIN_MIN_MONTH_OFFSET,
   monthRange,
-  type CompletedSessionRow,
+  type CompletedSessionRow as Row,
   type CompletedSessionsTab,
 } from '@/lib/sessions/completed-sessions';
 import { useTheme } from '@/providers/theme-provider';
@@ -99,36 +97,6 @@ function makeStyles(C: AppColors) {
       lineHeight: 20,
       color: C.textMuted,
     },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      padding: 14,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: C.border,
-      backgroundColor: C.card,
-    },
-    dateChip: {
-      minWidth: 46,
-      borderRadius: 10,
-      paddingVertical: 6,
-      paddingHorizontal: 8,
-      alignItems: 'center',
-      backgroundColor: C.pageBg,
-    },
-    dayName: { fontSize: 10, fontWeight: '600', color: C.textMuted },
-    dayNum: { fontSize: 14, fontWeight: '700', lineHeight: 18, color: C.text },
-    body: { flex: 1, gap: 6 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    title: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: C.text },
-    badge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-    badgeText: { fontSize: 10, fontWeight: '700' },
-    metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 4 },
-    metaText: { fontSize: 12, color: C.textFaint },
-    metaAccent: { fontWeight: '600', color: C.teal },
-    rating: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-    ratingText: { fontSize: 12, fontWeight: '600', color: C.textMuted },
     centered: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
     errorText: { fontSize: 14, color: C.textMuted, textAlign: 'center' },
     retryButton: {
@@ -141,95 +109,6 @@ function makeStyles(C: AppColors) {
     retryText: { fontSize: 14, fontWeight: '600', color: C.actionForeground },
     footer: { paddingVertical: 16 },
   });
-}
-
-type Styles = ReturnType<typeof makeStyles>;
-
-function formatDayParts(iso: string) {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return { dayName: '', dayNum: '', time: '' };
-  return {
-    dayName: date.toLocaleDateString(undefined, { weekday: 'short' }),
-    dayNum: date.toLocaleDateString(undefined, { day: 'numeric' }),
-    time: date
-      .toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true })
-      .replace(' AM', 'am')
-      .replace(' PM', 'pm'),
-  };
-}
-
-function CompletedSessionListRow({
-  row,
-  colors,
-  s,
-}: {
-  row: CompletedSessionRow;
-  colors: AppColors;
-  s: Styles;
-}) {
-  const { dayName, dayNum, time } = formatDayParts(row.startsAt);
-  const isPending = row.awaitingConfirmation;
-  return (
-    <View
-      style={s.row}
-      accessible
-      accessibilityLabel={[
-        row.title,
-        `${dayName} ${dayNum} ${time}`,
-        row.subtitle,
-        row.statusLabel,
-      ]
-        .filter(Boolean)
-        .join(', ')}
-    >
-      <View style={s.dateChip}>
-        <Text style={s.dayName}>{dayName}</Text>
-        <Text style={s.dayNum}>{dayNum}</Text>
-      </View>
-      <View style={s.body}>
-        <View style={s.titleRow}>
-          <Text style={s.title} numberOfLines={1}>
-            {row.title}
-          </Text>
-          <View
-            style={[
-              s.badge,
-              {
-                backgroundColor: isPending ? colors.warningSubtle : colors.successSubtle,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                s.badgeText,
-                { color: isPending ? colors.warning : colors.success },
-              ]}
-            >
-              {row.statusLabel}
-            </Text>
-          </View>
-        </View>
-        <View style={s.metaRow}>
-          <Clock3 size={11} color={colors.textFaint} />
-          <Text style={s.metaText}>{time}</Text>
-          {row.subtitle ? (
-            <>
-              <Text style={s.metaText}>·</Text>
-              <Text style={[s.metaText, s.metaAccent]} numberOfLines={1}>
-                {row.subtitle}
-              </Text>
-            </>
-          ) : null}
-        </View>
-      </View>
-      {row.rating != null ? (
-        <View style={s.rating} accessibilityLabel={`Rated ${row.rating} out of 5`}>
-          <Star size={12} color={colors.warning} fill={colors.warning} />
-          <Text style={s.ratingText}>{Number(row.rating.toFixed(1))}</Text>
-        </View>
-      ) : null}
-    </View>
-  );
 }
 
 const TABS: Array<{ key: CompletedSessionsTab; label: string }> = [
@@ -247,6 +126,12 @@ export default function CompletedSessionsScreen() {
   const [monthOffset, setMonthOffset] = useState(0);
   const month = useMemo(() => monthRange(monthOffset), [monthOffset]);
   const [refreshing, setRefreshing] = useState(false);
+  const reportsEnabled = useMobileFeatureFlag(
+    mobileFeatureFlagKeys.enableSessionCompletionReports,
+  );
+  const [reportTarget, setReportTarget] = useState<Row | null>(null);
+  // Rows reported on this screen show as reported before the list refetches.
+  const [reportedIds, setReportedIds] = useState<ReadonlySet<string>>(new Set());
 
   const {
     rows,
@@ -277,6 +162,12 @@ export default function CompletedSessionsScreen() {
     void queryClient.invalidateQueries({ queryKey: ['session-completions', 'summary'] });
   }, [queryClient]);
 
+  const handleReported = useCallback((completionId: string) => {
+    setReportedIds((ids) => new Set(ids).add(completionId));
+    setReportTarget(null);
+    dirtyRef.current = true;
+  }, []);
+
   const selectTab = (next: CompletedSessionsTab) => {
     if (next === tab) return;
     flushIfDirty();
@@ -302,8 +193,8 @@ export default function CompletedSessionsScreen() {
   const canGoForward = monthOffset < 0;
 
   const renderItem = useCallback(
-    ({ item }: { item: CompletedSessionRow }) =>
-      item.completion ? (
+    ({ item }: { item: Row }) =>
+      item.awaitingConfirmation && item.completion ? (
         <SessionCompletedTile
           completion={item.completion}
           colors={colors}
@@ -311,9 +202,16 @@ export default function CompletedSessionsScreen() {
           onRatingSubmit={handleCompletionChanged}
         />
       ) : (
-        <CompletedSessionListRow row={item} colors={colors} s={s} />
+        <CompletedSessionRow
+          row={item}
+          colors={colors}
+          reportsEnabled={reportsEnabled}
+          reportedLocally={reportedIds.has(item.id)}
+          onReport={setReportTarget}
+          onRated={handleCompletionChanged}
+        />
       ),
-    [colors, handleCompletionChanged, s],
+    [colors, handleCompletionChanged, reportedIds, reportsEnabled],
   );
 
   let content: React.ReactNode;
@@ -450,6 +348,14 @@ export default function CompletedSessionsScreen() {
       </View>
 
       {content}
+
+      <ReportCompletionSheet
+        completion={reportTarget?.completion ?? null}
+        confirmedBy={reportTarget?.confirmedBy ?? null}
+        colors={colors}
+        onClose={() => setReportTarget(null)}
+        onReported={handleReported}
+      />
     </SafeAreaView>
   );
 }

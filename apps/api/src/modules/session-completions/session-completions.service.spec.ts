@@ -257,6 +257,93 @@ describe('SessionCompletionsService', () => {
       });
     });
 
+    it('lists reports from every role and keeps staff attribution after a rating', async () => {
+      const STAFF_PROFILE_ID = '00000000-0000-4000-8000-0000000000f1';
+      const accountChain = makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+      const roleChain = makeChain({ data: { role_key: 'admin' } });
+      const completionChain = makeChain({
+        data: [
+          // Staff confirmed, then the tutor rated it (updated_by is now their own).
+          baseCompletionRow({
+            profile_id: PROFILE_ID,
+            role: 'educator',
+            status: 'confirmed',
+            confirmed_by: STAFF_PROFILE_ID,
+            updated_by: PROFILE_ID,
+            rating: 4,
+            resolved_at: '2030-03-06T11:05:00.000Z',
+            updated_at: '2030-03-06T12:00:00.000Z',
+          }),
+          // A student's auto-confirmed row, reported as wrongly marked complete.
+          baseCompletionRow({
+            id: '00000000-0000-4000-8000-000000000008',
+            profile_id: OTHER_PROFILE_ID,
+            role: 'child',
+            status: 'auto_confirmed',
+            reported_at: '2030-03-07T09:00:00.000Z',
+            report_category: 'did_not_happen',
+            report_reason: 'Nobody joined',
+            resolved_at: '2030-03-06T11:03:00.000Z',
+            updated_at: '2030-03-07T09:00:00.000Z',
+          }),
+        ],
+      });
+      const profilesChain = makeChain({
+        data: [
+          {
+            id: PROFILE_ID,
+            display_name: 'Taylor Reed',
+            first_name: null,
+            last_name: null,
+          },
+          {
+            id: OTHER_PROFILE_ID,
+            display_name: 'Jamie Lee',
+            first_name: null,
+            last_name: null,
+          },
+          {
+            id: STAFF_PROFILE_ID,
+            display_name: 'Sam Staff',
+            first_name: null,
+            last_name: null,
+          },
+        ],
+      });
+      const participantsChain = makeChain({ data: [] });
+      const learningSpacesChain = makeChain({ data: [] });
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') return accountChain;
+        if (table === 'user_roles') return roleChain;
+        if (table === 'class_session_completions') return completionChain;
+        if (table === 'profiles') return profilesChain;
+        if (table === 'class_schedule_participants') return participantsChain;
+        if (table === 'learning_spaces') return learningSpacesChain;
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+
+      const [occurrence] = await new SessionCompletionsService().listForAdmin(
+        AUTH_USER_ID,
+        { orgId: ORG_ID },
+      );
+
+      expect(occurrence.reports).toEqual([
+        {
+          profileId: OTHER_PROFILE_ID,
+          displayName: 'Jamie Lee',
+          role: 'child',
+          category: 'did_not_happen',
+          reason: 'Nobody joined',
+          reportedAt: '2030-03-07T09:00:00.000Z',
+        },
+      ]);
+      expect(
+        occurrence.participants?.find((person) => person.profileId === PROFILE_ID)
+          ?.confirmedByStaff,
+      ).toMatchObject({ profileId: STAFF_PROFILE_ID, displayName: 'Sam Staff' });
+    });
+
     it('resolves guardians through family_links when they are not schedule participants', async () => {
       const GUARDIAN_PROFILE_ID = '00000000-0000-4000-8000-0000000000a1';
       const GUARDIAN_ACCOUNT_ID = '00000000-0000-4000-8000-0000000000a2';
@@ -1423,6 +1510,42 @@ describe('SessionCompletionsService', () => {
       expect(result.nextCursor).toBeNull();
     });
 
+    it('reports who confirmed each row and any open report', async () => {
+      makeHistorySupabase({
+        rows: [
+          {
+            ...historyRow(ROW_A, '2026-03-20T10:00:00.000Z'),
+            confirmed_by: '00000000-0000-4000-8000-0000000000f1',
+            reported_at: '2026-03-21T10:00:00.000Z',
+            report_category: 'did_not_happen',
+            report_reason: 'Tutor never joined',
+          },
+          {
+            ...historyRow(ROW_B, '2026-03-19T10:00:00.000Z'),
+            confirmed_by: PROFILE_ID,
+          },
+          historyRow(ROW_C, '2026-03-18T10:00:00.000Z', 'auto_confirmed'),
+        ],
+      });
+
+      const result = await new SessionCompletionsService().listHistoryForProfile(
+        AUTH_USER_ID,
+        { orgId: ORG_ID, profileId: PROFILE_ID, status: 'completed' },
+      );
+
+      expect(result.items.map((item) => item.confirmedBy)).toEqual([
+        'staff',
+        'self',
+        'system',
+      ]);
+      expect(result.items[0].report).toEqual({
+        category: 'did_not_happen',
+        reason: 'Tutor never joined',
+        reportedAt: '2026-03-21T10:00:00.000Z',
+      });
+      expect(result.items[1].report).toBeNull();
+    });
+
     it('filters pending rows by status', async () => {
       const { historyChain } = makeHistorySupabase({ rows: [] });
       const service = new SessionCompletionsService();
@@ -1612,6 +1735,21 @@ describe('SessionCompletionsService', () => {
   });
 
   describe('confirm', () => {
+    it('records the participant as the confirmer', async () => {
+      const { updateChain } = makeSupabase({
+        completionRow: baseCompletionRow({ status: 'pending' }),
+      });
+
+      await new SessionCompletionsService().confirm(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+      });
+
+      expect(updateChain.update).toHaveBeenCalledWith(
+        expect.objectContaining({ status: 'confirmed', confirmed_by: PROFILE_ID }),
+      );
+    });
+
     it('marks the originating notification(s) as read, single and batched alike', async () => {
       const { activityFeedItemsUpdateChain } = makeSupabase({
         completionRow: baseCompletionRow({ status: 'pending' }),
@@ -1877,6 +2015,130 @@ describe('SessionCompletionsService', () => {
       expect(publishActivityEventMock).toHaveBeenCalledWith(
         expect.objectContaining({ eventType: 'session.completion.dispute_reported' }),
       );
+    });
+  });
+
+  describe('report', () => {
+    const STAFF_PROFILE_ID = '00000000-0000-4000-8000-0000000000f1';
+
+    // report() also runs publishDisputeNotifications, which reads the reporter,
+    // the schedule's educators and the org's staff.
+    function makeReportSupabase(row: Record<string, unknown>) {
+      const updateChain = makeUpdateChain();
+      let profilesCallCount = 0;
+      const from = jest.fn((table: string) => {
+        if (table === 'accounts') {
+          return makeChain({ data: { id: ACCOUNT_ID, org_id: ORG_ID } });
+        }
+        if (table === 'class_session_completions') {
+          return {
+            select: jest.fn(() => makeChain({ data: row })),
+            update: updateChain.update,
+          };
+        }
+        if (table === 'profiles') {
+          profilesCallCount += 1;
+          if (profilesCallCount <= 2) {
+            return makeChain({
+              data: {
+                id: PROFILE_ID,
+                account_id: ACCOUNT_ID,
+                org_id: ORG_ID,
+                kind: 'child',
+                display_name: 'Alex Student',
+              },
+            });
+          }
+          return makeChain({ data: [{ id: 'staff-1' }] });
+        }
+        if (table === 'class_schedule_participants') return makeChain({ data: [] });
+        throw new Error(`Unexpected table: ${table}`);
+      });
+      createSupabaseServiceClientMock.mockReturnValue({ from } as never);
+      return { updateChain };
+    }
+
+    it('flags a staff-confirmed session for review without changing its status', async () => {
+      const { updateChain } = makeReportSupabase(
+        baseCompletionRow({ status: 'confirmed', confirmed_by: STAFF_PROFILE_ID }),
+      );
+
+      await new SessionCompletionsService().report(AUTH_USER_ID, {
+        orgId: ORG_ID,
+        sessionCompletionId: COMPLETION_ID,
+        reportCategory: 'did_not_happen',
+        reportReason: '  We never met  ',
+      });
+
+      const patch = updateChain.update.mock.calls[0][0] as Record<string, unknown>;
+      expect(patch).toMatchObject({
+        report_category: 'did_not_happen',
+        report_reason: 'We never met',
+        reported_at: expect.any(String),
+      });
+      expect(patch).not.toHaveProperty('status');
+      expect(updateChain.is).toHaveBeenCalledWith('reported_at', null);
+      expect(publishActivityEventMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          eventType: 'session.completion.dispute_reported',
+          payload: expect.objectContaining({ reportKind: 'wrongly_completed' }),
+          dedupeKey: expect.stringMatching(/^completion-report:/),
+        }),
+      );
+    });
+
+    it('accepts an auto-confirmed session', async () => {
+      const { updateChain } = makeReportSupabase(
+        baseCompletionRow({ status: 'auto_confirmed' }),
+      );
+
+      await expect(
+        new SessionCompletionsService().report(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+          reportCategory: 'teacher_absent',
+        }),
+      ).resolves.toEqual({ success: true });
+      expect(updateChain.update).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['self-confirmed', { status: 'confirmed', confirmed_by: PROFILE_ID }],
+      ['legacy self-confirmed', { status: 'confirmed', confirmed_by: null }],
+      ['pending', { status: 'pending' }],
+      ['disputed', { status: 'disputed' }],
+      [
+        'already reported',
+        {
+          status: 'auto_confirmed',
+          reported_at: '2030-03-07T10:00:00.000Z',
+          report_category: 'other',
+        },
+      ],
+    ])('rejects a %s session with a Conflict', async (_label, overrides) => {
+      const { updateChain } = makeReportSupabase(baseCompletionRow(overrides));
+
+      await expect(
+        new SessionCompletionsService().report(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+          reportCategory: 'other',
+        }),
+      ).rejects.toThrow(ConflictException);
+      expect(updateChain.update).not.toHaveBeenCalled();
+      expect(publishActivityEventMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects an invalid reportCategory', async () => {
+      makeReportSupabase(baseCompletionRow({ status: 'auto_confirmed' }));
+
+      await expect(
+        new SessionCompletionsService().report(AUTH_USER_ID, {
+          orgId: ORG_ID,
+          sessionCompletionId: COMPLETION_ID,
+          reportCategory: 'nope' as never,
+        }),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

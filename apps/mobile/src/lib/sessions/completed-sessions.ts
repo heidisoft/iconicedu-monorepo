@@ -1,5 +1,6 @@
 import type {
   AdminSessionCompletionVM,
+  SessionCompletionConfirmedBy,
   SessionCompletionVM,
 } from '@iconicedu/shared-types';
 
@@ -51,32 +52,65 @@ export type CompletedSessionRow = {
   statusLabel: string;
   awaitingConfirmation: boolean;
   rating: number | null;
-  /** Present only for the viewer's own pending rows: rendered as the confirm tile. */
+  /** The viewer's own completion row; null on the admin org-wide list. */
   completion: SessionCompletionVM | null;
+  /** Who marked it complete, from the viewer's own row. */
+  confirmedBy: SessionCompletionConfirmedBy | null;
+  /** How many participants reported it as wrongly marked complete. */
+  reportCount: number;
+  /**
+   * Marked complete without the viewer (staff or the system) and not yet
+   * reported, so the viewer may report it as wrong.
+   */
+  reportable: boolean;
+  /** Completed but never rated (including a skipped rating), so it can be rated. */
+  ratable: boolean;
 };
 
 function sessionTitle(title: string | null | undefined) {
   return title?.trim() || 'Session';
 }
 
+const CONFIRMED_BY_LABELS: Record<SessionCompletionConfirmedBy, string> = {
+  self: 'Confirmed',
+  staff: 'Marked by staff',
+  system: 'Auto-confirmed',
+};
+
+function resolveConfirmedBy(
+  completion: SessionCompletionVM,
+): SessionCompletionConfirmedBy | null {
+  if (completion.confirmedBy) return completion.confirmedBy;
+  // Older API deployments omit confirmedBy; fall back to the status alone.
+  if (completion.status === 'auto_confirmed') return 'system';
+  if (completion.status === 'confirmed') return 'self';
+  return null;
+}
+
 export function fromProfileCompletion(
   completion: SessionCompletionVM,
 ): CompletedSessionRow {
+  const awaitingConfirmation = completion.status === 'pending';
+  const confirmedBy = resolveConfirmedBy(completion);
+  const reported = Boolean(completion.report);
   return {
     id: completion.id,
     title: sessionTitle(completion.sessionTitle),
     startsAt: completion.occurrenceKey,
     sessionEndAt: completion.sessionEndAt,
     subtitle: completion.studentName?.trim() || null,
-    statusLabel:
-      completion.status === 'auto_confirmed'
-        ? 'Auto-confirmed'
-        : completion.status === 'pending'
-          ? 'Awaiting confirmation'
-          : 'Confirmed',
-    awaitingConfirmation: completion.status === 'pending',
+    statusLabel: awaitingConfirmation
+      ? 'Awaiting confirmation'
+      : confirmedBy
+        ? CONFIRMED_BY_LABELS[confirmedBy]
+        : 'Confirmed',
+    awaitingConfirmation,
     rating: completion.rating ?? null,
-    completion: completion.status === 'pending' ? completion : null,
+    completion,
+    confirmedBy,
+    reportCount: reported ? 1 : 0,
+    reportable: !reported && (confirmedBy === 'staff' || confirmedBy === 'system'),
+    ratable: confirmedBy !== null && completion.rating == null,
   };
 }
 
@@ -118,5 +152,9 @@ export function adminRowsForTab(
       awaitingConfirmation: item.completionMethod === 'pending',
       rating: item.averageRating ?? null,
       completion: null,
+      confirmedBy: null,
+      reportCount: item.reports?.length ?? 0,
+      reportable: false,
+      ratable: false,
     }));
 }

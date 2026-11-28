@@ -4,6 +4,7 @@ import type {
   ConnectionVM,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
+  ReportSessionCompletionInput,
   SessionCompletionVM,
   SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
@@ -88,6 +89,19 @@ export function disputeSessionCompletion(input: DisputeSessionCompletionInput) {
       disputeCategory: input.disputeCategory,
       disputeReason: input.disputeReason ?? null,
       rescheduleRequested: input.rescheduleRequested ?? false,
+    },
+  );
+}
+
+// Flags a session that was marked complete without the viewer (auto-confirmed or
+// staff-confirmed) for staff review. The session's status does not change.
+export function reportSessionCompletion(input: ReportSessionCompletionInput) {
+  return apiPost<{ success: true }>(
+    `/session-completions/${input.sessionCompletionId}/report`,
+    {
+      orgId: input.orgId,
+      reportCategory: input.reportCategory,
+      reportReason: input.reportReason ?? null,
     },
   );
 }
