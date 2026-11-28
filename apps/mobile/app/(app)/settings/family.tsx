@@ -9,7 +9,6 @@ import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
-  Image,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -25,6 +24,7 @@ import { useFamilyLinks } from '@/hooks/use-family-links';
 import { useTheme } from '@/providers/theme-provider';
 import type { AppColors } from '@/lib/theme';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 function makeStyles(C: AppColors) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: C.pageBg },
@@ -198,7 +198,7 @@ export default function FamilyScreen() {
                   <SettingsRow
                     icon={
                       childAvatarUrl ? (
-                        <Image source={{ uri: childAvatarUrl }} style={s.childAvatar} />
+                        <AvatarImage uri={childAvatarUrl} style={s.childAvatar} />
                       ) : (
                         <View
                           style={[

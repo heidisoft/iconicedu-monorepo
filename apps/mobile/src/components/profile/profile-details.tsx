@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   CreditCard,
   Camera,
@@ -22,6 +22,7 @@ import type { ProfileSettingsResult } from '@/lib/api/profile-settings';
 import type { AppColors } from '@/lib/theme';
 import { type ProfileItem } from './profile-item-editor';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 export function ProfileDetails({
   data,
   child,
@@ -130,9 +131,9 @@ export function ProfileDetails({
       {header}
       <View style={s.avatarSection}>
         {value('avatar_url') ? (
-          <Image
+          <AvatarImage
             accessibilityLabel="Profile photo"
-            source={{ uri: value('avatar_url') }}
+            uri={value('avatar_url')}
             style={s.avatar}
           />
         ) : (

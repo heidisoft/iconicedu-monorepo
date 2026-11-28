@@ -1,12 +1,5 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -51,6 +44,7 @@ import {
   resolveLocalTimeIconKey,
 } from '@/lib/local-time-context';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 type AboutField = {
@@ -302,9 +296,7 @@ function LargeAvatar({ user }: { user: UserProfileVM }) {
   const avatarColors = profileAvatarColors({ seed, themeKey: user.ui?.themeKey });
 
   if (url) {
-    return (
-      <Image source={{ uri: url }} style={s.largeAvatar} accessibilityLabel={name} />
-    );
+    return <AvatarImage uri={url} style={s.largeAvatar} accessibilityLabel={name} />;
   }
 
   return (

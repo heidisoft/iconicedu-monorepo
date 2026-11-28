@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   Alert,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -37,6 +36,7 @@ import { RegionalFields } from './regional-fields';
 import { ThemeModePicker } from './theme-mode-options';
 import { profileFieldStyles } from './profile-text-input';
 import { ProfileFieldEditor, ProfileTextField } from './profile-field-editor';
+import { AvatarImage } from '@/components/profile/avatar-image';
 export const sectionTitles: Record<ProfileSettingsSection, string> = {
   identity: 'Identity',
   photo: 'Photo',
@@ -131,10 +131,9 @@ export function ProfileSectionForm({
           .from('public-avatars')
           .upload(path, bytes, { contentType: 'image/jpeg', upsert: false });
         if (uploadError) throw new Error('Photo upload failed. Please try again.');
-        const avatarUrl = supabase.storage.from('public-avatars').getPublicUrl(path)
-          .data.publicUrl;
+        // The bucket is private: store the object path and sign it for display.
         if ('section' in input && input.section === 'photo')
-          input.values.avatarUrl = avatarUrl;
+          input.values.avatarUrl = path;
       }
       await saveProfileSettings(String(profile.id), input);
       if (section === 'appearance') setMode(draftMode);
@@ -337,9 +336,9 @@ export function ProfileSectionForm({
       >
         <View style={hasFields ? profileFieldStyles(colors).card : { gap: 12 }}>
           {show('photo') && avatar ? (
-            <Image
+            <AvatarImage
               accessibilityLabel="Profile photo preview"
-              source={{ uri: avatar }}
+              uri={avatar}
               style={{ width: 80, height: 80, borderRadius: 40 }}
             />
           ) : null}

@@ -12,7 +12,6 @@ import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
-  Image,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
@@ -64,6 +63,7 @@ import {
 import type { AppColors } from '@/lib/theme';
 import { profileAvatarColors } from '@/lib/profile-avatar-colors';
 
+import { AvatarImage } from '@/components/profile/avatar-image';
 // ---------------------------------------------------------------------------
 // Avatar color helpers — ui_theme_key → hex, fallback to seed palette
 // ---------------------------------------------------------------------------
@@ -889,10 +889,7 @@ export default function HomeScreen() {
                   ]}
                 >
                   {avatarUrl ? (
-                    <Image
-                      source={{ uri: avatarUrl }}
-                      style={{ width: 44, height: 44 }}
-                    />
+                    <AvatarImage uri={avatarUrl} style={{ width: 44, height: 44 }} />
                   ) : (
                     <Text style={[s.avatarTxt, { color: avatarFg }]}>{initial}</Text>
                   )}
@@ -1359,8 +1356,8 @@ export default function HomeScreen() {
                       ]}
                     >
                       {option.avatarUrl ? (
-                        <Image
-                          source={{ uri: option.avatarUrl }}
+                        <AvatarImage
+                          uri={option.avatarUrl}
                           style={{ width: 36, height: 36 }}
                         />
                       ) : (
