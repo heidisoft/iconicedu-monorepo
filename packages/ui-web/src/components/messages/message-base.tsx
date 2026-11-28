@@ -130,11 +130,13 @@ export const MessageBase = memo(function MessageBase({
   const feedRoleLabel = getFeedRoleLabel(message.core.sender.kind);
   const FeedRoleIcon = getFeedRoleIcon(message.core.sender.kind);
   // Staff can review private messages they are not part of, read-only.
-  const isStaffReview = isOutsideMessageAudience({
-    visibility: message.core.visibility,
-    senderProfileId: message.core.sender.ids.id,
-    viewerProfileId: currentUserId,
-  });
+  const isStaffReview =
+    Boolean(messagesState?.enableStaffMessageReview) &&
+    isOutsideMessageAudience({
+      visibility: message.core.visibility,
+      senderProfileId: message.core.sender.ids.id,
+      viewerProfileId: currentUserId,
+    });
   const isInteractionDisabled = Boolean(isReadOnly) || isStaffReview;
   const shouldHideQuickActions = shouldHideMessageQuickActions(message);
   const pendingReactionEmojis = actionState?.pendingReactionEmojis ?? [];

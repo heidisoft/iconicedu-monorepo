@@ -30,6 +30,7 @@ export function LearningSpaceShell({
   enableMessageListFormatting = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
+  enableStaffMessageReview = false,
   sendTextMessage,
   sendFileMessage,
   sendFilesMessage,
@@ -55,6 +56,7 @@ export function LearningSpaceShell({
   enableMessageListFormatting?: boolean;
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
+  enableStaffMessageReview?: boolean;
   sendTextMessage: (input: MessageSendTextInput) => Promise<MessageVM>;
   sendFileMessage: (input: MessageSendFileInput) => Promise<MessageVM>;
   sendFilesMessage: (input: MessageSendFilesInput) => Promise<MessageVM>;
@@ -93,6 +95,7 @@ export function LearningSpaceShell({
       enableMessageListFormatting={enableMessageListFormatting}
       enableMessageSendReliability={enableMessageSendReliability}
       enableMessageAudience={enableMessageAudience}
+      enableStaffMessageReview={enableStaffMessageReview}
       panelRegistry={{
         channel_info: (props) => (
           <LearningSpaceInfoPanel {...props} learningSpace={learningSpace} />

@@ -125,6 +125,8 @@ export interface MessagesContainerProps {
   /** Gates clientMessageId-based idempotent retry of failed sends. Default off. */
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
+  /** Gates the read-only staff view of private messages the viewer is not part of. Default off. */
+  enableStaffMessageReview?: boolean;
 }
 
 const isGuardianProfile = (profile: UserProfileVM): profile is GuardianProfileVM =>

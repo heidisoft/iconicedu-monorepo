@@ -77,11 +77,13 @@ export const VisibilityBadge = memo(function VisibilityBadge({
     state?.currentUserId,
   );
   if (!copy) return null;
-  const isStaffReview = isOutsideMessageAudience({
-    visibility: message.core.visibility,
-    senderProfileId: message.core.sender?.ids.id,
-    viewerProfileId: state?.currentUserId,
-  });
+  const isStaffReview =
+    Boolean(state?.enableStaffMessageReview) &&
+    isOutsideMessageAudience({
+      visibility: message.core.visibility,
+      senderProfileId: message.core.sender?.ids.id,
+      viewerProfileId: state?.currentUserId,
+    });
 
   return (
     <Popover>

@@ -57,7 +57,7 @@ export function ThreadSheet({
   ) => Promise<void> | void;
   getMessageActionState?: (messageId: string) => MessageActionState | undefined;
 }) {
-  const { channel } = useMessagesState();
+  const { channel, enableStaffMessageReview } = useMessagesState();
   const { onSendReply, onProfileClick, onToggleReaction, onToggleSaved, onToggleHidden } =
     actions;
   const messages = useMemo(
@@ -78,13 +78,14 @@ export function ThreadSheet({
       .filter((name): name is string => Boolean(name));
     return names.length ? names.join(', ') : 'the original audience';
   }, [channel.collections.participants, parentMessage]);
-  const isStaffReview = parentMessage
-    ? isOutsideMessageAudience({
-        visibility: parentMessage.core.visibility,
-        senderProfileId: parentMessage.core.sender.ids.id,
-        viewerProfileId: currentUserId,
-      })
-    : false;
+  const isStaffReview =
+    enableStaffMessageReview && parentMessage
+      ? isOutsideMessageAudience({
+          visibility: parentMessage.core.visibility,
+          senderProfileId: parentMessage.core.sender.ids.id,
+          viewerProfileId: currentUserId,
+        })
+      : false;
   const scrollAreaRootRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const messageCountRef = useRef(messages.length);

@@ -122,6 +122,7 @@ describe('VisibilityBadge', () => {
   beforeEach(() => {
     messagesState.current = {
       currentUserId: 'me',
+      enableStaffMessageReview: true,
       channel: {
         collections: {
           participants: [
@@ -176,6 +177,28 @@ describe('VisibilityBadge', () => {
     );
     fireEvent.click(screen.getByTestId('message-visibility-badge'));
     expect(screen.getByText('Staff view · you can read this but not reply')).toBeTruthy();
+  });
+
+  it('does not show the staff note while staff review is flagged off', () => {
+    messagesState.current = {
+      ...(messagesState.current as object),
+      currentUserId: 'staff-1',
+      enableStaffMessageReview: false,
+    };
+    render(
+      <VisibilityBadge
+        message={
+          {
+            core: {
+              visibility: { type: 'specific-users', userIds: ['p1', 'p2'] },
+              sender: { ids: { id: 'p1' } },
+            },
+          } as unknown as MessageVM
+        }
+      />,
+    );
+    fireEvent.click(screen.getByTestId('message-visibility-badge'));
+    expect(screen.queryByText(/Staff view/)).toBeNull();
   });
 
   it('does not show the staff note to audience members', () => {

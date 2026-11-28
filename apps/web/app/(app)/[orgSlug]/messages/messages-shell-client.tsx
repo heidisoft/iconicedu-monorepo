@@ -154,6 +154,7 @@ type MessagesShellClientProps = {
   enableMessageListFormatting?: boolean;
   enableMessageSendReliability?: boolean;
   enableMessageAudience?: boolean;
+  enableStaffMessageReview?: boolean;
   panelRegistry?: Partial<
     MessagesRightPanelRegistry<ComponentType<{ intent: MessagesRightPanelIntent }>>
   >;
@@ -195,6 +196,7 @@ export function MessagesShellClient({
   enableMessageListFormatting = false,
   enableMessageSendReliability = false,
   enableMessageAudience = false,
+  enableStaffMessageReview = false,
   panelRegistry,
   sendTextMessage,
   sendFileMessage,
@@ -560,6 +562,7 @@ export function MessagesShellClient({
         enableMessageListFormatting={enableMessageListFormatting}
         enableMessageSendReliability={enableMessageSendReliability}
         enableMessageAudience={enableMessageAudience}
+        enableStaffMessageReview={enableStaffMessageReview}
         panelRegistry={panelRegistry}
         realtimeClient={realtimeClient}
         messageWriteClient={messageWriteClient}

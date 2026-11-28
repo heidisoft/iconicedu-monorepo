@@ -79,6 +79,7 @@ export const MessagesShell = memo(function MessagesShell(props: MessagesShellPro
       }
       enableMessageListFormatting={props.enableMessageListFormatting}
       enableMessageSendReliability={props.enableMessageSendReliability}
+      enableStaffMessageReview={props.enableStaffMessageReview}
     >
       <MessagesShellLayout {...props} registry={rightPanelRegistry} />
     </MessagesStateProvider>

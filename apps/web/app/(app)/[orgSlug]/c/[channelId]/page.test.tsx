@@ -116,6 +116,8 @@ describe('d/c/[channelId] page', () => {
           enableMessageReplyReference: true,
           enableNotificationConversationControls: false,
           enableMessageListFormatting: true,
+          enableMessageAudience: false,
+          enableStaffMessageReview: false,
         }),
       );
     });

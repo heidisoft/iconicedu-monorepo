@@ -49,6 +49,8 @@ interface MessagesStateContextValue {
   showCreateMessageTypeButton: boolean;
   enableMessageMarkUnread: boolean;
   enableMessageReplyReference: boolean;
+  /** Read-only staff view of private messages the viewer is not part of. */
+  enableStaffMessageReview: boolean;
   enableNotificationConversationControls: boolean;
   enableMessageListFormatting: boolean;
   replyTarget: MessageReplyReferenceVM | null;
@@ -175,6 +177,7 @@ export function MessagesStateProvider({
   enableNotificationConversationControls = false,
   enableMessageListFormatting = false,
   enableMessageSendReliability = false,
+  enableStaffMessageReview = false,
   children,
 }: {
   channel: ChannelVM;
@@ -190,6 +193,7 @@ export function MessagesStateProvider({
   enableNotificationConversationControls?: boolean;
   enableMessageListFormatting?: boolean;
   enableMessageSendReliability?: boolean;
+  enableStaffMessageReview?: boolean;
   children: React.ReactNode;
 }) {
   const [state, setState] = useState<MessagesRightSidebarState>({
@@ -363,6 +367,7 @@ export function MessagesStateProvider({
       showCreateMessageTypeButton,
       enableMessageMarkUnread,
       enableMessageReplyReference,
+      enableStaffMessageReview,
       enableNotificationConversationControls,
       enableMessageListFormatting,
       replyTarget,
@@ -416,6 +421,7 @@ export function MessagesStateProvider({
       showCreateMessageTypeButton,
       enableMessageMarkUnread,
       enableMessageReplyReference,
+      enableStaffMessageReview,
       enableNotificationConversationControls,
       enableMessageListFormatting,
       replyTarget,
