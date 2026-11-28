@@ -1,8 +1,10 @@
 import type {
+  AdminSessionCompletionVM,
   ConfirmSessionCompletionInput,
   ConnectionVM,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
+  ReportSessionCompletionInput,
   SessionCompletionVM,
   SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
@@ -16,6 +18,31 @@ export function listSessionCompletions(input: {
   limit?: number;
 }) {
   return apiGet<ConnectionVM<SessionCompletionVM>>('/session-completions', input);
+}
+
+// Full history for the "Sessions completed" screen — not the carousel window
+// listSessionCompletions returns. `status` picks a tab: confirmed/auto_confirmed
+// rows, or rows still awaiting the viewer's confirmation.
+export function listSessionCompletionHistory(input: {
+  orgId: string;
+  profileId: string;
+  status: 'completed' | 'pending';
+  completedSince?: string;
+  completedUntil?: string;
+  cursor?: string | null;
+  limit?: number;
+}) {
+  return apiGet<ConnectionVM<SessionCompletionVM>>('/session-completions/history', input);
+}
+
+// Org-wide occurrence list for staff/admins (same endpoint as web's admin
+// attendance page). The API clamps it to a rolling three-month window.
+export function listAdminSessionCompletions(input: {
+  orgId: string;
+  completedSince?: string;
+  completedUntil?: string;
+}) {
+  return apiGet<AdminSessionCompletionVM[]>('/session-completions/admin', input);
 }
 
 export function getOrgSessionCompletionSummary(input: {
@@ -62,6 +89,19 @@ export function disputeSessionCompletion(input: DisputeSessionCompletionInput) {
       disputeCategory: input.disputeCategory,
       disputeReason: input.disputeReason ?? null,
       rescheduleRequested: input.rescheduleRequested ?? false,
+    },
+  );
+}
+
+// Flags a session that was marked complete without the viewer (auto-confirmed or
+// staff-confirmed) for staff review. The session's status does not change.
+export function reportSessionCompletion(input: ReportSessionCompletionInput) {
+  return apiPost<{ success: true }>(
+    `/session-completions/${input.sessionCompletionId}/report`,
+    {
+      orgId: input.orgId,
+      reportCategory: input.reportCategory,
+      reportReason: input.reportReason ?? null,
     },
   );
 }

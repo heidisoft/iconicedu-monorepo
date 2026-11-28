@@ -340,6 +340,27 @@ describe('API activity definitions context rendering', () => {
     });
   });
 
+  it.each([
+    [{}, "Anika reported Algebra I didn't happen"],
+    [
+      { reportKind: 'wrongly_completed' },
+      'Anika reported Algebra I was wrongly marked complete',
+    ],
+  ])('renders dispute-reported copy for %o', (extra, headline) => {
+    const definition = getActivityEventDefinition('session.completion.dispute_reported');
+    const rendered = definition!.render(
+      makeEvent('session.completion.dispute_reported', {
+        reportedByDisplayName: 'Anika',
+        disputeCategory: 'did_not_happen',
+        recipientRole: 'staff',
+        ...extra,
+      }),
+    );
+
+    expect(rendered.headline.primary).toBe(headline);
+    expect(rendered.summary).toContain('Did not happen');
+  });
+
   it('only sets session expanded content when payload content exists', () => {
     const reminderDefinition = getActivityEventDefinition('session.reminder.sent');
     const feedbackDefinition = getActivityEventDefinition(

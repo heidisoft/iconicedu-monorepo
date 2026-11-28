@@ -18,6 +18,7 @@ import type {
   ConfirmSessionCompletionInput,
   DisputeSessionCompletionInput,
   RateSessionCompletionInput,
+  ReportSessionCompletionInput,
   SkipSessionCompletionRatingInput,
   UndoSessionCompletionInput,
 } from '@iconicedu/shared-types';
@@ -123,6 +124,30 @@ export class SessionCompletionsController {
     });
   }
 
+  @Get('history')
+  @UseGuards(AuthGuard)
+  listHistory(
+    @Req() req: AuthenticatedRequest,
+    @Query('orgId') orgId: string,
+    @Query('profileId') profileId: string,
+    @Query('status') status: 'completed' | 'pending',
+    @Query('completedSince') completedSince?: string,
+    @Query('completedUntil') completedUntil?: string,
+    @Query('cursor') cursor?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedLimit = limit ? Number(limit) : undefined;
+    return this.sessionCompletionsService.listHistoryForProfile(req.user.id, {
+      orgId,
+      profileId,
+      status,
+      completedSince: completedSince ?? null,
+      completedUntil: completedUntil ?? null,
+      cursor: cursor ?? null,
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+    });
+  }
+
   @Post(':id/confirm')
   @UseGuards(AuthGuard)
   confirm(
@@ -144,6 +169,19 @@ export class SessionCompletionsController {
     @Body() body: DisputeSessionCompletionInput,
   ) {
     return this.sessionCompletionsService.dispute(req.user.id, {
+      ...body,
+      sessionCompletionId: id,
+    });
+  }
+
+  @Post(':id/report')
+  @UseGuards(AuthGuard)
+  report(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: ReportSessionCompletionInput,
+  ) {
+    return this.sessionCompletionsService.report(req.user.id, {
       ...body,
       sessionCompletionId: id,
     });

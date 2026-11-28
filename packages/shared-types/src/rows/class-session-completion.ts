@@ -32,6 +32,15 @@ export interface ClassSessionCompletionRow {
   verification_note?: string | null;
   rating?: number | null;
   rating_comment?: string | null;
+  // Who settled a 'confirmed' row: the participant themselves, or the staff
+  // member whose adminConfirm settled it on their behalf. Null for every other
+  // status (auto_confirmed rows are confirmed by the system, not a profile).
+  confirmed_by?: UUID | null;
+  // A participant's report that the row was wrongly marked complete — staff
+  // review queue, never a status change. See 20261127120000_session_completion_reports.
+  reported_at?: ISODateTime | null;
+  report_category?: ClassSessionCompletionDisputeCategory | null;
+  report_reason?: string | null;
   channel_id?: UUID | null;
   learning_space_id?: UUID | null;
   session_title?: string | null;
