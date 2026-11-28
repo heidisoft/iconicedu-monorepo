@@ -49,6 +49,7 @@ describe('MessageInput', () => {
         onSend={onSend}
         profileId="sender"
         audienceParticipants={[
+          { id: 'sender', name: 'Sender', role: 'staff' },
           { id: 'parent-A', name: 'Parent Alpha', role: 'guardian' },
         ]}
       />,
@@ -78,6 +79,7 @@ describe('MessageInput', () => {
         onSend={onSend}
         profileId="staff-1"
         audienceParticipants={[
+          { id: 'staff-1', name: 'Sam Staff', role: 'staff' },
           { id: 'parent-1', name: 'Alex Parent', role: 'guardian' },
           { id: 'tutor-1', name: 'Taylor Tutor', role: 'educator' },
         ]}
@@ -93,6 +95,57 @@ describe('MessageInput', () => {
         audienceProfileIds: ['parent-1'],
       }),
     );
+  });
+
+  describe('audience safeguarding', () => {
+    const channel = [
+      { id: 'staff-1', name: 'Sam Staff', role: 'staff' },
+      { id: 'tutor-1', name: 'Taylor Tutor', role: 'educator' },
+      { id: 'parent-1', name: 'Alex Parent', role: 'guardian' },
+      { id: 'parent-2', name: 'Blair Parent', role: 'guardian' },
+      { id: 'student-1', name: 'Casey Student', role: 'child' },
+    ];
+    const renderAs = (profileId: string) =>
+      render(
+        <MessageInput
+          onSend={jest.fn()}
+          profileId={profileId}
+          audienceParticipants={channel}
+        />,
+      );
+
+    it.each(['student-1', 'unknown-profile'])('hides the picker for %s', (profileId) => {
+      renderAs(profileId);
+      expect(screen.queryByTestId('message-audience-picker')).toBeNull();
+    });
+
+    it('lets parents address only staff and tutors', () => {
+      renderAs('parent-1');
+      expect(screen.getByLabelText('Message audience Sam Staff')).toBeTruthy();
+      expect(screen.getByLabelText('Message audience Taylor Tutor')).toBeTruthy();
+      expect(screen.queryByLabelText('Message audience Blair Parent')).toBeNull();
+      expect(screen.queryByLabelText('Message audience Casey Student')).toBeNull();
+      expect(screen.queryByLabelText('Message audience Parents')).toBeNull();
+    });
+
+    it('lets tutors address students and says the parent is included', () => {
+      renderAs('tutor-1');
+      expect(screen.queryByTestId('message-audience-guardian-hint')).toBeNull();
+      fireEvent.press(screen.getByLabelText('Message audience Casey Student'));
+      expect(screen.getByTestId('message-audience-guardian-hint')).toBeTruthy();
+    });
+
+    it('lets staff address everyone', () => {
+      renderAs('staff-1');
+      for (const name of [
+        'Taylor Tutor',
+        'Alex Parent',
+        'Blair Parent',
+        'Casey Student',
+      ]) {
+        expect(screen.getByLabelText(`Message audience ${name}`)).toBeTruthy();
+      }
+    });
   });
 
   it('renders input field', () => {

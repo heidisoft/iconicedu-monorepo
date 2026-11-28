@@ -75,3 +75,61 @@ describe('audience copy edge cases', () => {
     expect(value?.summary).toBe('Only visible to Channel member');
   });
 });
+
+// Keep in sync with packages/ui-web/src/components/messages/shared/visibility-badge.test.tsx
+describe('audience copy for viewers outside the audience', () => {
+  const participants = [
+    { id: 'p1', name: 'Marc F', role: 'staff' },
+    { id: 'p2', name: 'Taylor R', role: 'educator' },
+    { id: 'p3', name: 'Jordan K', role: 'guardian' },
+  ];
+
+  it('names the first person and counts the rest', () => {
+    expect(
+      getMessageVisibilityCopy({
+        visibility: { type: 'specific-users', userIds: ['p1', 'p2', 'p3'] },
+        currentProfileId: 'staff',
+        participants,
+      }),
+    ).toEqual({
+      summary: 'Only visible to Marc F + 2 others',
+      audienceNames: ['Marc F', 'Taylor R', 'Jordan K'],
+    });
+  });
+
+  it('deduplicates before counting', () => {
+    expect(
+      getMessageVisibilityCopy({
+        visibility: { type: 'specific-users', userIds: ['p1', 'p1'] },
+        currentProfileId: 'staff',
+        participants,
+      })?.summary,
+    ).toBe('Only visible to Marc F');
+  });
+
+  it('falls back to neutral labels when participants are not loaded', () => {
+    expect(
+      getMessageVisibilityCopy({
+        visibility: { type: 'specific-users', userIds: ['p1', 'p2'] },
+      }),
+    ).toEqual({
+      summary: 'Only visible to Channel member + 1 other',
+      audienceNames: ['Channel member', 'Channel member'],
+    });
+    expect(
+      getMessageVisibilityCopy({ visibility: { type: 'recipient-only', userId: 'p9' } }),
+    ).toEqual({
+      summary: 'Only visible to recipient',
+      audienceNames: ['Recipient'],
+    });
+  });
+
+  it('does not say "you" when the viewer is unknown', () => {
+    expect(
+      getMessageVisibilityCopy({
+        visibility: { type: 'recipient-only', userId: 'p1' },
+        participants,
+      })?.summary,
+    ).toBe('Only visible to Marc F');
+  });
+});

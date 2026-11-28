@@ -63,6 +63,11 @@ import {
   type MentionCandidate,
 } from '@/lib/messages/message-mentions';
 import type { MessageAudienceParticipant } from './message-visibility';
+import {
+  canAddressPrivately,
+  canInitiateRestrictedMessage,
+  resolveMessageAudienceRole,
+} from '@iconicedu/utils';
 
 // Minimum non-whitespace characters typed before "Refine with AI" appears —
 // picked within the 10-20 char range called out in issue #264 so the
@@ -607,6 +612,12 @@ function makeStyles(C: AppColors, bottomInset: number, keyboardVisible: boolean)
     },
     audienceContent: { paddingHorizontal: 12, gap: 6, alignItems: 'center' },
     audienceLabel: { color: C.textMuted, fontSize: 12, fontWeight: '600' },
+    audienceHint: {
+      color: C.textMuted,
+      fontSize: 11,
+      paddingHorizontal: 12,
+      paddingTop: 4,
+    },
     audienceChip: {
       borderWidth: StyleSheet.hairlineWidth,
       borderColor: C.border,
@@ -1242,8 +1253,24 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const canSend = (text.trim().length > 0 || pendingAttachments.length > 0) && !disabled;
   const resolvedPlaceholder = truncatePlaceholder(placeholder);
   const canSaveEdit = text.trim().length > 0 && !savingEdit;
-  const selectableAudienceParticipants = audienceParticipants.filter(
-    (participant) => participant.id !== profileId,
+  // Safeguarding rules (enforced by the API): students cannot start private
+  // messages, parents may only address staff and tutors, and so on.
+  const audienceSenderRole = resolveMessageAudienceRole(
+    audienceParticipants.find((participant) => participant.id === profileId)?.role,
+  );
+  const selectableAudienceParticipants = canInitiateRestrictedMessage(audienceSenderRole)
+    ? audienceParticipants.filter(
+        (participant) =>
+          participant.id !== profileId &&
+          canAddressPrivately(
+            audienceSenderRole,
+            resolveMessageAudienceRole(participant.role),
+          ),
+      )
+    : [];
+  const includesSelectedStudent = selectableAudienceParticipants.some(
+    (participant) =>
+      participant.role === 'child' && audienceProfileIds.includes(participant.id),
   );
   const parentAudienceIds = selectableAudienceParticipants
     .filter((participant) => participant.role === 'guardian')
@@ -1292,6 +1319,11 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               );
             })}
           </ScrollView>
+          {includesSelectedStudent ? (
+            <Text style={s.audienceHint} testID="message-audience-guardian-hint">
+              Their parent is included automatically
+            </Text>
+          ) : null}
         </View>
       )}
       {/* Reply preview banner — either a thread reply or a quote reply (mutually exclusive) */}

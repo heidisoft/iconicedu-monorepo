@@ -38,6 +38,28 @@ async function send(
   });
 }
 
+const STAFF_ROLES = ['owner', 'admin', 'staff'];
+const isStaff = (person: Persona) => STAFF_ROLES.includes(person.role);
+
+/**
+ * Safeguarding rules (see packages/utils/src/message-audience-policy.ts):
+ * staff -> anyone; tutor -> staff/tutors/parents, students only with a parent
+ * in the channel; parent -> staff/tutors; student -> nobody. The fixture's
+ * channel student has no guardian in the channel.
+ */
+function canSendPrivately(sender: Persona, recipient: Persona) {
+  if (isStaff(sender)) return true;
+  if (sender.role === 'educator') return recipient.role !== 'child';
+  if (sender.role === 'guardian')
+    return isStaff(recipient) || recipient.role === 'educator';
+  return false;
+}
+
+/** Audience members plus every staff reviewer (read-only review access). */
+function readersOf(fixture: AudienceFixture, audience: Persona[]) {
+  return fixture.members.filter((person) => audience.includes(person) || isStaff(person));
+}
+
 async function delivered(
   request: APIRequestContext,
   fixture: AudienceFixture,
@@ -82,9 +104,19 @@ test.describe('real local messaging role and recipient matrix', () => {
         const response = await send(request, fixture, sender, {
           audience: { profileIds: [recipient.profile] },
         });
+        if (!canSendPrivately(sender, recipient)) {
+          expect(response.status(), `${role} to ${recipient.name} is blocked`).toBe(403);
+          fixture.members.forEach((person, index) =>
+            expect(
+              fixture.unread(person) - before[index],
+              `unread for ${person.name}`,
+            ).toBe(0),
+          );
+          continue;
+        }
         expect(response.status(), `${role} to ${recipient.name}`).toBe(201);
         const { id } = await response.json();
-        await delivered(request, fixture, id, [sender, recipient]);
+        await delivered(request, fixture, id, readersOf(fixture, [sender, recipient]));
         fixture.members.forEach((person, index) => {
           expect(
             fixture.unread(person) - before[index],
@@ -102,52 +134,80 @@ test.describe('real local messaging role and recipient matrix', () => {
       const browser = await playwright.chromium.launch();
       try {
         const sender = fixture.members.find((person) => person.role === role)!;
-        const recipient = fixture.members[6]; // Same-role peer proves this is profile targeting, not a role broadcast.
+        // Peer Parent proves profile targeting rather than a role broadcast.
+        // Parents may only address staff and tutors, so they target the tutor.
+        const recipient =
+          role === 'guardian'
+            ? fixture.members.find((person) => person.role === 'educator')!
+            : fixture.members[6];
         const reader = await fixture.open(browser, recipient);
         const excluded = await fixture.open(
           browser,
-          fixture.members.find((person) => person !== sender && person !== recipient)!,
+          fixture.members.find(
+            (person) => person !== sender && person !== recipient && !isStaff(person),
+          )!,
         );
         const actor = await fixture.open(browser, sender);
         const privateText = `Private UI ${randomUUID()}`,
           publicText = `Everyone UI ${randomUUID()}`;
         try {
           await actor.page.bringToFront();
-          await actor.page.getByRole('button', { name: /Message audience:/ }).click();
-          const target = actor.page.getByRole('menuitemcheckbox', {
-            name: /Peer Parent/,
-          });
-          await expect(target).toBeInViewport();
-          await target.click();
-          await actor.page.keyboard.press('Escape');
-          await actor.page
-            .getByPlaceholder(/^(Write a message|Message #)/)
-            .fill(privateText);
-          await actor.page.getByRole('button', { name: 'Send', exact: true }).click();
-          await expect(
-            actor.page.getByPlaceholder(/^(Write a message|Message #)/),
-          ).toHaveValue('');
-          await expect(actor.page.getByText(privateText, { exact: true })).toBeVisible();
-          await expect(
-            actor.page.getByRole('button', { name: /Message audience: Everyone/ }),
-          ).toBeVisible();
-          await expect(reader.page.getByText(privateText, { exact: true })).toBeVisible({
-            timeout: 15000,
-          });
-          await reader.page.reload();
-          await expect(reader.page.getByText(privateText, { exact: true })).toBeVisible();
-          const privateId = (await fixture.history(request, sender)).find((row) =>
-            JSON.stringify(row).includes(privateText),
-          )?.ids.id;
-          expect(privateId).toBeTruthy();
-          await delivered(request, fixture, privateId!, [sender, recipient]);
-          await excluded.page.reload();
-          await expect(
-            excluded.page.getByPlaceholder(/^(Write a message|Message #)/),
-          ).toBeVisible();
-          await expect(excluded.page.getByText(privateText, { exact: true })).toHaveCount(
-            0,
-          );
+          if (role === 'child') {
+            // Students cannot start private messages: no audience picker.
+            await expect(
+              actor.page.getByPlaceholder(/^(Write a message|Message #)/),
+            ).toBeVisible();
+            await expect(
+              actor.page.getByRole('button', { name: /Message audience:/ }),
+            ).toHaveCount(0);
+          } else {
+            await actor.page.getByRole('button', { name: /Message audience:/ }).click();
+            const target = actor.page.getByRole('menuitemcheckbox', {
+              name: role === 'guardian' ? /E2E educator/ : /Peer Parent/,
+            });
+            await expect(target).toBeInViewport();
+            await target.click();
+            await actor.page.keyboard.press('Escape');
+            await actor.page
+              .getByPlaceholder(/^(Write a message|Message #)/)
+              .fill(privateText);
+            await actor.page.getByRole('button', { name: 'Send', exact: true }).click();
+            await expect(
+              actor.page.getByPlaceholder(/^(Write a message|Message #)/),
+            ).toHaveValue('');
+            await expect(
+              actor.page.getByText(privateText, { exact: true }),
+            ).toBeVisible();
+            await expect(
+              actor.page.getByRole('button', { name: /Message audience: Everyone/ }),
+            ).toBeVisible();
+            await expect(reader.page.getByText(privateText, { exact: true })).toBeVisible(
+              {
+                timeout: 15000,
+              },
+            );
+            await reader.page.reload();
+            await expect(
+              reader.page.getByText(privateText, { exact: true }),
+            ).toBeVisible();
+            const privateId = (await fixture.history(request, sender)).find((row) =>
+              JSON.stringify(row).includes(privateText),
+            )?.ids.id;
+            expect(privateId).toBeTruthy();
+            await delivered(
+              request,
+              fixture,
+              privateId!,
+              readersOf(fixture, [sender, recipient]),
+            );
+            await excluded.page.reload();
+            await expect(
+              excluded.page.getByPlaceholder(/^(Write a message|Message #)/),
+            ).toBeVisible();
+            await expect(
+              excluded.page.getByText(privateText, { exact: true }),
+            ).toHaveCount(0);
+          }
           await actor.page.bringToFront();
           await actor.page
             .getByPlaceholder(/^(Write a message|Message #)/)
@@ -184,7 +244,13 @@ test.describe('real local messaging role and recipient matrix', () => {
     request,
     audience: fixture,
   }) => {
-    const [sender, excluded, , recipient] = fixture.members;
+    // Tutor -> parent private conversation. Peer Parent is excluded; the
+    // owner reviews it read-only.
+    const sender = fixture.members.find((person) => person.role === 'educator')!;
+    const recipient = fixture.members.find((person) => person.role === 'guardian')!;
+    const excluded = fixture.members[6];
+    const reviewer = fixture.members.find((person) => person.role === 'owner')!;
+    const readers = readersOf(fixture, [sender, recipient]);
     expect(
       (await request.post(`${fixture.apiUrl}/messages/text`, { data: {} })).status(),
     ).toBe(401);
@@ -204,7 +270,17 @@ test.describe('real local messaging role and recipient matrix', () => {
     ).toHaveLength(1);
     const quoted = await send(request, fixture, recipient, { replyToMessageId: id });
     expect(quoted.status()).toBe(201);
-    await delivered(request, fixture, (await quoted.json()).id, [sender, recipient]);
+    await delivered(request, fixture, (await quoted.json()).id, readers);
+    expect(
+      (await fixture.history(request, reviewer)).some((row) => row.ids.id === id),
+      'staff reviewer can read the private message',
+    ).toBe(true);
+    for (const field of ['threadParentId', 'replyToMessageId']) {
+      expect(
+        (await send(request, fixture, reviewer, { [field]: id })).status(),
+        `staff reviewer cannot reply via ${field}`,
+      ).toBe(403);
+    }
     expect(
       (await fixture.history(request, excluded, recipient.profile)).some(
         (row) => row.ids.id === id,
@@ -213,7 +289,7 @@ test.describe('real local messaging role and recipient matrix', () => {
     const reply = await send(request, fixture, recipient, { threadParentId: id });
     expect(reply.status()).toBe(201);
     const replyId = (await reply.json()).id;
-    for (const person of [sender, recipient, excluded]) {
+    for (const person of [sender, recipient, reviewer, excluded]) {
       const response = await request.get(`${fixture.apiUrl}/messages/thread`, {
         headers: { Authorization: `Bearer ${person.session.access_token}` },
         params: {
@@ -259,7 +335,7 @@ test.describe('real local messaging role and recipient matrix', () => {
       data: { orgId: fixture.org, messageId: id, content: 'Edited private E2E message' },
     });
     expect(edited.status()).toBe(200);
-    await delivered(request, fixture, id, [sender, recipient]);
+    await delivered(request, fixture, id, readers);
     const deleted = await request.delete(`${fixture.apiUrl}/messages/${replyId}`, {
       headers: { Authorization: `Bearer ${recipient.session.access_token}` },
       data: { orgId: fixture.org, profileId: recipient.profile },

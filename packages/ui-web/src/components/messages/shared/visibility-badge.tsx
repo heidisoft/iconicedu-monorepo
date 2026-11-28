@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@iconicedu/ui-web/ui/po
 import { LockKeyhole } from 'lucide-react';
 import type { MessageVM } from '@iconicedu/shared-types';
 import { useOptionalMessagesState } from '@iconicedu/ui-web/components/messages/context/messages-state-provider';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 
 interface VisibilityBadgeProps {
   message: MessageVM;
@@ -26,10 +27,10 @@ export function getVisibilityCopy(
     const name =
       visibility.userId === currentUserId
         ? 'You'
-        : (participantNames.get(visibility.userId) ?? 'Recipient');
+        : participantNames.get(visibility.userId);
     return {
-      summary: `Only visible to ${name === 'You' ? 'you' : name}`,
-      names: [name],
+      summary: `Only visible to ${name === 'You' ? 'you' : (name ?? 'recipient')}`,
+      names: [name ?? 'Recipient'],
     };
   }
   if (visibility.type === 'specific-users') {
@@ -76,6 +77,11 @@ export const VisibilityBadge = memo(function VisibilityBadge({
     state?.currentUserId,
   );
   if (!copy) return null;
+  const isStaffReview = isOutsideMessageAudience({
+    visibility: message.core.visibility,
+    senderProfileId: message.core.sender?.ids.id,
+    viewerProfileId: state?.currentUserId,
+  });
 
   return (
     <Popover>
@@ -99,6 +105,11 @@ export const VisibilityBadge = memo(function VisibilityBadge({
             <li key={`${name}:${index}`}>{name}</li>
           ))}
         </ul>
+        {isStaffReview ? (
+          <p className="mt-2 border-t border-border pt-2 text-xs text-muted-foreground">
+            Staff view · you can read this but not reply
+          </p>
+        ) : null}
       </PopoverContent>
     </Popover>
   );

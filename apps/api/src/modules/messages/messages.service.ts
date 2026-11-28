@@ -33,6 +33,10 @@ import {
   resolveVisibilityAudienceFromMessageRow,
 } from '@iconicedu/api/lib/messages/message-activity';
 import { filterVisibleMessageRows } from '@iconicedu/api/lib/messages/message-visibility';
+import {
+  enforceMessageAudiencePolicy,
+  isMessageAudienceReviewer,
+} from '@iconicedu/api/lib/messages/message-audience-policy';
 import { createSupabaseServiceClient } from '@iconicedu/api/lib/supabase/service';
 import { assertChannelWritable } from '@iconicedu/api/lib/messages/assert-channel-writable';
 import { createSupabaseSessionClient } from '@iconicedu/api/lib/supabase/session';
@@ -513,6 +517,12 @@ export async function resolveChannelAudienceVisibility(input: {
       if (!inheritedIds.length) {
         throw new BadRequestException('Referenced message has an invalid empty audience');
       }
+      // Staff can review private messages they are not part of, read-only.
+      if (!inheritedIds.includes(input.senderProfileId)) {
+        throw new ForbiddenException(
+          'Only the people in a private message can reply to it',
+        );
+      }
       return {
         visibility_type: 'specific-users' as const,
         visibility_user_ids: inheritedIds,
@@ -562,8 +572,35 @@ export async function resolveChannelAudienceVisibility(input: {
 
   return {
     visibility_type: 'specific-users' as const,
-    visibility_user_ids: Array.from(new Set([input.senderProfileId, ...requestedIds])),
+    visibility_user_ids: await enforceMessageAudiencePolicy({
+      serviceSupabase: input.serviceSupabase,
+      orgId: input.orgId,
+      channelId: input.channelId,
+      senderProfileId: input.senderProfileId,
+      requestedProfileIds: requestedIds,
+    }),
   };
+}
+
+/**
+ * Staff review of restricted messages ships with channel audiences, so it uses
+ * the same rollout flag. The database grants the matching read-only access.
+ */
+async function canReviewRestrictedMessages(input: {
+  orgId: string;
+  profileId: string;
+}): Promise<boolean> {
+  if (!input.profileId) return false;
+  const enabled = await evaluateApiBooleanFlag({
+    flagKey: apiFeatureFlagKeys.enableChannelCommunications,
+    distinctId: input.profileId,
+  });
+  if (!enabled) return false;
+  return isMessageAudienceReviewer({
+    serviceSupabase: createSupabaseServiceClient(),
+    orgId: input.orgId,
+    profileId: input.profileId,
+  });
 }
 
 async function ensureChannelMembershipForMessageWrite(input: {
@@ -1348,6 +1385,7 @@ export class MessagesService {
     const typedRows = filterVisibleMessageRows(
       (data ?? []) as unknown as RawMessageRow[],
       input.profileId,
+      { includeRestricted: await canReviewRestrictedMessages(input) },
     );
     if (!typedRows.length) return [];
 
@@ -1391,6 +1429,7 @@ export class MessagesService {
     const typedRows = filterVisibleMessageRows(
       (data ?? []) as unknown as RawMessageRow[],
       input.profileId,
+      { includeRestricted: await canReviewRestrictedMessages(input) },
     );
     if (!typedRows.length) return [];
 
@@ -1451,6 +1490,7 @@ export class MessagesService {
     const typedRows = filterVisibleMessageRows(
       (rows ?? []) as unknown as RawMessageRow[],
       input.profileId,
+      { includeRestricted: await canReviewRestrictedMessages(input) },
     );
     if (!typedRows.length) return [];
 

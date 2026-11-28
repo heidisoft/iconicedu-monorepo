@@ -88,3 +88,23 @@ describe('profile privacy regardless of organizational role', () => {
     ).toEqual([]);
   });
 });
+
+describe('staff review of restricted messages', () => {
+  const privateRow = makeRow({
+    id: 'private',
+    visibility_type: 'specific-users',
+    visibility_user_ids: ['sender', 'parent-A'],
+  });
+
+  it('includes restricted rows only for an identified reviewer', () => {
+    expect(
+      filterVisibleMessageRows([privateRow], 'staff-1', { includeRestricted: true }),
+    ).toEqual([privateRow]);
+    expect(
+      filterVisibleMessageRows([privateRow], '', { includeRestricted: true }),
+    ).toEqual([]);
+    expect(
+      filterVisibleMessageRows([privateRow], 'staff-1', { includeRestricted: false }),
+    ).toEqual([]);
+  });
+});

@@ -69,7 +69,22 @@ export async function createAudienceFixture() {
   const users: string[] = [];
   const members: Persona[] = [];
   const cleanup = async () => {
-    sql(`delete from public.orgs where id in ('${org}','${otherOrg}');`);
+    // Profile audit triggers write profile_change_events (which references orgs
+    // without cascading) on every profile/account delete, so a plain org delete
+    // fails. Remove audited rows while the org exists, then the events, then the org.
+    const orgs = `('${org}','${otherOrg}')`;
+    sql(`begin;
+      update public.messages set thread_id = null where org_id in ${orgs};
+      delete from public.threads where org_id in ${orgs};
+      delete from public.messages where org_id in ${orgs} and (thread_parent_id is not null or reply_to_message_id is not null);
+      delete from public.messages where org_id in ${orgs};
+      delete from public.channels where org_id in ${orgs};
+      delete from public.family_link_invites where org_id in ${orgs};
+      delete from public.family_links where org_id in ${orgs};
+      delete from public.accounts where org_id in ${orgs};
+      delete from public.profile_change_events where org_id in ${orgs};
+      delete from public.orgs where id in ${orgs};
+      commit;`);
     for (const id of users) {
       const { error } = await admin.auth.admin.deleteUser(id);
       if (error) throw new Error('Audience fixture auth cleanup failed');
@@ -208,9 +223,11 @@ export async function createAudienceFixture() {
             message: 'Authenticated messages subscription joined',
           })
           .toBe(true);
-        await expect(page.getByRole('button', { name: /Message audience:/ })).toBeVisible(
-          { timeout: 60000 },
-        );
+        // Every member gets a composer; the audience picker is role-dependent
+        // (students have none), so readiness waits on the composer itself.
+        await expect(page.getByPlaceholder(/^(Write a message|Message #)/)).toBeVisible({
+          timeout: 60000,
+        });
         return { context, page };
       },
       async history(

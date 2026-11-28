@@ -16,6 +16,7 @@ import {
   AppState,
 } from 'react-native';
 import { GraduationCap, LifeBuoy, MessageSquare } from 'lucide-react-native';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 import type { MessageVM } from '@iconicedu/shared-types';
 import type { MessageAudienceParticipant } from './message-visibility';
 import { useTheme } from '@/providers/theme-provider';
@@ -730,6 +731,11 @@ export const MessageList: React.FC<MessageListProps> = ({
       }
 
       const isOwn = item.core.sender.ids.id === currentProfileId;
+      const isStaffReview = isOutsideMessageAudience({
+        visibility: item.core.visibility,
+        senderProfileId: item.core.sender.ids.id,
+        viewerProfileId: currentProfileId,
+      });
 
       // A new group starts if: different sender, no prev message, or >5 min gap
       const isGroupStart = !prevMsg || !areMessagesInSameVisualGroup(prevMsg, item);
@@ -749,7 +755,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           currentProfileId={currentProfileId}
           currentAccountId={currentAccountId}
           audienceParticipants={audienceParticipants}
-          isReadOnly={isReadOnly}
+          isReadOnly={isReadOnly || isStaffReview}
           onSendAnnotation={onSendAnnotation}
           messageUiThemeKey={messageUiThemeKey}
           isPinned={pinnedMessageIds?.has(item.ids.id) ?? false}

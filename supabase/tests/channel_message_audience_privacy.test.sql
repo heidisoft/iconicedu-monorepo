@@ -8,20 +8,23 @@ select policies_are('public', 'threads', array[
   'threads delete by parent audience',
   'threads insert by parent audience',
   'threads select by parent audience',
+  'threads select staff review',
   'threads update by parent audience'
-], 'Thread metadata has only audience-aware policies');
+], 'Thread metadata has only audience-aware and read-only staff review policies');
 select policies_are('public', 'channel_media', array[
   'channel media delete by message audience',
   'channel media insert by message audience',
   'channel media select by message audience',
+  'channel_media select staff review',
   'channel media update by message audience'
-], 'Media metadata has only audience-aware policies');
+], 'Media metadata has only audience-aware and read-only staff review policies');
 select policies_are('public', 'channel_files', array[
   'channel files delete by message audience',
   'channel files insert by message audience',
   'channel files select by message audience',
+  'channel_files select staff review',
   'channel files update by message audience'
-], 'File metadata has only audience-aware policies');
+], 'File metadata has only audience-aware and read-only staff review policies');
 
 insert into public.orgs(id, name, slug)
 values ('a1000000-0000-4000-8000-000000000001', 'Audience privacy test', 'audience-privacy-test');

@@ -360,7 +360,7 @@ describe('message-input mention helpers', () => {
 });
 
 describe('MessageInput audience selection', () => {
-  it.each(['staff', 'guardian', 'child', 'educator'] as const)(
+  it.each(['staff', 'educator'] as const)(
     '%s can select one exact parent, then send to everyone after reset',
     async (kind) => {
       const user = userEvent.setup();
@@ -407,11 +407,12 @@ describe('MessageInput audience selection', () => {
       .mockRejectedValueOnce(new Error('Offline'))
       .mockResolvedValue(undefined);
     const parent = createParticipant({ ids: { id: 'parent-1' } });
+    const self = createParticipant({ kind: 'staff', ids: { id: 'sender' } });
     render(
       <MessageInput
         onSend={onSend}
-        participants={[parent]}
-        audienceParticipants={[parent]}
+        participants={[self, parent]}
+        audienceParticipants={[self, parent]}
         currentUserId="sender"
       />,
     );
@@ -433,11 +434,12 @@ describe('MessageInput audience selection', () => {
     const user = userEvent.setup();
     const onSend = vi.fn().mockResolvedValue(undefined);
     const parent = createParticipant({ ids: { id: 'parent-1' } });
+    const self = createParticipant({ kind: 'staff', ids: { id: 'staff-1' } });
     render(
       <MessageInput
         onSend={onSend}
-        participants={[parent]}
-        audienceParticipants={[parent]}
+        participants={[self, parent]}
+        audienceParticipants={[self, parent]}
         currentUserId="staff-1"
       />,
     );
@@ -453,6 +455,73 @@ describe('MessageInput audience selection', () => {
     expect(
       screen.getByRole('button', { name: /Everyone in this channel/i }),
     ).toBeTruthy();
+  });
+});
+
+describe('MessageInput audience safeguarding', () => {
+  const member = (id: string, kind: 'staff' | 'educator' | 'guardian' | 'child') =>
+    createParticipant({
+      kind,
+      ids: { id },
+      profile: { ...createParticipant().profile, displayName: `${kind} ${id}` },
+    });
+  const channel = [
+    member('staff-1', 'staff'),
+    member('tutor-1', 'educator'),
+    member('parent-1', 'guardian'),
+    member('parent-2', 'guardian'),
+    member('student-1', 'child'),
+    member('student-2', 'child'),
+  ];
+
+  async function openPicker(currentUserId: string) {
+    const user = userEvent.setup();
+    render(
+      <MessageInput
+        onSend={vi.fn()}
+        participants={channel}
+        audienceParticipants={channel}
+        currentUserId={currentUserId}
+      />,
+    );
+    const trigger = screen.queryByRole('button', { name: /Message audience:/i });
+    if (trigger) await user.click(trigger);
+    return { user, trigger };
+  }
+
+  const options = () =>
+    screen.queryAllByRole('menuitemcheckbox').map((item) => item.textContent ?? '');
+
+  it('hides the audience picker from students', async () => {
+    const { trigger } = await openPicker('student-1');
+    expect(trigger).toBeNull();
+  });
+
+  it('hides the audience picker when the sender is unknown', async () => {
+    const { trigger } = await openPicker('not-in-channel');
+    expect(trigger).toBeNull();
+  });
+
+  it('lets parents choose only staff and tutors', async () => {
+    await openPicker('parent-1');
+    const visible = options();
+    expect(visible.some((text) => text.includes('staff-1'))).toBe(true);
+    expect(visible.some((text) => text.includes('tutor-1'))).toBe(true);
+    expect(visible.some((text) => /parent-2|student-/.test(text))).toBe(false);
+    expect(screen.queryByRole('menuitem', { name: /^Parents?$/ })).toBeNull();
+  });
+
+  it('lets tutors choose students and explains the parent is included', async () => {
+    const { user } = await openPicker('tutor-1');
+    expect(options()).toHaveLength(5);
+    await user.click(screen.getByRole('menuitemcheckbox', { name: /student-1/ }));
+    await user.keyboard('{Escape}');
+    expect(screen.getByText(/their parent is included automatically/)).toBeTruthy();
+  });
+
+  it('lets staff choose anyone', async () => {
+    await openPicker('staff-1');
+    expect(options()).toHaveLength(5);
   });
 });
 

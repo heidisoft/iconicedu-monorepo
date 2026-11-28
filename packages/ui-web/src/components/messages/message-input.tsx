@@ -110,6 +110,11 @@ import {
 import { useMessageDraft } from './use-message-draft';
 import type { MessageDraftScope } from './message-draft-store';
 import { generateClientMessageId } from './client-message-id';
+import {
+  canAddressPrivately,
+  canInitiateRestrictedMessage,
+  resolveMessageAudienceRole,
+} from '@iconicedu/utils';
 
 const TYPING_STOP_DELAY_MS = 3000;
 const TYPING_KEEPALIVE_THROTTLE_MS = 1200;
@@ -1582,12 +1587,23 @@ export function MessageInput({
     [handleTyping, readOnly],
   );
 
-  const selectableAudienceParticipants = React.useMemo(
-    () =>
-      (audienceParticipants ?? []).filter(
-        (participant) => participant.ids.id !== currentUserId,
-      ),
-    [audienceParticipants, currentUserId],
+  // Safeguarding rules (enforced by the API): students cannot start private
+  // messages, parents may only address staff and tutors, and so on.
+  const selectableAudienceParticipants = React.useMemo(() => {
+    const candidates = audienceParticipants ?? [];
+    const senderRole = resolveMessageAudienceRole(
+      candidates.find((participant) => participant.ids.id === currentUserId)?.kind,
+    );
+    if (!canInitiateRestrictedMessage(senderRole)) return [];
+    return candidates.filter(
+      (participant) =>
+        participant.ids.id !== currentUserId &&
+        canAddressPrivately(senderRole, resolveMessageAudienceRole(participant.kind)),
+    );
+  }, [audienceParticipants, currentUserId]);
+  const includesSelectedStudent = selectableAudienceParticipants.some(
+    (participant) =>
+      participant.kind === 'child' && audienceProfileIds.includes(participant.ids.id),
   );
   const selectedAudienceNames = selectableAudienceParticipants
     .filter((participant) => audienceProfileIds.includes(participant.ids.id))
@@ -1685,6 +1701,9 @@ export function MessageInput({
             {audienceProfileIds.length ? (
               <span className="truncate text-xs text-muted-foreground">
                 Visible only to {selectedAudienceNames.join(', ')} and you
+                {includesSelectedStudent
+                  ? ' · their parent is included automatically'
+                  : ''}
               </span>
             ) : null}
           </div>

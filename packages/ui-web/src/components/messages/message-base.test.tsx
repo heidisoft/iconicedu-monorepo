@@ -146,3 +146,44 @@ describe('MessageBase chat bubbles', () => {
     );
   });
 });
+
+describe('MessageBase staff review of private messages', () => {
+  const privateMessage: MessageVM = {
+    ...baseMessage,
+    core: {
+      ...baseMessage.core,
+      visibility: { type: 'specific-users', userIds: ['profile-1', 'parent-1'] },
+    },
+  };
+
+  it('is read-only for a viewer outside the audience', () => {
+    renderMessageBase({
+      message: privateMessage,
+      currentUserId: 'staff-1',
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'single',
+    });
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Add emoji' })).toBeDisabled();
+  });
+
+  it.each(['parent-1', 'profile-1'])('stays interactive for audience member %s', (id) => {
+    renderMessageBase({
+      message: privateMessage,
+      currentUserId: id,
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'single',
+    });
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Add emoji' })).toBeEnabled();
+  });
+
+  it('keeps everyone messages interactive for staff', () => {
+    renderMessageBase({
+      currentUserId: 'staff-1',
+      messageUiThemeKey: 'feed',
+      feedGroupPosition: 'single',
+    });
+    expect(screen.getByRole('button', { name: 'Reply' })).toBeEnabled();
+  });
+});

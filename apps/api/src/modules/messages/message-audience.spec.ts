@@ -1,6 +1,14 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { resolveChannelAudienceVisibility } from './messages.service';
 import { evaluateApiBooleanFlag } from '@iconicedu/api/lib/flags/posthog-openfeature';
+import { enforceMessageAudiencePolicy } from '@iconicedu/api/lib/messages/message-audience-policy';
+
+// Role rules are covered in lib/messages/message-audience-policy.spec.ts; here
+// the policy approves the requested audience so resolution can be tested alone.
+jest.mock('@iconicedu/api/lib/messages/message-audience-policy', () => ({
+  enforceMessageAudiencePolicy: jest.fn(),
+  isMessageAudienceReviewer: jest.fn(),
+}));
 
 jest.mock('@iconicedu/api/lib/flags/posthog-openfeature', () => ({
   apiFeatureFlagKeys: {
@@ -32,6 +40,15 @@ const base = {
   senderProfileId: 'staff-1',
   supportVisibility: { visibility_type: 'all' as const },
 };
+
+beforeEach(() => {
+  jest
+    .mocked(enforceMessageAudiencePolicy)
+    .mockReset()
+    .mockImplementation(async ({ senderProfileId, requestedProfileIds }) =>
+      Array.from(new Set([senderProfileId, ...requestedProfileIds])),
+    );
+});
 
 describe('resolveChannelAudienceVisibility', () => {
   beforeEach(() => {
@@ -127,11 +144,14 @@ describe('resolveChannelAudienceVisibility', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('allows any channel member to choose an audience', async () => {
+  it('stores the audience approved by the safeguarding policy', async () => {
     const memberQuery = queryReturning({
       data: [{ profile_id: 'tutor-1' }],
       error: null,
     });
+    jest
+      .mocked(enforceMessageAudiencePolicy)
+      .mockResolvedValueOnce(['parent-1', 'tutor-1', 'guardian-added']);
     await expect(
       resolveChannelAudienceVisibility({
         ...base,
@@ -141,8 +161,63 @@ describe('resolveChannelAudienceVisibility', () => {
       }),
     ).resolves.toEqual({
       visibility_type: 'specific-users',
-      visibility_user_ids: ['parent-1', 'tutor-1'],
+      visibility_user_ids: ['parent-1', 'tutor-1', 'guardian-added'],
     });
+    expect(enforceMessageAudiencePolicy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        channelId: 'channel-1',
+        senderProfileId: 'parent-1',
+        requestedProfileIds: ['tutor-1'],
+      }),
+    );
+  });
+
+  it('propagates a policy rejection', async () => {
+    const memberQuery = queryReturning({
+      data: [{ profile_id: 'child-1' }],
+      error: null,
+    });
+    jest
+      .mocked(enforceMessageAudiencePolicy)
+      .mockRejectedValueOnce(new ForbiddenException('blocked'));
+    await expect(
+      resolveChannelAudienceVisibility({
+        ...base,
+        serviceSupabase: { from: jest.fn(() => memberQuery) } as never,
+        senderProfileId: 'parent-1',
+        requestedProfileIds: ['child-1'],
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it.each(['threadParentId', 'replyToMessageId'])(
+    'keeps staff reviewers read-only: %s outside the audience is forbidden',
+    async (field) => {
+      const parentQuery = queryReturning({
+        data: {
+          visibility_type: 'specific-users',
+          visibility_user_ids: ['tutor-1', 'parent-1'],
+        },
+        error: null,
+      });
+      await expect(
+        resolveChannelAudienceVisibility({
+          ...base,
+          serviceSupabase: { from: jest.fn(() => parentQuery) } as never,
+          senderProfileId: 'staff-reviewer',
+          [field]: 'private-root',
+        }),
+      ).rejects.toThrow('Only the people in a private message can reply to it');
+    },
+  );
+
+  it('does not consult the policy for everyone messages or replies', async () => {
+    await resolveChannelAudienceVisibility({
+      ...base,
+      serviceSupabase: { from: jest.fn() } as never,
+    });
+    expect(enforceMessageAudiencePolicy).not.toHaveBeenCalled();
   });
 
   it('rejects disabled-flag audience requests', async () => {

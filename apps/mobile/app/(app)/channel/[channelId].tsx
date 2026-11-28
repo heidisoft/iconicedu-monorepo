@@ -11,6 +11,7 @@ import {
 import { MessageCircle, CalendarDays } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { isOutsideMessageAudience } from '@iconicedu/utils';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MessageMentionVM, MessageVM, UserProfileVM } from '@iconicedu/shared-types';
@@ -250,15 +251,34 @@ export default function ChannelConversationScreen() {
   // ── Quote reply target — distinct from "reply in thread"; drives its own preview ──
   const [quoteReplyTarget, setQuoteReplyTarget] = useState<MessageVM | null>(null);
 
-  const handleThreadOpen = useCallback((msg: MessageVM) => {
-    setQuoteReplyTarget(null);
-    setThreadReplyTarget(msg);
-  }, []);
+  // Staff can review private messages they are not part of, read-only.
+  const isStaffReviewMessage = useCallback(
+    (msg: MessageVM) =>
+      isOutsideMessageAudience({
+        visibility: msg.core.visibility,
+        senderProfileId: msg.core.sender.ids.id,
+        viewerProfileId: profileId,
+      }),
+    [profileId],
+  );
 
-  const handleQuoteReply = useCallback((msg: MessageVM) => {
-    setThreadReplyTarget(null);
-    setQuoteReplyTarget(msg);
-  }, []);
+  const handleThreadOpen = useCallback(
+    (msg: MessageVM) => {
+      if (isStaffReviewMessage(msg)) return;
+      setQuoteReplyTarget(null);
+      setThreadReplyTarget(msg);
+    },
+    [isStaffReviewMessage],
+  );
+
+  const handleQuoteReply = useCallback(
+    (msg: MessageVM) => {
+      if (isStaffReviewMessage(msg)) return;
+      setThreadReplyTarget(null);
+      setQuoteReplyTarget(msg);
+    },
+    [isStaffReviewMessage],
+  );
 
   const handleMarkUnread = useCallback(
     async (msg: MessageVM) => {
@@ -1107,7 +1127,10 @@ export default function ChannelConversationScreen() {
         visible={actionsVisible}
         message={actionsMessage}
         isOwn={actionsMessage ? isOwnMessage(actionsMessage) : false}
-        isReadOnly={isStaffReadOnly}
+        isReadOnly={
+          isStaffReadOnly ||
+          (actionsMessage ? isStaffReviewMessage(actionsMessage) : false)
+        }
         onClose={() => setActionsVisible(false)}
         onReact={handleReactionToggle}
         onThread={handleThreadOpen}
